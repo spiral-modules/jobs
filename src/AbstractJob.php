@@ -59,14 +59,6 @@ abstract class AbstractJob implements JobInterface, \JsonSerializable
     /**
      * @return array|mixed
      */
-    public function jsonSerialize()
-    {
-        return $this->data;
-    }
-
-    /**
-     * @return array|mixed
-     */
     public function serialize()
     {
         return json_encode($this->data);
