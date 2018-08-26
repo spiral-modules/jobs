@@ -8,10 +8,10 @@
 
 namespace Spiral\Jobs;
 
-final class Options implements \Serializable
+final class Options implements \JsonSerializable
 {
     /** @var int */
-    private $delay = 0;
+    private $delay = null;
 
     /** @var string|null */
     private $pipeline = null;
@@ -20,7 +20,7 @@ final class Options implements \Serializable
      * @param int    $delay
      * @param string $pipeline
      */
-    public function __construct(int $delay, string $pipeline = null)
+    public function __construct(int $delay = null, string $pipeline = null)
     {
         $this->delay = $delay;
         $this->pipeline = $pipeline;
@@ -29,7 +29,7 @@ final class Options implements \Serializable
     /**
      * @return int
      */
-    public function getDelay(): int
+    public function getDelay(): ?int
     {
         return $this->delay;
     }
@@ -37,7 +37,7 @@ final class Options implements \Serializable
     /**
      * @param int $delay
      */
-    public function setDelay(int $delay)
+    public function setDelay(?int $delay)
     {
         $this->delay = $delay;
     }
@@ -53,30 +53,19 @@ final class Options implements \Serializable
     /**
      * @param null|string $pipeline
      */
-    public function setPipeline(string $pipeline)
+    public function setPipeline(?string $pipeline)
     {
         $this->pipeline = $pipeline;
     }
 
     /**
-     * @return array
+     * @return array|mixed
      */
-    public function serialize()
+    public function jsonSerialize()
     {
-        return json_encode([
+        return [
             'delay'    => $this->delay,
             'pipeline' => $this->pipeline
-        ]);
-    }
-
-    /**
-     * @param string $serialized
-     */
-    public function unserialize($serialized)
-    {
-        $serialized = json_decode($serialized, true);
-
-        $this->delay = $serialized['delay'];
-        $this->pipeline = $serialized['pipeline'];
+        ];
     }
 }

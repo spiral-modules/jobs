@@ -17,7 +17,7 @@ class JobsConfig extends InjectableConfig
     /**
      * @var array
      */
-    private $config = [
+    protected $config = [
         // Association between jobs and pipelines
         'pipelines'       => [
             //JobClass::

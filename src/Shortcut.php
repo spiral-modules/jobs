@@ -6,9 +6,12 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests;
+namespace Spiral\Jobs;
 
-class TestLocal
+/**
+ * Runs all the jobs in the same process.
+ */
+class Shortcut
 {
 
 }

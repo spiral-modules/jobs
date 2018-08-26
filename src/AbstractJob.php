@@ -9,16 +9,13 @@
 namespace Spiral\Jobs;
 
 use Spiral\Core\ResolverInterface;
-use Spiral\Core\Traits\SaturateTrait;
 use Spiral\Jobs\Exceptions\JobException;
 
 /**
  * Job with array based context and method injection support for do function.
  */
-abstract class AbstractJob implements JobInterface
+abstract class AbstractJob implements JobInterface, \JsonSerializable
 {
-    use SaturateTrait;
-
     const HANDLE_FUNCTION = 'do';
 
     /** @var array */
@@ -31,13 +28,13 @@ abstract class AbstractJob implements JobInterface
      * @param array                  $data
      * @param ResolverInterface|null $resolver
      */
-    public function __construct(array $data, ResolverInterface $resolver = null)
+    public function __construct(array $data, ResolverInterface $resolver)
     {
         $this->data = $data;
-        $this->resolver = $this->saturate($resolver, ResolverInterface::class);
+        $this->resolver = $resolver;
     }
 
-    public function execute()
+    public function execute(string $id)
     {
         $method = new \ReflectionMethod($this, static::HANDLE_FUNCTION);
         $method->setAccessible(true);
@@ -45,7 +42,7 @@ abstract class AbstractJob implements JobInterface
         try {
             return $method->invokeArgs(
                 $this,
-                $this->resolver->resolveArguments($method)
+                $this->resolver->resolveArguments($method, compact('id'))
             );
         } catch (\Throwable $e) {
             throw new JobException(
@@ -56,11 +53,10 @@ abstract class AbstractJob implements JobInterface
         }
     }
 
-
     /**
-     * @return array
+     * @return array|mixed
      */
-    public function serialize()
+    public function jsonSerialize()
     {
         return $this->data;
     }

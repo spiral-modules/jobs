@@ -8,10 +8,12 @@
 
 namespace Spiral\Jobs;
 
-interface JobInterface extends \Serializable
+interface JobInterface
 {
     /**
-     * Execute job.
+     * @param string $id
+     *
+     * @return mixed
      */
-    public function execute();
+    public function execute(string $id);
 }

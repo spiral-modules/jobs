@@ -1,0 +1,15 @@
+rpc:
+  enable: true
+  listen: tcp://127.0.0.1:6001
+
+jobs:
+  enabled: true
+  pipelines:
+    async: local
+  handlers:
+    local:
+      command:  "php tests/handler.php"
+      pool:
+        numWorkers: 1
+        allocateTimeout: 60
+        destroyTimeout:  30

@@ -40,11 +40,15 @@ class Jobs implements JobsInterface, SingletonInterface
     public function push(JobInterface $job, Options $options = null): string
     {
         try {
+            if (empty($options)) {
+                $options = new Options();
+            }
+
             return $this->rpc->call(self::RR_SERVICE . '.Push', [
                 'job'      => get_class($job),
                 'pipeline' => $options->getPipeline() ?? $this->config->jobPipeline(get_class($job)),
-                'payload'  => $job->serialize(),
-                'options'  => $options->serialize()
+                'payload'  => $job,
+                'options'  => $options
             ]);
         } catch (RoadRunnerException|\Throwable $e) {
             throw new JobException($e->getMessage(), $e->getCode(), $e);
