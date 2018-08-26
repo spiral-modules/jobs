@@ -54,7 +54,7 @@ class LocalTest extends TestCase
 
         $this->assertNotEmpty($id);
 
-        $this->waitForJob();
+        $this->assertTrue($this->waitForJob() > 1);
         $this->assertFileExists(LocalJob::JOB_FILE);
 
         $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
@@ -91,11 +91,14 @@ class LocalTest extends TestCase
         );
     }
 
-    private function waitForJob()
+    private function waitForJob(): float
     {
+        $start = microtime(true);
         $try = 0;
         while (!file_exists(LocalJob::JOB_FILE) && $try < 10) {
             usleep(250000);
         }
+
+        return microtime(true) - $start;
     }
 }
