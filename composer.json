@@ -1,7 +1,7 @@
 {
   "name": "spiral/jobs",
   "type": "library",
-  "description": "RoadRunner: Job Manager",
+  "description": "Spiral: Async Jobs and Queue",
   "license": "MIT",
   "authors": [
     {
