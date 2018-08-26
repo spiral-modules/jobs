@@ -11,7 +11,7 @@ namespace Spiral\Jobs;
 /**
  * Runs all the jobs in the same process.
  */
-class Shortcut implements JobsInterface
+class ShortCircuit implements JobsInterface
 {
     /**
      * @inheritdoc
