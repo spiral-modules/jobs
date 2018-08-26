@@ -11,6 +11,9 @@ namespace Spiral\Jobs;
 use Spiral\Core\FactoryInterface;
 use Spiral\RoadRunner\Worker;
 
+/***
+ * @codeCoverageIgnore handled on Golang end.
+ */
 class Handler
 {
     /*** @var Worker */
