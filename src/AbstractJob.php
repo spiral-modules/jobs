@@ -34,6 +34,9 @@ abstract class AbstractJob implements JobInterface, \JsonSerializable
         $this->resolver = $resolver;
     }
 
+    /**
+     * @inheritdoc
+     */
     public function execute(string $id)
     {
         $method = new \ReflectionMethod($this, static::HANDLE_FUNCTION);
