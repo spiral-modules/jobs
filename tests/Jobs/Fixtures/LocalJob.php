@@ -12,9 +12,11 @@ use Spiral\Jobs\AbstractJob;
 
 class LocalJob extends AbstractJob
 {
+    const JOB_FILE = __DIR__ . '/../../local.job';
+
     public function do(string $id)
     {
-        file_put_contents('local.job', json_encode(
+        file_put_contents(self::JOB_FILE, json_encode(
             $this->data + compact('id')
         ));
     }

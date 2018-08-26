@@ -13,25 +13,12 @@ final class Options implements \JsonSerializable
     /** @var int */
     private $delay = null;
 
-    /** @var string|null */
-    private $pipeline = null;
-
     /**
-     * @param int    $delay
-     * @param string $pipeline
+     * @param int $delay
      */
-    public function __construct(int $delay = null, string $pipeline = null)
+    public function __construct(int $delay = null)
     {
         $this->delay = $delay;
-        $this->pipeline = $pipeline;
-    }
-
-    /**
-     * @return int
-     */
-    public function getDelay(): ?int
-    {
-        return $this->delay;
     }
 
     /**
@@ -43,19 +30,11 @@ final class Options implements \JsonSerializable
     }
 
     /**
-     * @return null|string
+     * @return int
      */
-    public function getPipeline(): ?string
+    public function getDelay(): ?int
     {
-        return $this->pipeline;
-    }
-
-    /**
-     * @param null|string $pipeline
-     */
-    public function setPipeline(?string $pipeline)
-    {
-        $this->pipeline = $pipeline;
+        return $this->delay;
     }
 
     /**
@@ -64,8 +43,7 @@ final class Options implements \JsonSerializable
     public function jsonSerialize()
     {
         return [
-            'delay'    => $this->delay,
-            'pipeline' => $this->pipeline
+            'delay' => $this->delay,
         ];
     }
 }

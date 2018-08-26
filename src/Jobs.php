@@ -46,7 +46,7 @@ class Jobs implements JobsInterface, SingletonInterface
 
             return $this->rpc->call(self::RR_SERVICE . '.Push', [
                 'job'      => get_class($job),
-                'pipeline' => $options->getPipeline() ?? $this->config->jobPipeline(get_class($job)),
+                'pipeline' => $this->config->jobPipeline(get_class($job)),
                 'payload'  => $job,
                 'options'  => $options
             ]);

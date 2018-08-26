@@ -27,6 +27,13 @@ class LocalTest extends TestCase
         ], new Container));
 
         $this->assertNotEmpty($id);
+
+        $this->waitForJob();
+        $this->assertFileExists(LocalJob::JOB_FILE);
+
+        $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
+        $this->assertSame($id, $data['id']);
+        $this->assertSame(100, $data['data']);
     }
 
     public function makeJobs(): Jobs
@@ -38,5 +45,13 @@ class LocalTest extends TestCase
             ]),
             new RPC(new SocketRelay('localhost', 6001))
         );
+    }
+
+    private function waitForJob()
+    {
+        $try = 0;
+        while (!file_exists(LocalJob::JOB_FILE) && $try < 10) {
+            usleep(10000);
+        }
     }
 }
