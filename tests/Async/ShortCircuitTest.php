@@ -9,10 +9,11 @@
 namespace Spiral\Async\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Spiral\Core\Container;
 use Spiral\Async\Options;
 use Spiral\Async\ShortCircuit;
+use Spiral\Async\Tests\Fixtures\ErrorJob;
 use Spiral\Async\Tests\Fixtures\LocalJob;
+use Spiral\Core\Container;
 
 class ShortCircuitTest extends TestCase
 {
@@ -38,6 +39,15 @@ class ShortCircuitTest extends TestCase
         $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
         $this->assertSame($id, $data['id']);
         $this->assertSame(100, $data['data']);
+    }
+
+    /**
+     * @expectedException \Spiral\Async\Exceptions\JobException
+     */
+    public function testError()
+    {
+        $jobs = new ShortCircuit();
+        $jobs->push(new ErrorJob([], new Container()));
     }
 
     public function testLocalDelay()
