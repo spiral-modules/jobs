@@ -26,11 +26,6 @@ func (l *local) Handle(j *Job) (string, error) {
 		return "", err
 	}
 
-	payload, err := json.Marshal(j.Payload)
-	if err != nil {
-		return "", err
-	}
-
 	context, err := json.Marshal(struct {
 		ID  string `json:"id"`
 		Job string `json:"job"`
@@ -49,7 +44,7 @@ func (l *local) Handle(j *Job) (string, error) {
 		delay = time.Second * time.Duration(*j.Options.Delay)
 	}
 
-	go l.runJob(delay, payload, context, id.String())
+	go l.runJob(delay, []byte(j.Payload), context, id.String())
 
 	return id.String(), nil
 }

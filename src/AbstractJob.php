@@ -8,13 +8,13 @@
 
 namespace Spiral\Async;
 
-use Spiral\Core\ResolverInterface;
 use Spiral\Async\Exceptions\JobException;
+use Spiral\Core\ResolverInterface;
 
 /**
  * Job with array based context and method injection support for do function.
  */
-abstract class AbstractJob implements JobInterface, \JsonSerializable
+abstract class AbstractJob implements JobInterface
 {
     const HANDLE_FUNCTION = 'do';
 
