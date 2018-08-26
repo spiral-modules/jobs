@@ -23,6 +23,8 @@ class Handler
     private $factory;
 
     /**
+     * @codeCoverageIgnore
+     *
      * @param Worker           $worker
      * @param FactoryInterface $factory
      */
@@ -33,7 +35,7 @@ class Handler
     }
 
     /**
-     *
+     * @codeCoverageIgnore
      */
     public function serveHandler()
     {
