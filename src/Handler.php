@@ -37,7 +37,7 @@ class Handler
     /**
      * @codeCoverageIgnore
      */
-    public function serveHandler()
+    public function handleJobs()
     {
         while ($body = $this->worker->receive($context)) {
             try {
