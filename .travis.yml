@@ -21,10 +21,9 @@ install:
   - composer install --no-interaction --ignore-platform-reqs
 
 before_script:
-  - ./rr serve -v --config tests/.rr.yaml &
+  - ./rr serve --config tests/.rr.yaml &
 
 script:
-  - sudo cp `which php7.1` `which php`
   - vendor/bin/phpunit --coverage-clover=coverage.xml
 
 after_success:
