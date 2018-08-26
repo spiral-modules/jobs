@@ -15,6 +15,7 @@ before_install:
   - go build -o rr tests/main.go
 
 install:
+  - sudo cp `which php7.1` `which php`
   - php -v
   - composer self-update
   - composer install --no-interaction --ignore-platform-reqs
@@ -23,6 +24,7 @@ before_script:
   - ./rr serve -v --config tests/.rr.yaml &
 
 script:
+  - sudo cp `which php7.1` `which php`
   - vendor/bin/phpunit --coverage-clover=coverage.xml
 
 after_success:
