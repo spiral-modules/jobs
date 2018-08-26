@@ -4,6 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner/service/rpc"
 	"github.com/spiral/jobs/handler"
+	"fmt"
 )
 
 const ID = "jobs"
@@ -85,8 +86,16 @@ func (s *Service) initHandlers() error {
 	return nil
 }
 
-func (s *Service) getHandler(handler string) (handler.Handler, error) {
-	return s.handlers["local"], nil
+func (s *Service) getHandler(pipeline string) (handler.Handler, error) {
+	target, ok := s.cfg.Pipelines[pipeline]
+	if !ok {
+		return nil, fmt.Errorf("undefined pipeline %s", pipeline)
+	}
 
-	return nil, nil
+	h, ok := s.handlers[target]
+	if !ok {
+		return nil, fmt.Errorf("undefined handler %s", target)
+	}
+
+	return h, nil
 }
