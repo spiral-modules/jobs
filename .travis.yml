@@ -20,7 +20,7 @@ install:
   - composer install --no-interaction --ignore-platform-reqs
 
 before_script:
-  - ./rr serve -v -d --config="cmd/.rr.yaml" &
+  - ./rr serve -v --config="cmd/.rr.yaml" &
 
 script:
   - vendor/bin/phpunit --coverage-clover=coverage.xml
