@@ -5,11 +5,23 @@ php:
   - 7.2
   - nightly
 
+go:
+  - 1.8
+
+services:
+  - rabbitmq
+
 before_install:
   - composer self-update
 
 install:
   - composer install --no-interaction
+  - go get "github.com/spiral/jobs"
+  - cp -r * $GOPATH/src/github.com/spiral/jobs
+  - go build cmd/main.go -o rr
+
+before_script:
+  - ./rr serve -v -d &
 
 script:
   - vendor/bin/phpunit --coverage-clover=coverage.xml
