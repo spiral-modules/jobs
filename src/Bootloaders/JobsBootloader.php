@@ -6,10 +6,10 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Bootloaders;
+namespace Spiral\Async\Bootloaders;
 
-use Spiral\Jobs\Jobs;
-use Spiral\Jobs\JobsInterface;
+use Spiral\Async\Jobs;
+use Spiral\Async\JobsInterface;
 
 class JobsBootloader
 {

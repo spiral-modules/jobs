@@ -6,12 +6,12 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs;
+namespace Spiral\Async;
 
 use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
-use Spiral\Jobs\Configs\JobsConfig;
-use Spiral\Jobs\Exceptions\JobException;
+use Spiral\Async\Configs\JobsConfig;
+use Spiral\Async\Exceptions\JobException;
 use Spiral\RoadRunner\Exceptions\RoadRunnerException;
 
 class Jobs implements JobsInterface, SingletonInterface

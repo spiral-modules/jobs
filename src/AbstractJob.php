@@ -6,10 +6,10 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs;
+namespace Spiral\Async;
 
 use Spiral\Core\ResolverInterface;
-use Spiral\Jobs\Exceptions\JobException;
+use Spiral\Async\Exceptions\JobException;
 
 /**
  * Job with array based context and method injection support for do function.

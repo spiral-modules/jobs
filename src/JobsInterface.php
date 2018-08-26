@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs;
+namespace Spiral\Async;
 
 interface JobsInterface
 {
@@ -18,7 +18,7 @@ interface JobsInterface
      *
      * @return string Job id.
      *
-     * @throws \Spiral\Jobs\Exceptions\JobException
+     * @throws \Spiral\Async\Exceptions\JobException
      */
     public function push(JobInterface $job, Options $options = null): string;
 }

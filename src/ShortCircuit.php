@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs;
+namespace Spiral\Async;
 
 use Ramsey\Uuid\Uuid;
 

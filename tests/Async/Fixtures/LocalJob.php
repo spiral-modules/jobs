@@ -6,9 +6,9 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests\Fixtures;
+namespace Spiral\Async\Tests\Fixtures;
 
-use Spiral\Jobs\AbstractJob;
+use Spiral\Async\AbstractJob;
 
 class LocalJob extends AbstractJob
 {

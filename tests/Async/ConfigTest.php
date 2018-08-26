@@ -6,11 +6,11 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests;
+namespace Spiral\Async\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Spiral\Jobs\Configs\JobsConfig;
-use Spiral\Jobs\Tests\Fixtures\LocalJob;
+use Spiral\Async\Configs\JobsConfig;
+use Spiral\Async\Tests\Fixtures\LocalJob;
 
 class ConfigTest extends TestCase
 {

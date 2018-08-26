@@ -20,12 +20,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Spiral\\Jobs\\": "src/"
+      "Spiral\\Async\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Spiral\\Jobs\\Tests\\": "tests/Jobs/"
+      "Spiral\\Async\\Tests\\": "tests/Async/"
     }
   }
 }

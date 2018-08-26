@@ -6,13 +6,13 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests;
+namespace Spiral\Async\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Spiral\Core\Container;
-use Spiral\Jobs\Options;
-use Spiral\Jobs\ShortCircuit;
-use Spiral\Jobs\Tests\Fixtures\LocalJob;
+use Spiral\Async\Options;
+use Spiral\Async\ShortCircuit;
+use Spiral\Async\Tests\Fixtures\LocalJob;
 
 class ShortCircuitTest extends TestCase
 {
