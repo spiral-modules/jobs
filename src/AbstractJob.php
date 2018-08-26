@@ -28,7 +28,7 @@ abstract class AbstractJob implements JobInterface
      * @param array                  $data
      * @param ResolverInterface|null $resolver
      */
-    public function __construct(array $data = [], ResolverInterface $resolver)
+    public function __construct(array $data = [], ResolverInterface $resolver = null)
     {
         $this->data = $data;
         $this->resolver = $resolver;
