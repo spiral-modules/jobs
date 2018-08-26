@@ -6,6 +6,7 @@ jobs:
   enabled: true
   pipelines:
     async: local
+  # todo: merge with parent level
   handlers:
     local:
       command: "php ../tests/handler.php"
