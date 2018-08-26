@@ -28,7 +28,7 @@ abstract class AbstractJob implements JobInterface, \JsonSerializable
      * @param array                  $data
      * @param ResolverInterface|null $resolver
      */
-    public function __construct(array $data, ResolverInterface $resolver)
+    public function __construct(array $data = [], ResolverInterface $resolver)
     {
         $this->data = $data;
         $this->resolver = $resolver;
@@ -59,6 +59,14 @@ abstract class AbstractJob implements JobInterface, \JsonSerializable
     public function jsonSerialize()
     {
         return $this->data;
+    }
+
+    /**
+     * @return array|mixed
+     */
+    public function serialize()
+    {
+        return json_encode($this->data);
     }
 
     /**

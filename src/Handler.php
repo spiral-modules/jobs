@@ -27,10 +27,15 @@ class Handler
     {
         while ($body = $this->worker->receive($context)) {
             try {
-                error_log($body);
-                error_log($context);
+                $context = json_decode($context, true);
 
-                $this->worker->send((string)$body, (string)$context);
+                /** @var \Spiral\Jobs\JobInterface $job */
+                $job = $this->factory->make($context['job']);
+
+                $job->unserialize($body);
+                $job->execute($context['id']);
+
+                $this->worker->send("ok");
             } catch (\Throwable $e) {
                 $this->worker->error((string)$e);
             }

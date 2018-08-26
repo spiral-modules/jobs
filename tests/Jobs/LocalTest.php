@@ -12,9 +12,9 @@ use PHPUnit\Framework\TestCase;
 use Spiral\Core\Container;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
-use Spiral\Jobs\AbstractJob;
 use Spiral\Jobs\Configs\JobsConfig;
 use Spiral\Jobs\Jobs;
+use Spiral\Jobs\Tests\Fixtures\LocalJob;
 
 class LocalTest extends TestCase
 {
@@ -38,15 +38,5 @@ class LocalTest extends TestCase
             ]),
             new RPC(new SocketRelay('localhost', 6001))
         );
-    }
-}
-
-class LocalJob extends AbstractJob
-{
-    public function do(string $id)
-    {
-        file_put_contents('local.job', json_encode(
-            $this->data + compact('id')
-        ));
     }
 }

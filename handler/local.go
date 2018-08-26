@@ -32,8 +32,10 @@ func (l *local) Handle(j *Job) (string, error) {
 	}
 
 	context, err := json.Marshal(struct {
-		Job string `json:"handler"`
+		ID  string `json:"id"`
+		Job string `json:"job"`
 	}{
+		ID:  id.String(),
 		Job: j.Job,
 	})
 	if err != nil {
