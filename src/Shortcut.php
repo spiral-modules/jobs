@@ -18,6 +18,10 @@ class Shortcut implements JobsInterface
      */
     public function push(JobInterface $job, Options $options = null): string
     {
+        if (!empty($options) && $options->getDelay()) {
+            sleep($options->getDelay());
+        }
+
         $job->execute("shortcut");
 
         return "shortcut";
