@@ -62,6 +62,24 @@ class LocalTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
+    /**
+     * @expectedException \Spiral\Jobs\Exceptions\JobException
+     */
+    public function testConnectionException()
+    {
+        $jobs = new Jobs(
+            new JobsConfig([
+                'pipelines'       => [],
+                'defaultPipeline' => 'async'
+            ]),
+            new RPC(new SocketRelay('localhost', 6002))
+        );
+
+        $jobs->push(new LocalJob([
+            'data' => 100
+        ], new Container));
+    }
+
     public function makeJobs(): Jobs
     {
         return new Jobs(
