@@ -6,13 +6,14 @@ php:
   - nightly
 
 go:
-  - 1.8
+  - 1.9
 
 before_install:
   - composer self-update
 
 install:
   - composer install --no-interaction
+  - go version
   - go get "github.com/spiral/jobs"
   - cp -r * $GOPATH/src/github.com/spiral/jobs
   - go build cmd/main.go -o rr
