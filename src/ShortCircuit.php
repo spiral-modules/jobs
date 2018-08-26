@@ -24,6 +24,8 @@ class ShortCircuit implements JobsInterface
             sleep($options->getDelay());
         }
 
+        $job->unserialize($job->serialize());
+
         $uuid = Uuid::uuid4()->toString();
         $job->execute($uuid);
 
