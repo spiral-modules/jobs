@@ -8,8 +8,9 @@ jobs:
     async: local
   handlers:
     local:
-      command:  "php tests/handler.php"
+      command: "php tests/handler.php"
       pool:
         numWorkers: 1
+        majJobs: 1
         allocateTimeout: 60
         destroyTimeout:  30
