@@ -21,7 +21,7 @@ install:
   - go build cmd/main.go -o rr
 
 before_script:
-  - ./rr serve -v -d &
+  - ./rr serve -v -d --config = cmd/.rr.yaml &
 
 script:
   - vendor/bin/phpunit --coverage-clover=coverage.xml
