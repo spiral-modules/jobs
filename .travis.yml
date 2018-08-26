@@ -8,9 +8,6 @@ php:
 go:
   - 1.8
 
-services:
-  - rabbitmq
-
 before_install:
   - composer self-update
 
