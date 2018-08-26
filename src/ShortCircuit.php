@@ -8,6 +8,8 @@
 
 namespace Spiral\Jobs;
 
+use Ramsey\Uuid\Uuid;
+
 /**
  * Runs all the jobs in the same process.
  */
@@ -22,8 +24,9 @@ class ShortCircuit implements JobsInterface
             sleep($options->getDelay());
         }
 
-        $job->execute("shortcut");
+        $uuid = Uuid::uuid4()->toString();
+        $job->execute($uuid);
 
-        return "shortcut";
+        return $uuid;
     }
 }
