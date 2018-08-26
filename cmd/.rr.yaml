@@ -9,7 +9,7 @@ jobs:
   # todo: merge with parent level
   handlers:
     local:
-      command: "php ../tests/handler.php"
+      command: "php tests/handler.php"
       pool:
         numWorkers: 1
         majJobs: 1
