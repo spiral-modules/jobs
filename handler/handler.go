@@ -1,7 +1,7 @@
-package jobs
+package handler
 
 type Handler interface {
-	Handle() error
+	Handle(j *Job) (string, error)
 	Serve() error
 	Stop()
 }

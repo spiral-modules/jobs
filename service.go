@@ -11,7 +11,7 @@ const ID = "jobs"
 type Service struct {
 	Logger   *logrus.Logger
 	cfg      *Config
-	handlers map[string]Handler
+	handlers map[string]handler.Handler
 }
 
 func (s *Service) Init(cfg *Config, r *rpc.Service) (ok bool, err error) {
@@ -37,7 +37,7 @@ func (s *Service) Serve() error {
 		numServing++
 		s.Logger.Debugf("[jobs.%s]: handler started", name)
 
-		go func(h Handler, name string) {
+		go func(h handler.Handler, name string) {
 			if err := h.Serve(); err != nil {
 				s.Logger.Errorf("[jobs.%s]: %s", name, err)
 				done <- err
@@ -73,9 +73,9 @@ func (s *Service) Stop() {
 }
 
 func (s *Service) initHandlers() error {
-	s.handlers = make(map[string]Handler)
+	s.handlers = make(map[string]handler.Handler)
 
-	h, err := handler.NewLocal(s.cfg.Handlers.Local)
+	h, err := handler.LocalHandler(s.cfg.Handlers.Local, s.Logger)
 	if err != nil {
 		return err
 	}
@@ -85,6 +85,8 @@ func (s *Service) initHandlers() error {
 	return nil
 }
 
-func (s *Service) getHandler(handler string) Handler {
-	return nil
+func (s *Service) getHandler(handler string) (handler.Handler, error) {
+	return s.handlers["local"], nil
+
+	return nil, nil
 }

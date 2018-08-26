@@ -1,23 +1,20 @@
 package jobs
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/spiral/jobs/handler"
+)
 
 type rpcService struct {
 	s *Service
 }
 
-type Job struct {
-	Job      string `json:"job"`
-	Pipeline string `json:"pipeline"`
-	Payload  interface{}
-	Options struct {
-		Delay *int `json:"delay"`
+func (s *rpcService) Push(j *handler.Job, id *string) error {
+	h, err := s.s.getHandler(j.Pipeline)
+	if err != nil {
+		return err
 	}
-}
 
-func (s *rpcService) Push(j *Job, id *string) error {
-	*id = j.Job
+	*id, err = h.Handle(j)
 
-	logrus.Println(*id)
-	return nil
+	return err
 }
