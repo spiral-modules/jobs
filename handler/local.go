@@ -41,19 +41,15 @@ func (l *local) Handle(j *Job) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	l.log.Debugf("[jobs.local] %s registered", id)
 
-	go func(payload, context []byte, id string) {
-		if j.Options.Delay != nil {
-			time.Sleep(time.Second * time.Duration(*j.Options.Delay))
-		}
+	var delay time.Duration
+	if j.Options.Delay != nil {
+		delay = time.Second * time.Duration(*j.Options.Delay)
+	}
 
-		if _, err := l.rr.Exec(&roadrunner.Payload{Body: payload, Context: context,}); err != nil {
-			l.log.Errorf("[jobs.local] %s: %s", id, err)
-		} else {
-			l.log.Debugf("[jobs.local] %s complete", id)
-		}
-	}(payload, context, id.String())
+	go l.runJob(delay, payload, context, id.String())
 
 	return id.String(), nil
 }
@@ -74,5 +70,17 @@ func (l *local) Serve() error {
 func (l *local) Stop() {
 	if l.done != nil {
 		l.done <- nil
+	}
+}
+
+func (l *local) runJob(delay time.Duration, data, ctx []byte, id string) {
+	if delay != 0 {
+		time.Sleep(delay)
+	}
+
+	if _, err := l.rr.Exec(&roadrunner.Payload{Body: data, Context: ctx}); err != nil {
+		l.log.Errorf("[jobs.local] %s: %s", id, err)
+	} else {
+		l.log.Debugf("[jobs.local] %s complete", id)
 	}
 }
