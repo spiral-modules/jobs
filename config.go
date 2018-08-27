@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Config defines settings for job handler, workers and routing options.
+// Config defines settings for job endpoint, workers and routing options.
 type Config struct {
 	// Enable enables jobs service.
 	Enable bool
@@ -14,12 +14,10 @@ type Config struct {
 	// Workers configures roadrunner server and worker pool.
 	Workers *roadrunner.ServerConfig
 
-	// Pipelines defines mapping between PHP job pipeline and associated job handler.
-	Pipelines map[string]string
-
-	// todo: do something about it
-	Handlers struct {
-		Local *roadrunner.ServerConfig
+	// Pipelines defines mapping between PHP job pipeline and associated job endpoint.
+	Pipelines map[string]struct {
+		// Endpoint defines associated endpoint.
+		Endpoint string
 	}
 }
 

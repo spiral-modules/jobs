@@ -4,58 +4,21 @@ rpc:
 
 jobs:
   enable: true
+
+  # local rr endpoint configuration
   workers:
     command: "php tests/handler.php"
     pool:
       numWorkers: 1
       maxJobs: 1
 
+  # list of endpoint pipelines associated with endpoints
   pipelines:
-    local:
-      endpoint: local
-
     default:
-      endpoint: rabbitmq
-      options:
-        channel: "default"
-        priority: 100
+      endpoint: local
+      options: []
 
-  # todo: merge with parent level
-
-
-
+  # list of active endpoints and endpoint consumers
   endpoints:
-    rabbitmq:
-      user:    ...
-      pasword: ...
-      ...
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  handlers:
     local:
-      command: "php tests/handler.php"
-      relay: "pipes"
-      pool:
-        numWorkers: 1
-        majJobs: 1
-        allocateTimeout: 60
-        destroyTimeout:  30
+      enable: true

@@ -68,7 +68,7 @@ class LocalTest extends TestCase
         $jobs = new Queue(
             new JobsConfig([
                 'pipelines'       => [],
-                'defaultPipeline' => 'local'
+                'defaultPipeline' => 'default'
             ]),
             new RPC(new SocketRelay('localhost', 6002))
         );
@@ -83,7 +83,7 @@ class LocalTest extends TestCase
         return new Queue(
             new JobsConfig([
                 'pipelines'       => [],
-                'defaultPipeline' => 'local'
+                'defaultPipeline' => 'default'
             ]),
             new RPC(new SocketRelay('localhost', 6001))
         );

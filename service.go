@@ -3,7 +3,9 @@ package jobs
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner/service/rpc"
-	"github.com/spiral/jobs/handler"
+	"github.com/spiral/roadrunner"
+	"github.com/spiral/roadrunner/cmd/rr/debug"
+	"github.com/satori/go.uuid"
 	"fmt"
 )
 
@@ -12,10 +14,15 @@ const ID = "jobs"
 
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
-	// Logger provides ability to publish job accept, compete and error messages.
-	Logger    *logrus.Logger
+	log       *logrus.Logger
 	cfg       *Config
-	endpoints map[string]handler.Handler
+	rr        *roadrunner.Server
+	endpoints map[string]Endpoint
+}
+
+// NewService creates new service for job handling.
+func NewService(log *logrus.Logger, endpoints map[string]Endpoint) *Service {
+	return &Service{log: log, endpoints: endpoints}
 }
 
 // Init configures job service.
@@ -29,11 +36,22 @@ func (s *Service) Init(cfg *Config, r *rpc.Service) (ok bool, err error) {
 		return false, err
 	}
 
-	return true, s.initEndpoints()
+	s.rr = roadrunner.NewServer(s.cfg.Workers)
+
+	// move to the main later
+	s.rr.Listen(debug.Listener(s.log))
+
+	// todo: init queues
+
+	return true, nil
 }
 
-// Serve serves local rr server and creates endpoints association.
+// Serve serves local rr server and creates endpoint association.
 func (s *Service) Serve() error {
+	if err := s.rr.Start(); err != nil {
+		return err
+	}
+
 	var (
 		numServing int
 		done       = make(chan interface{}, len(s.endpoints))
@@ -41,11 +59,11 @@ func (s *Service) Serve() error {
 
 	for name, h := range s.endpoints {
 		numServing++
-		s.Logger.Debugf("[jobs.%s]: handler started", name)
+		s.log.Debugf("[jobs.%s]: endpoint started", name)
 
-		go func(h handler.Handler, name string) {
-			if err := h.Serve(); err != nil {
-				s.Logger.Errorf("[jobs.%s]: %s", name, err)
+		go func(h Endpoint, name string) {
+			if err := h.Serve(s); err != nil {
+				s.log.Errorf("[jobs.%s]: %s", name, err)
 				done <- err
 			} else {
 				done <- nil
@@ -61,7 +79,7 @@ func (s *Service) Serve() error {
 			continue
 		}
 
-		// found an error in one of the services, stopping the rest of running services.
+		// found an error in one of the endpoint, stopping everything
 		if err := result.(error); err != nil {
 			s.Stop()
 			return err
@@ -74,33 +92,59 @@ func (s *Service) Serve() error {
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
 	for name, h := range s.endpoints {
+		s.log.Debugf("[jobs.%s]: stopping", name)
 		h.Stop()
-		s.Logger.Debugf("[jobs.%s]: stopped", name)
 	}
+
+	s.rr.Stop()
+	s.log.Debugf("[jobs]: stopped")
 }
 
-func (s *Service) initEndpoints() error {
-	s.endpoints = make(map[string]handler.Handler)
-
-	h, err := handler.LocalHandler(s.cfg.Handlers.Local, s.Logger)
+// Push job to associated endpoint and return job id.
+func (s *Service) Push(j *Job) (string, error) {
+	endpoint, err := s.getEndpoint(j.Pipeline)
 	if err != nil {
+		return "", err
+	}
+
+	id, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+
+	j.ID = id.String()
+
+	s.log.Debugf("[jobs] new job `%s`", j.ID)
+	return j.ID, endpoint.Push(j)
+}
+
+// Exec executed job using local RR server. Make sure that service is started.
+func (s *Service) Exec(j *Job) error {
+	ctx, err := j.Context()
+	if err != nil {
+		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
 		return err
 	}
 
-	s.endpoints["local"] = h
+	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
+		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
+		return err
+	}
 
+	s.log.Debugf("[jobs.local] complete `%s`", j.ID)
 	return nil
 }
 
-func (s *Service) getHandler(pipeline string) (handler.Handler, error) {
-	target, ok := s.cfg.Pipelines[pipeline]
+// return endpoint associated with given pipeline.
+func (s *Service) getEndpoint(pipeline string) (Endpoint, error) {
+	pipe, ok := s.cfg.Pipelines[pipeline]
 	if !ok {
-		return nil, fmt.Errorf("undefined pipeline %s", pipeline)
+		return nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
 	}
 
-	h, ok := s.endpoints[target]
+	h, ok := s.endpoints[pipe.Endpoint]
 	if !ok {
-		return nil, fmt.Errorf("undefined handler %s", target)
+		return nil, fmt.Errorf("undefined endpoint `%s`", pipe)
 	}
 
 	return h, nil
