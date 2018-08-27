@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async\Configs;
+namespace Spiral\Jobs\Configs;
 
 use Spiral\Core\InjectableConfig;
 

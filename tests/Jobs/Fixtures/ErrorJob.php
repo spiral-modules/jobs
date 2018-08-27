@@ -6,9 +6,9 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async\Tests\Fixtures;
+namespace Spiral\Jobs\Tests\Fixtures;
 
-use Spiral\Async\AbstractJob;
+use Spiral\Jobs\AbstractJob;
 
 class ErrorJob extends AbstractJob
 {

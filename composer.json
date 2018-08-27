@@ -1,7 +1,7 @@
 {
   "name": "spiral/async",
   "type": "library",
-  "description": "Spiral: Async Jobs and Queue",
+  "description": "Spiral: Jobs Jobs and Queue",
   "license": "MIT",
   "authors": [
     {
@@ -20,12 +20,12 @@
   },
   "autoload": {
     "psr-4": {
-      "Spiral\\Async\\": "src/"
+      "Spiral\\Jobs\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "Spiral\\Async\\Tests\\": "tests/Async/"
+      "Spiral\\Jobs\\Tests\\": "tests/Jobs/"
     }
   }
 }

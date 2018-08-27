@@ -6,10 +6,10 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async\Tests;
+namespace Spiral\Jobs\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Spiral\Async\Options;
+use Spiral\Jobs\Options;
 
 class OptionsTest extends TestCase
 {

@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async;
+namespace Spiral\Jobs;
 
 use Spiral\Core\FactoryInterface;
 use Spiral\RoadRunner\Worker;
@@ -43,7 +43,7 @@ class Handler
             try {
                 $context = json_decode($context, true);
 
-                /** @var \Spiral\Async\JobInterface $job */
+                /** @var \Spiral\Jobs\JobInterface $job */
                 $job = $this->factory->make($context['job']);
 
                 $job->unserialize($body);

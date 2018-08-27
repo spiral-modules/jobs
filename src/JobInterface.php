@@ -6,15 +6,14 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async;
+namespace Spiral\Jobs;
 
 interface JobInterface extends \Serializable
 {
     /**
-     * @param string $id
+     * Execute job, id will be provided by job handler.
      *
-     * @return mixed
+     * @param string $id
      */
-    public function execute(string $id);
-
+    public function execute(string $id): void;
 }

@@ -11,7 +11,7 @@
          stopOnFailure="false"
          stopOnError="false">
     <testsuites>
-        <testsuite name="Spiral: Async Jobs and Queue">
+        <testsuite name="Spiral: Jobs Jobs and Queue">
             <directory>./tests/</directory>
         </testsuite>
     </testsuites>

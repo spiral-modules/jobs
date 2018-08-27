@@ -6,7 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"time"
 	"github.com/spiral/roadrunner/cmd/rr/debug"
-	"github.com/gin-gonic/gin/json"
+	"encoding/json"
 )
 
 type local struct {

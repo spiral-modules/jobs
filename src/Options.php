@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async;
+namespace Spiral\Jobs;
 
 final class Options implements \JsonSerializable
 {
@@ -42,8 +42,6 @@ final class Options implements \JsonSerializable
      */
     public function jsonSerialize()
     {
-        return [
-            'delay' => $this->delay,
-        ];
+        return ['delay' => $this->delay];
     }
 }

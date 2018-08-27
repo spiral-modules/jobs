@@ -6,10 +6,10 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async;
+namespace Spiral\Jobs;
 
-use Spiral\Async\Configs\JobsConfig;
-use Spiral\Async\Exceptions\JobException;
+use Spiral\Jobs\Configs\JobsConfig;
+use Spiral\Jobs\Exceptions\JobException;
 use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
 use Spiral\RoadRunner\Exceptions\RoadRunnerException;

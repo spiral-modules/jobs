@@ -6,16 +6,16 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async\Tests;
+namespace Spiral\Jobs\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Spiral\Core\Container;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
-use Spiral\Async\Configs\JobsConfig;
-use Spiral\Async\Jobs;
-use Spiral\Async\Options;
-use Spiral\Async\Tests\Fixtures\LocalJob;
+use Spiral\Jobs\Configs\JobsConfig;
+use Spiral\Jobs\Jobs;
+use Spiral\Jobs\Options;
+use Spiral\Jobs\Tests\Fixtures\LocalJob;
 
 class LocalTest extends TestCase
 {
@@ -63,7 +63,7 @@ class LocalTest extends TestCase
     }
 
     /**
-     * @expectedException \Spiral\Async\Exceptions\JobException
+     * @expectedException \Spiral\Jobs\Exceptions\JobException
      */
     public function testConnectionException()
     {

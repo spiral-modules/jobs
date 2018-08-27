@@ -6,13 +6,13 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async\Tests;
+namespace Spiral\Jobs\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Spiral\Async\Options;
-use Spiral\Async\ShortCircuit;
-use Spiral\Async\Tests\Fixtures\ErrorJob;
-use Spiral\Async\Tests\Fixtures\LocalJob;
+use Spiral\Jobs\Options;
+use Spiral\Jobs\ShortCircuit;
+use Spiral\Jobs\Tests\Fixtures\ErrorJob;
+use Spiral\Jobs\Tests\Fixtures\LocalJob;
 use Spiral\Core\Container;
 
 class ShortCircuitTest extends TestCase
@@ -42,7 +42,7 @@ class ShortCircuitTest extends TestCase
     }
 
     /**
-     * @expectedException \Spiral\Async\Exceptions\JobException
+     * @expectedException \Spiral\Jobs\Exceptions\JobException
      */
     public function testError()
     {

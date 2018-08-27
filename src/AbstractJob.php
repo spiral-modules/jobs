@@ -6,9 +6,9 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Async;
+namespace Spiral\Jobs;
 
-use Spiral\Async\Exceptions\JobException;
+use Spiral\Jobs\Exceptions\JobException;
 use Spiral\Core\ResolverInterface;
 
 /**
@@ -37,13 +37,13 @@ abstract class AbstractJob implements JobInterface
     /**
      * @inheritdoc
      */
-    public function execute(string $id)
+    public function execute(string $id): void
     {
         $method = new \ReflectionMethod($this, static::HANDLE_FUNCTION);
         $method->setAccessible(true);
 
         try {
-            return $method->invokeArgs(
+            $method->invokeArgs(
                 $this,
                 $this->resolver->resolveArguments($method, compact('id'))
             );
