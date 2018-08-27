@@ -45,7 +45,7 @@ abstract class AbstractJob implements JobInterface
         try {
             $method->invokeArgs(
                 $this,
-                $this->resolver->resolveArguments($method, compact('id'))
+                $this->resolver->resolveArguments($method, $this->data + compact('id'))
             );
         } catch (\Throwable $e) {
             throw new JobException(

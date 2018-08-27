@@ -14,7 +14,7 @@ use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
 use Spiral\RoadRunner\Exceptions\RoadRunnerException;
 
-class Jobs implements JobsInterface, SingletonInterface
+class Queue implements QueueInterface, SingletonInterface
 {
     const RR_SERVICE = 'jobs';
 

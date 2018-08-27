@@ -13,7 +13,7 @@ use Spiral\Core\Container;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
 use Spiral\Jobs\Configs\JobsConfig;
-use Spiral\Jobs\Jobs;
+use Spiral\Jobs\Queue;
 use Spiral\Jobs\Options;
 use Spiral\Jobs\Tests\Fixtures\LocalJob;
 
@@ -30,9 +30,7 @@ class LocalTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
-        $id = $jobs->push(new LocalJob([
-            'data' => 100
-        ], new Container));
+        $id = $jobs->push(new LocalJob(['data' => 100]));
 
         $this->assertNotEmpty($id);
 
@@ -50,7 +48,7 @@ class LocalTest extends TestCase
 
         $id = $jobs->push(new LocalJob([
             'data' => 100
-        ], new Container), new Options(1));
+        ]), new Options(1));
 
         $this->assertNotEmpty($id);
 
@@ -67,10 +65,10 @@ class LocalTest extends TestCase
      */
     public function testConnectionException()
     {
-        $jobs = new Jobs(
+        $jobs = new Queue(
             new JobsConfig([
                 'pipelines'       => [],
-                'defaultPipeline' => 'async'
+                'defaultPipeline' => 'local'
             ]),
             new RPC(new SocketRelay('localhost', 6002))
         );
@@ -80,12 +78,12 @@ class LocalTest extends TestCase
         ], new Container));
     }
 
-    public function makeJobs(): Jobs
+    public function makeJobs(): Queue
     {
-        return new Jobs(
+        return new Queue(
             new JobsConfig([
                 'pipelines'       => [],
-                'defaultPipeline' => 'async'
+                'defaultPipeline' => 'local'
             ]),
             new RPC(new SocketRelay('localhost', 6001))
         );

@@ -8,7 +8,7 @@
 
 namespace Spiral\Jobs;
 
-interface JobsInterface
+interface QueueInterface
 {
     /**
      * Push job execution into associated pipeline.

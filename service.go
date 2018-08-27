@@ -7,16 +7,20 @@ import (
 	"fmt"
 )
 
+// ID defines Jobs service public alias.
 const ID = "jobs"
 
+// Service manages job execution and connection to multiple job pipelines.
 type Service struct {
-	Logger   *logrus.Logger
-	cfg      *Config
-	handlers map[string]handler.Handler
+	// Logger provides ability to publish job accept, compete and error messages.
+	Logger    *logrus.Logger
+	cfg       *Config
+	endpoints map[string]handler.Handler
 }
 
+// Init configures job service.
 func (s *Service) Init(cfg *Config, r *rpc.Service) (ok bool, err error) {
-	if !cfg.Enabled {
+	if !cfg.Enable {
 		return false, nil
 	}
 
@@ -25,16 +29,17 @@ func (s *Service) Init(cfg *Config, r *rpc.Service) (ok bool, err error) {
 		return false, err
 	}
 
-	return true, s.initHandlers()
+	return true, s.initEndpoints()
 }
 
+// Serve serves local rr server and creates endpoints association.
 func (s *Service) Serve() error {
 	var (
 		numServing int
-		done       = make(chan interface{}, len(s.handlers))
+		done       = make(chan interface{}, len(s.endpoints))
 	)
 
-	for name, h := range s.handlers {
+	for name, h := range s.endpoints {
 		numServing++
 		s.Logger.Debugf("[jobs.%s]: handler started", name)
 
@@ -66,22 +71,23 @@ func (s *Service) Serve() error {
 	return nil
 }
 
+// Stop all pipelines and rr server.
 func (s *Service) Stop() {
-	for name, h := range s.handlers {
+	for name, h := range s.endpoints {
 		h.Stop()
 		s.Logger.Debugf("[jobs.%s]: stopped", name)
 	}
 }
 
-func (s *Service) initHandlers() error {
-	s.handlers = make(map[string]handler.Handler)
+func (s *Service) initEndpoints() error {
+	s.endpoints = make(map[string]handler.Handler)
 
 	h, err := handler.LocalHandler(s.cfg.Handlers.Local, s.Logger)
 	if err != nil {
 		return err
 	}
 
-	s.handlers["local"] = h
+	s.endpoints["local"] = h
 
 	return nil
 }
@@ -92,7 +98,7 @@ func (s *Service) getHandler(pipeline string) (handler.Handler, error) {
 		return nil, fmt.Errorf("undefined pipeline %s", pipeline)
 	}
 
-	h, ok := s.handlers[target]
+	h, ok := s.endpoints[target]
 	if !ok {
 		return nil, fmt.Errorf("undefined handler %s", target)
 	}

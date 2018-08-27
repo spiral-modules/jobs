@@ -13,7 +13,7 @@ use Ramsey\Uuid\Uuid;
 /**
  * Runs all the jobs in the same process.
  */
-class ShortCircuit implements JobsInterface
+class ShortCircuit implements QueueInterface
 {
     /**
      * @inheritdoc

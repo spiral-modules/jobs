@@ -20,7 +20,7 @@ class JobsConfig extends InjectableConfig
     protected $config = [
         // Association between jobs and pipelines
         'pipelines'       => [
-            //JobClass::
+            // JobClass::class => "rabbitmq"
         ],
         'defaultPipeline' => 'local'
     ];

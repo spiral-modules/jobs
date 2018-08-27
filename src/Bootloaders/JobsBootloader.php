@@ -8,12 +8,12 @@
 
 namespace Spiral\Jobs\Bootloaders;
 
-use Spiral\Jobs\Jobs;
-use Spiral\Jobs\JobsInterface;
+use Spiral\Jobs\Queue;
+use Spiral\Jobs\QueueInterface;
 
 class JobsBootloader
 {
     const BINDINGS = [
-        JobsInterface::class => Jobs::class
+        QueueInterface::class => Queue::class
     ];
 }

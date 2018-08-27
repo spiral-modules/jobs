@@ -16,7 +16,7 @@ final class Options implements \JsonSerializable
     /**
      * @param int $delay
      */
-    public function __construct(int $delay = null)
+    public function __construct(?int $delay = null)
     {
         $this->delay = $delay;
     }

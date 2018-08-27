@@ -1,15 +1,59 @@
 rpc:
   enable: true
-  listen: tcp://127.0.0.1:6001
+  listen: tcp://0.0.0.0:6001
 
 jobs:
-  enabled: true
+  enable: true
+  workers:
+    command: "php tests/handler.php"
+    pool:
+      numWorkers: 1
+      maxJobs: 1
+
   pipelines:
-    async: local
+    local:
+      endpoint: local
+
+    default:
+      endpoint: rabbitmq
+      options:
+        channel: "default"
+        priority: 100
+
   # todo: merge with parent level
+
+
+
+  endpoints:
+    rabbitmq:
+      user:    ...
+      pasword: ...
+      ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   handlers:
     local:
       command: "php tests/handler.php"
+      relay: "pipes"
       pool:
         numWorkers: 1
         majJobs: 1
