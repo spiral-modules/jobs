@@ -30,3 +30,8 @@ jobs:
       address:  localhost:6379
       password: ""
       db:       0
+
+      # list of queue to consume jobs from
+      serve:
+        default:
+          fifo:  true
