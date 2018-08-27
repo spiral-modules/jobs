@@ -1,10 +1,10 @@
 package endpoint
 
 import (
-	"github.com/spiral/jobs"
-	"time"
-	"sync"
 	"errors"
+	"github.com/spiral/jobs"
+	"sync"
+	"time"
 )
 
 // Local run jobs using local goroutines.

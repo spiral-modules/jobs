@@ -6,8 +6,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/spiral/jobs/endpoint"
 	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/endpoint"
 )
 
 func main() {

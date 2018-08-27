@@ -1,12 +1,12 @@
 package jobs
 
 import (
+	"fmt"
+	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/spiral/roadrunner/service/rpc"
 	"github.com/spiral/roadrunner"
 	"github.com/spiral/roadrunner/cmd/rr/debug"
-	"github.com/satori/go.uuid"
-	"fmt"
+	"github.com/spiral/roadrunner/service/rpc"
 )
 
 // ID defines Jobs service public alias.

@@ -1,8 +1,8 @@
 package jobs
 
 import (
-	"github.com/spiral/roadrunner/service"
 	"github.com/spiral/roadrunner"
+	"github.com/spiral/roadrunner/service"
 	"time"
 )
 
