@@ -59,11 +59,11 @@ func (s *Service) Serve() error {
 
 	for name, h := range s.endpoints {
 		numServing++
-		s.log.Debugf("[jobs.%s]: endpoint started", name)
+		s.log.Debugf("[jobs.%svc]: endpoint started", name)
 
 		go func(h Endpoint, name string) {
 			if err := h.Serve(s); err != nil {
-				s.log.Errorf("[jobs.%s]: %s", name, err)
+				s.log.Errorf("[jobs.%svc]: %svc", name, err)
 				done <- err
 			} else {
 				done <- nil
@@ -92,7 +92,7 @@ func (s *Service) Serve() error {
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
 	for name, h := range s.endpoints {
-		s.log.Debugf("[jobs.%s]: stopping", name)
+		s.log.Debugf("[jobs.%svc]: stopping", name)
 		h.Stop()
 	}
 
@@ -114,7 +114,7 @@ func (s *Service) Push(j *Job) (string, error) {
 
 	j.ID = id.String()
 
-	s.log.Debugf("[jobs] new job `%s`", j.ID)
+	s.log.Debugf("[jobs] new job `%svc`", j.ID)
 	return j.ID, endpoint.Push(j)
 }
 
@@ -122,16 +122,16 @@ func (s *Service) Push(j *Job) (string, error) {
 func (s *Service) Exec(j *Job) error {
 	ctx, err := j.Context()
 	if err != nil {
-		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
+		s.log.Errorf("[jobs.local] error `%svc`: %svc", j.ID, err)
 		return err
 	}
 
 	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
-		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
+		s.log.Errorf("[jobs.local] error `%svc`: %svc", j.ID, err)
 		return err
 	}
 
-	s.log.Debugf("[jobs.local] complete `%s`", j.ID)
+	s.log.Debugf("[jobs.local] complete `%svc`", j.ID)
 	return nil
 }
 
@@ -139,12 +139,12 @@ func (s *Service) Exec(j *Job) error {
 func (s *Service) getEndpoint(pipeline string) (Endpoint, error) {
 	pipe, ok := s.cfg.Pipelines[pipeline]
 	if !ok {
-		return nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
+		return nil, fmt.Errorf("undefined pipeline `%svc`", pipeline)
 	}
 
 	h, ok := s.endpoints[pipe.Endpoint]
 	if !ok {
-		return nil, fmt.Errorf("undefined endpoint `%s`", pipe)
+		return nil, fmt.Errorf("undefined endpoint `%svc`", pipe)
 	}
 
 	return h, nil

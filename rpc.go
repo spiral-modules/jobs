@@ -1,11 +1,11 @@
 package jobs
 
 type rpcService struct {
-	s *Service
+	svc *Service
 }
 
 // Push job to the queue.
 func (s *rpcService) Push(j *Job, id *string) (err error) {
-	*id, err = s.s.Push(j)
+	*id, err = s.svc.Push(j)
 	return
 }
