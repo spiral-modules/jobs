@@ -5,18 +5,22 @@ import (
 	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner"
-	"github.com/spiral/roadrunner/cmd/rr/debug"
 	"github.com/spiral/roadrunner/service/rpc"
+	"github.com/spiral/roadrunner/service"
 )
 
 // ID defines Jobs service public alias.
 const ID = "jobs"
+
+// Handler handles job execution.
+type Handler func(j *Job) error
 
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
 	log       *logrus.Logger
 	cfg       *Config
 	rr        *roadrunner.Server
+	container service.Container
 	endpoints map[string]Endpoint
 }
 
@@ -26,22 +30,32 @@ func NewService(log *logrus.Logger, endpoints map[string]Endpoint) *Service {
 }
 
 // Init configures job service.
-func (s *Service) Init(cfg *Config, r *rpc.Service) (ok bool, err error) {
-	if !cfg.Enable {
+func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) {
+	config := &Config{}
+	if err := config.Hydrate(cfg); err != nil {
+		return false, err
+	}
+
+	if !config.Enable {
 		return false, nil
 	}
 
-	s.cfg = cfg
+	s.cfg = config
 	if err := r.Register(ID, &rpcService{s}); err != nil {
 		return false, err
 	}
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
-	// move to the main later
-	s.rr.Listen(debug.Listener(s.log))
+	// we are going to keep all handlers withing the container
+	// so we can easier manage their state and configuration
+	s.container = service.NewContainer(s.log)
+	for name, e := range s.endpoints {
+		e.Handler(s.exec)
+		s.container.Register(fmt.Sprintf("jobs.%s", name), e)
+	}
 
-	// todo: init queues
+	s.container.Init(cfg.Get("endpoints"))
 
 	return true, nil
 }
@@ -52,49 +66,12 @@ func (s *Service) Serve() error {
 		return err
 	}
 
-	var (
-		numServing int
-		done       = make(chan interface{}, len(s.endpoints))
-	)
-
-	for name, h := range s.endpoints {
-		numServing++
-		s.log.Debugf("[jobs.%svc]: endpoint started", name)
-
-		go func(h Endpoint, name string) {
-			if err := h.Serve(s); err != nil {
-				s.log.Errorf("[jobs.%svc]: %svc", name, err)
-				done <- err
-			} else {
-				done <- nil
-			}
-		}(h, name)
-	}
-
-	for i := 0; i < numServing; i++ {
-		result := <-done
-
-		if result == nil {
-			// no errors
-			continue
-		}
-
-		// found an error in one of the endpoint, stopping everything
-		if err := result.(error); err != nil {
-			s.Stop()
-			return err
-		}
-	}
-
-	return nil
+	return s.container.Serve()
 }
 
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
-	for name, h := range s.endpoints {
-		s.log.Debugf("[jobs.%svc]: stopping", name)
-		h.Stop()
-	}
+	s.container.Stop()
 
 	s.rr.Stop()
 	s.log.Debugf("[jobs]: stopped")
@@ -114,24 +91,24 @@ func (s *Service) Push(j *Job) (string, error) {
 
 	j.ID = id.String()
 
-	s.log.Debugf("[jobs] new job `%svc`", j.ID)
+	s.log.Debugf("[jobs] new job `%s`", j.ID)
 	return j.ID, endpoint.Push(j)
 }
 
-// Exec executed job using local RR server. Make sure that service is started.
-func (s *Service) Exec(j *Job) error {
+// exec executed job using local RR server. Make sure that service is started.
+func (s *Service) exec(j *Job) error {
 	ctx, err := j.Context()
 	if err != nil {
-		s.log.Errorf("[jobs.local] error `%svc`: %svc", j.ID, err)
+		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
 		return err
 	}
 
 	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
-		s.log.Errorf("[jobs.local] error `%svc`: %svc", j.ID, err)
+		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
 		return err
 	}
 
-	s.log.Debugf("[jobs.local] complete `%svc`", j.ID)
+	s.log.Debugf("[jobs.local] complete `%s`", j.ID)
 	return nil
 }
 
@@ -139,12 +116,12 @@ func (s *Service) Exec(j *Job) error {
 func (s *Service) getEndpoint(pipeline string) (Endpoint, error) {
 	pipe, ok := s.cfg.Pipelines[pipeline]
 	if !ok {
-		return nil, fmt.Errorf("undefined pipeline `%svc`", pipeline)
+		return nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
 	}
 
 	h, ok := s.endpoints[pipe.Endpoint]
 	if !ok {
-		return nil, fmt.Errorf("undefined endpoint `%svc`", pipe)
+		return nil, fmt.Errorf("undefined endpoint `%s`", pipe)
 	}
 
 	return h, nil
