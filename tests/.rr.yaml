@@ -16,12 +16,14 @@ jobs:
   pipelines:
     default:
       endpoint: local
+      listen:   true
 
     redis:
       endpoint: redis
+      listen:   true
       options:
-        queue: default
-        fifo:  true
+        queue:  default
+        fifo:   true
 
   # list of active endpoints and endpoint consumers
   endpoints:
@@ -30,8 +32,3 @@ jobs:
       address:  localhost:6379
       password: ""
       db:       0
-
-      # list of queue to consume jobs from
-      listen:
-        default:
-          fifo:  true
