@@ -102,16 +102,16 @@ func (s *Service) Push(j *Job) (string, error) {
 func (s *Service) exec(j *Job) error {
 	ctx, err := j.Context()
 	if err != nil {
-		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
+		s.log.Errorf("[jobs.%s] error `%s`: %s", j.Pipeline, j.ID, err)
 		return err
 	}
 
 	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
-		s.log.Errorf("[jobs.local] error `%s`: %s", j.ID, err)
+		s.log.Errorf("[jobs.%s] error `%s`: %s", j.Pipeline, j.ID, err)
 		return err
 	}
 
-	s.log.Debugf("[jobs.local] complete `%s`", j.ID)
+	s.log.Debugf("[jobs.%s] complete `%s`", j.Pipeline, j.ID)
 	return nil
 }
 

@@ -17,7 +17,7 @@ jobs:
     default:
       endpoint: local
 
-    distributed:
+    redis:
       endpoint: redis
       options:
         queue: "default"

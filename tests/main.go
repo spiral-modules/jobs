@@ -14,7 +14,7 @@ func main() {
 	rr.Container.Register(rpc.ID, &rpc.Service{})
 	rr.Container.Register(jobs.ID, jobs.NewService(rr.Logger, map[string]jobs.Endpoint{
 		"local": &endpoint.Local{},
-		//"redis": &endpoint.Redis{},
+		"redis": &endpoint.Redis{},
 	}))
 
 	rr.Logger.Formatter = &logrus.TextFormatter{ForceColors: true}

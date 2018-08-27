@@ -17,7 +17,7 @@ use Spiral\Jobs\Queue;
 use Spiral\Jobs\Options;
 use Spiral\Jobs\Tests\Fixtures\LocalJob;
 
-class LocalTest extends TestCase
+class RedisTest extends TestCase
 {
     protected function tearDown()
     {
@@ -42,24 +42,6 @@ class LocalTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
-    public function testLocalDelay()
-    {
-        $jobs = $this->makeJobs();
-
-        $id = $jobs->push(new LocalJob([
-            'data' => 100
-        ]), new Options(1));
-
-        $this->assertNotEmpty($id);
-
-        $this->assertTrue($this->waitForJob() > 1);
-        $this->assertFileExists(LocalJob::JOB_FILE);
-
-        $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
-        $this->assertSame($id, $data['id']);
-        $this->assertSame(100, $data['data']);
-    }
-
     /**
      * @expectedException \Spiral\Jobs\Exceptions\JobException
      */
@@ -68,7 +50,7 @@ class LocalTest extends TestCase
         $jobs = new Queue(
             new JobsConfig([
                 'pipelines'       => [],
-                'defaultPipeline' => 'default'
+                'defaultPipeline' => 'redis'
             ]),
             new RPC(new SocketRelay('localhost', 6002))
         );
@@ -83,7 +65,7 @@ class LocalTest extends TestCase
         return new Queue(
             new JobsConfig([
                 'pipelines'       => [],
-                'defaultPipeline' => 'default'
+                'defaultPipeline' => 'redis'
             ]),
             new RPC(new SocketRelay('localhost', 6001))
         );

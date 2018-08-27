@@ -5,6 +5,9 @@ sudo: required
 go:
   - "1.10.x"
 
+services:
+  - redis
+
 before_install:
   - go version
   - sudo add-apt-repository -y ppa:ondrej/php

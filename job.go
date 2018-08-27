@@ -1,6 +1,8 @@
 package jobs
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // Job carries information about single job.
 type Job struct {
