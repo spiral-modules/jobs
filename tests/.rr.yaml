@@ -32,6 +32,6 @@ jobs:
       db:       0
 
       # list of queue to consume jobs from
-      serve:
+      listen:
         default:
           fifo:  true
