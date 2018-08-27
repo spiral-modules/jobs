@@ -1,5 +1,5 @@
 {
-  "name": "spiral/async",
+  "name": "spiral/jobs",
   "type": "library",
   "description": "Spiral: Jobs Jobs and Queue",
   "license": "MIT",
