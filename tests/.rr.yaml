@@ -23,7 +23,7 @@ jobs:
       listen:   true
       options:
         queue:  default
-        fifo:   true
+        mode:   fifo
 
   # list of active endpoints and endpoint consumers
   endpoints:
