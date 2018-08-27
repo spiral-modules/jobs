@@ -16,9 +16,14 @@ jobs:
   pipelines:
     default:
       endpoint: local
-      options: []
+
+    distributed:
+      endpoint: redis
+      options:
+        queue: "default"
+        fifo:  true
 
   # list of active endpoints and endpoint consumers
   endpoints:
-    local:
-      enable: true
+    redis:
+      address:  redis://localhost:6379/0
