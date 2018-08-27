@@ -12,6 +12,9 @@ import (
 // ID defines Jobs service public alias.
 const ID = "jobs"
 
+// EndpointsConfig defines config section related to endpoints configuration.
+const EndpointsConfig = "endpoints"
+
 // Handler handles job execution.
 type Handler func(j *Job) error
 
@@ -55,7 +58,7 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 		s.container.Register(fmt.Sprintf("jobs.%s", name), e)
 	}
 
-	s.container.Init(cfg.Get("endpoints"))
+	s.container.Init(cfg.Get(EndpointsConfig))
 
 	return true, nil
 }
