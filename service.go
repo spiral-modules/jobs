@@ -55,7 +55,7 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 	s.container = service.NewContainer(s.log)
 	for name, e := range s.endpoints {
 		e.Handler(s.exec)
-		s.container.Register(fmt.Sprintf("jobs.%s", name), e)
+		s.container.Register(name, e)
 	}
 
 	s.container.Init(cfg.Get(EndpointsConfig))
