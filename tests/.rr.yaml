@@ -10,7 +10,7 @@ jobs:
     command: "php tests/handler.php"
     pool:
       numWorkers: 1
-      maxJobs: 1
+      maxJobs:    1
 
   # list of endpoint pipelines associated with endpoints
   pipelines:
