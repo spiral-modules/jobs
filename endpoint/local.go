@@ -1,7 +1,6 @@
 package endpoint
 
 import (
-	"errors"
 	"github.com/spiral/jobs"
 	"sync"
 	"time"
@@ -31,13 +30,6 @@ func (l *Local) Init() (bool, error) {
 
 // Push new job to queue
 func (l *Local) Push(j *jobs.Job) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.jobs == nil {
-		return errors.New("local job endpoint is not started")
-	}
-
 	l.jobs <- j
 	return nil
 }

@@ -26,4 +26,6 @@ jobs:
   # list of active endpoints and endpoint consumers
   endpoints:
     redis:
-      address:  redis://localhost:6379/0
+      address:  localhost:6379
+      password: ""
+      db:       0
