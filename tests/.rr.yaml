@@ -20,7 +20,7 @@ jobs:
     redis:
       endpoint: redis
       options:
-        queue: "default"
+        queue: default
         fifo:  true
 
   # list of active endpoints and endpoint consumers
