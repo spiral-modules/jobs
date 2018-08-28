@@ -117,9 +117,9 @@ func (s *Service) exec(j *Job) error {
 	}
 
 	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
-		p, e, perr := s.getPipeline(j.Pipeline)
-		if perr != nil {
-			s.log.Errorf("[jobs.%s] retry error `%s`: %s", j.Pipeline, j.ID, perr.Error())
+		p, e, prr := s.getPipeline(j.Pipeline)
+		if prr != nil {
+			s.log.Errorf("[jobs.%s] retry error `%s`: %s", j.Pipeline, j.ID, prr.Error())
 			return err
 		}
 
