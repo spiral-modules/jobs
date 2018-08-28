@@ -26,6 +26,9 @@ type Pipeline struct {
 	// Retry defined number of job retries in case of error. Default none.
 	Retry int
 
+	// RetryDelay defines for how long wait till job retry.
+	RetryDelay int
+
 	// Listen tells the service that this pipeline must be consumed by the service.
 	Listen bool
 

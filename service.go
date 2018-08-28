@@ -128,7 +128,11 @@ func (s *Service) exec(j *Job) error {
 
 			j.Attempt++
 			if j.Options != nil {
-				j.Options.Delay = nil
+				if p.RetryDelay != 0 {
+					*j.Options.Delay = p.RetryDelay
+				} else {
+					j.Options.Delay = nil
+				}
 			}
 
 			e.Push(p, j)
