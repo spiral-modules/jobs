@@ -112,19 +112,19 @@ func (s *Service) Push(j *Job) (string, error) {
 func (s *Service) exec(j *Job) error {
 	ctx, err := j.Context()
 	if err != nil {
-		s.log.Errorf("[jobs.%s] error `%s`: %s", j.Pipeline, j.ID, err)
+		s.log.Errorf("[jobs] error `%s`: %s", j.ID, err)
 		return err
 	}
 
 	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
 		p, e, prr := s.getPipeline(j.Pipeline)
 		if prr != nil {
-			s.log.Errorf("[jobs.%s] retry error `%s`: %s", j.Pipeline, j.ID, prr.Error())
+			s.log.Errorf("[jobs] retry error `%s`: %s", j.ID, prr.Error())
 			return err
 		}
 
 		if p.Retry > j.Attempt {
-			s.log.Warningf("[jobs.%s] retrying `%s`: %s", j.Pipeline, j.ID, err.Error())
+			s.log.Warningf("[jobs] retrying `%s`: %s", j.ID, err.Error())
 
 			j.Attempt++
 			if j.Options != nil {
@@ -140,11 +140,11 @@ func (s *Service) exec(j *Job) error {
 			return nil
 		}
 
-		s.log.Errorf("[jobs.%s] error `%s`: %s", j.Pipeline, j.ID, err.Error())
+		s.log.Errorf("[jobs] error `%s`: %s", j.ID, err.Error())
 		return err
 	}
 
-	s.log.Debugf("[jobs.%s] complete `%s`", j.Pipeline, j.ID)
+	s.log.Debugf("[jobs] complete `%s`", j.ID)
 	return nil
 }
 
