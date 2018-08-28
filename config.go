@@ -15,10 +15,19 @@ type Config struct {
 	Workers *roadrunner.ServerConfig
 
 	// Pipelines defines mapping between PHP job pipeline and associated job endpoint.
-	Pipelines map[string]struct {
-		// Endpoint defines associated endpoint.
-		Endpoint string
-	}
+	Pipelines map[string]*Pipeline
+}
+
+// Pipeline describes endpoint specific pipeline.
+type Pipeline struct {
+	// Endpoint defines name of associated endpoint.
+	Endpoint string
+
+	// Listen tells the service that this pipeline must be consumed by the service.
+	Listen bool
+
+	// Options are endpoint specific options.
+	Options map[string]interface{}
 }
 
 // Hydrate populates config values.

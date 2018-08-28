@@ -14,8 +14,9 @@ type Local struct {
 }
 
 // SetHandler configures function to handle job execution.
-func (l *Local) Handler(exec jobs.Handler) {
+func (l *Local) Handle(pipes []*jobs.Pipeline, exec jobs.Handler) jobs.Endpoint {
 	l.exec = exec
+	return l
 }
 
 // Init configures local job endpoint.
@@ -29,7 +30,7 @@ func (l *Local) Init() (bool, error) {
 }
 
 // Push new job to queue
-func (l *Local) Push(j *jobs.Job) error {
+func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) error {
 	l.jobs <- j
 	return nil
 }

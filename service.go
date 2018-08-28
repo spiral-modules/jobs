@@ -15,7 +15,7 @@ const ID = "jobs"
 // EndpointsConfig defines config section related to endpoints configuration.
 const EndpointsConfig = "endpoints"
 
-// Handler handles job execution.
+// Handle handles job execution.
 type Handler func(j *Job) error
 
 // Service manages job execution and connection to multiple job pipelines.
@@ -54,8 +54,14 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 	// so we can easier manage their state and configuration
 	s.container = service.NewContainer(s.log)
 	for name, e := range s.endpoints {
-		e.Handler(s.exec)
-		s.container.Register(name, e)
+		pipes := make([]*Pipeline, 0)
+		for _, p := range s.cfg.Pipelines {
+			if p.Endpoint == name {
+				pipes = append(pipes, p)
+			}
+		}
+
+		s.container.Register(name, e.Handle(pipes, s.exec))
 	}
 
 	s.container.Init(cfg.Get(EndpointsConfig))
@@ -82,7 +88,7 @@ func (s *Service) Stop() {
 
 // Push job to associated endpoint and return job id.
 func (s *Service) Push(j *Job) (string, error) {
-	endpoint, err := s.getEndpoint(j.Pipeline)
+	pipeline, endpoint, err := s.getPipeline(j.Pipeline)
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +101,7 @@ func (s *Service) Push(j *Job) (string, error) {
 	j.ID = id.String()
 
 	s.log.Debugf("[jobs] new job `%s`", j.ID)
-	return j.ID, endpoint.Push(j)
+	return j.ID, endpoint.Push(pipeline, j)
 }
 
 // exec executed job using local RR server. Make sure that service is started.
@@ -116,16 +122,16 @@ func (s *Service) exec(j *Job) error {
 }
 
 // return endpoint associated with given pipeline.
-func (s *Service) getEndpoint(pipeline string) (Endpoint, error) {
+func (s *Service) getPipeline(pipeline string) (*Pipeline, Endpoint, error) {
 	pipe, ok := s.cfg.Pipelines[pipeline]
 	if !ok {
-		return nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
+		return nil, nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
 	}
 
 	h, ok := s.endpoints[pipe.Endpoint]
 	if !ok {
-		return nil, fmt.Errorf("undefined endpoint `%s`", pipe)
+		return nil, nil, fmt.Errorf("undefined endpoint `%s`", pipe)
 	}
 
-	return h, nil
+	return pipe, h, nil
 }

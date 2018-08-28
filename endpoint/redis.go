@@ -32,8 +32,9 @@ type Redis struct {
 }
 
 // SetHandler configures function to handle job execution.
-func (r *Redis) Handler(exec jobs.Handler) {
+func (r *Redis) Handle(pipes []*jobs.Pipeline, exec jobs.Handler) jobs.Endpoint {
 	r.exec = exec
+	return r
 }
 
 // Init configures local job endpoint.
@@ -53,7 +54,7 @@ func (r *Redis) Init(cfg *RedisConfig) (bool, error) {
 }
 
 // Push new job to queue
-func (r *Redis) Push(j *jobs.Job) error {
+func (r *Redis) Push(p *jobs.Pipeline, j *jobs.Job) error {
 	data, err := json.Marshal(j)
 	if err != nil {
 		return err
