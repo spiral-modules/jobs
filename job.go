@@ -9,6 +9,9 @@ type Job struct {
 	// ID contains unique job id.
 	ID string `json:"id"`
 
+	// Attempt is number of job attempt if case of error.
+	Attempt int `json:"attempt"`
+
 	// Job contains name of job endpoint (usually PHP class).
 	Job string `json:"job"`
 

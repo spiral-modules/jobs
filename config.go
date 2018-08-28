@@ -23,6 +23,9 @@ type Pipeline struct {
 	// Endpoint defines name of associated endpoint.
 	Endpoint string
 
+	// Retry defined number of job retries in case of error. Default none.
+	Retry int
+
 	// Listen tells the service that this pipeline must be consumed by the service.
 	Listen bool
 

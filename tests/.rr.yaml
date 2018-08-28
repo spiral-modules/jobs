@@ -21,7 +21,6 @@ jobs:
     redis:
       endpoint: redis
       listen:   true
-      listen:   true
       options:
         queue:  default
 

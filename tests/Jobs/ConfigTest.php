@@ -18,12 +18,12 @@ class ConfigTest extends TestCase
     {
         $config = new JobsConfig([
             'pipelines'       => [
-                LocalJob::class => 'other'
+                LocalJob::class => 'redis'
             ],
-            'default'         => 'async'
+            'default'         => 'default'
         ]);
 
-        $this->assertSame('other', $config->jobPipeline(LocalJob::class));
-        $this->assertSame('async', $config->jobPipeline(self::class));
+        $this->assertSame('redis', $config->jobPipeline(LocalJob::class));
+        $this->assertSame('default', $config->jobPipeline(self::class));
     }
 }
