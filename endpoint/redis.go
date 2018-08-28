@@ -181,8 +181,7 @@ func (r *Redis) listen(p *pipeline) error {
 					return err
 				}
 
-				// todo: retry ?
-				r.exec(j)
+				go r.exec(j)
 			}
 		}
 	}

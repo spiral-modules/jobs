@@ -39,7 +39,6 @@ func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) error {
 // Serve local endpoint.
 func (l *Local) Serve() error {
 	for j := range l.jobs {
-		// todo: use worker pool instead
 		go func(j *jobs.Job) {
 			if j.Options != nil && j.Options.Delay != nil {
 				time.Sleep(time.Second * time.Duration(*j.Options.Delay))
