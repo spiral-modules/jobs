@@ -49,8 +49,8 @@ class RedisTest extends TestCase
     {
         $jobs = new Queue(
             new JobsConfig([
-                'pipelines'       => [],
-                'defaultPipeline' => 'redis'
+                'pipelines' => [],
+                'default'   => 'redis'
             ]),
             new RPC(new SocketRelay('localhost', 6002))
         );
@@ -64,8 +64,8 @@ class RedisTest extends TestCase
     {
         return new Queue(
             new JobsConfig([
-                'pipelines'       => [],
-                'defaultPipeline' => 'redis'
+                'pipelines' => [],
+                'default'   => 'redis'
             ]),
             new RPC(new SocketRelay('localhost', 6001))
         );

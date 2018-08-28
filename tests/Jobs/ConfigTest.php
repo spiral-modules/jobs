@@ -20,7 +20,7 @@ class ConfigTest extends TestCase
             'pipelines'       => [
                 LocalJob::class => 'other'
             ],
-            'defaultPipeline' => 'async'
+            'default'         => 'async'
         ]);
 
         $this->assertSame('other', $config->jobPipeline(LocalJob::class));

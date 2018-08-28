@@ -22,7 +22,7 @@ class JobsConfig extends InjectableConfig
         'pipelines'       => [
             // JobClass::class => "rabbitmq"
         ],
-        'defaultPipeline' => 'local'
+        'default' => 'local'
     ];
 
     /**
@@ -38,6 +38,6 @@ class JobsConfig extends InjectableConfig
             return $this->config['pipelines'][$job];
         }
 
-        return $this->config['defaultPipeline'];
+        return $this->config['default'];
     }
 }
