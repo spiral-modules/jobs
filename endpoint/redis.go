@@ -7,6 +7,7 @@ import (
 	"time"
 	"encoding/json"
 	"sync"
+	"fmt"
 )
 
 // RedisConfig defines connection options to Redis server.
@@ -24,17 +25,75 @@ func (c *RedisConfig) Hydrate(cfg service.Config) error {
 
 // Local run jobs using local goroutines.
 type Redis struct {
-	cfg    *RedisConfig
-	client *redis.Client
-	exec   jobs.Handler
-	mu     sync.Mutex
-	stop   chan interface{}
+	cfg       *RedisConfig
+	client    *redis.Client
+	exec      jobs.Handler
+	mu        sync.Mutex
+	pipelines map[*jobs.Pipeline]*pipeline
+	stop      chan interface{}
 }
 
-// SetHandler configures function to handle job execution.
-func (r *Redis) Handle(pipes []*jobs.Pipeline, exec jobs.Handler) jobs.Endpoint {
+// redis specific pipeline configuration
+type pipeline struct {
+	// Listen the pipeline.
+	Listen bool
+
+	// Queue name.
+	Queue string
+
+	// Mode defines operating mode (fifo, lifo, broadcast)
+	Mode string
+
+	// Timeout defines listen timeout, defaults to 1.
+	Timeout int
+}
+
+func makePipeline(p *jobs.Pipeline) (*pipeline, error) {
+	rp := &pipeline{
+		Listen:  p.Listen,
+		Queue:   p.Options.String("queue", ""),
+		Mode:    p.Options.String("mode", "fifo"),
+		Timeout: p.Options.Int("timeout", 1),
+	}
+
+	if err := rp.Valid(); err != nil {
+		return nil, err
+	}
+
+	return rp, nil
+}
+
+// Valid returns error if pipeline configuration is not valid.
+func (p *pipeline) Valid() error {
+	if p.Queue == "" {
+		return fmt.Errorf("missing `queue` option for redis pipeline")
+	}
+
+	if p.Mode != "fifo" && p.Mode != "lifo" {
+		return fmt.Errorf("undefined pipeline mode `%s` [fifo|lifo]", p.Mode)
+	}
+
+	if p.Timeout < 0 {
+		return fmt.Errorf("invalid pipeline timeout %v", p.Timeout)
+	}
+
+	return nil
+}
+
+// Handle configures endpoint with list of pipelines to listen and handler function.
+func (r *Redis) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
+	r.pipelines = make(map[*jobs.Pipeline]*pipeline)
+
+	for _, p := range pipelines {
+		if rp, err := makePipeline(p); err != nil {
+			return err
+		} else {
+			r.pipelines[p] = rp
+		}
+	}
+
 	r.exec = exec
-	return r
+	return nil
 }
 
 // Init configures local job endpoint.
@@ -60,7 +119,16 @@ func (r *Redis) Push(p *jobs.Pipeline, j *jobs.Job) error {
 		return err
 	}
 
-	cmd := r.client.RPush(j.Pipeline, data)
+	// todo: delays
+
+	var cmd *redis.IntCmd
+	switch r.pipelines[p].Mode {
+	case "fifo":
+		cmd = r.client.RPush(r.pipelines[p].Queue, data)
+	case "lifo":
+		cmd = r.client.LPush(r.pipelines[p].Queue, data)
+	}
+
 	if cmd.Err() != nil {
 		return cmd.Err()
 	}
@@ -80,24 +148,13 @@ func (r *Redis) Serve() error {
 	r.stop = make(chan interface{})
 	r.mu.Unlock()
 
-	for {
-		select {
-		case <-r.stop:
-			return nil
-		default:
-			res := r.client.BLPop(time.Second, "redis")
-			if len(res.Val()) == 2 {
-				j := &jobs.Job{}
-				if err := json.Unmarshal([]byte(res.Val()[1]), j); err != nil {
-					return err
-				}
-
-				// log err
-				r.exec(j)
-			}
+	for _, p := range r.pipelines {
+		if p.Listen {
+			go r.listen(p)
 		}
 	}
 
+	<-r.stop
 	return nil
 }
 
@@ -108,5 +165,25 @@ func (r *Redis) Stop() {
 
 	if r.stop != nil {
 		close(r.stop)
+	}
+}
+
+func (r *Redis) listen(p *pipeline) error {
+	for {
+		select {
+		case <-r.stop:
+			return nil
+		default:
+			res := r.client.BLPop(time.Second*time.Duration(p.Timeout), p.Queue)
+			if len(res.Val()) == 2 {
+				j := &jobs.Job{}
+				if err := json.Unmarshal([]byte(res.Val()[1]), j); err != nil {
+					return err
+				}
+
+				// todo: retry ?
+				r.exec(j)
+			}
+		}
 	}
 }

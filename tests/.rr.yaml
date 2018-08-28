@@ -21,9 +21,9 @@ jobs:
     redis:
       endpoint: redis
       listen:   true
+      listen:   true
       options:
         queue:  default
-        mode:   fifo
 
   # list of active endpoints and endpoint consumers
   endpoints:

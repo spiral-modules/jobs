@@ -2,8 +2,8 @@ package jobs
 
 // Endpoint represents single endpoint abstraction.
 type Endpoint interface {
-	// Handle must be provided by parent service and define how to execute job.
-	Handle(pipes []*Pipeline, h Handler) Endpoint
+	// Handle configures endpoint with list of pipelines to listen and handler function.
+	Handle(pipelines []*Pipeline, h Handler) error
 
 	// Push new job to the endpoint.
 	Push(p *Pipeline, j *Job) error

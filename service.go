@@ -61,7 +61,11 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 			}
 		}
 
-		s.container.Register(name, e.Handle(pipes, s.exec))
+		if err := e.Handle(pipes, s.exec); err != nil {
+			return false, err
+		}
+
+		s.container.Register(name, e)
 	}
 
 	s.container.Init(cfg.Get(EndpointsConfig))

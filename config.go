@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Config defines settings for job endpoint, workers and routing options.
+// Config defines settings for job endpoint, workers and routing PipelineOptions.
 type Config struct {
 	// Enable enables jobs service.
 	Enable bool
@@ -26,8 +26,32 @@ type Pipeline struct {
 	// Listen tells the service that this pipeline must be consumed by the service.
 	Listen bool
 
-	// Options are endpoint specific options.
-	Options map[string]interface{}
+	// Options are endpoint specific PipelineOptions.
+	Options PipelineOptions
+}
+
+type PipelineOptions map[string]interface{}
+
+// String must return option value as string or return default value.
+func (o PipelineOptions) String(name string, d string) string {
+	if value, ok := o[name]; ok {
+		if str, ok := value.(string); ok {
+			return str
+		}
+	}
+
+	return d
+}
+
+// Int must return option value as string or return default value.
+func (o PipelineOptions) Int(name string, d int) int {
+	if value, ok := o[name]; ok {
+		if str, ok := value.(int); ok {
+			return str
+		}
+	}
+
+	return d
 }
 
 // Hydrate populates config values.

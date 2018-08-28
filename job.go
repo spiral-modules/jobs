@@ -18,7 +18,7 @@ type Job struct {
 	// Payload is string data (usually JSON) passed to Job endpoint.
 	Payload string `json:"payload"`
 
-	// Options contains set of options specific to job execution. Can be empty.
+	// Options contains set of PipelineOptions specific to job execution. Can be empty.
 	Options *Options `json:"options,omitempty"`
 }
 
