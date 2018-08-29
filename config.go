@@ -50,7 +50,7 @@ func (o PipelineOptions) String(name string, d string) string {
 }
 
 // Int must return option value as string or return default value.
-func (o PipelineOptions) Int(name string, d int) int {
+func (o PipelineOptions) Integer(name string, d int) int {
 	if value, ok := o[name]; ok {
 		if str, ok := value.(int); ok {
 			return str

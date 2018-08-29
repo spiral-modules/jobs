@@ -53,7 +53,7 @@ func makePipeline(p *jobs.Pipeline) (*pipeline, error) {
 		Listen:  p.Listen,
 		Queue:   p.Options.String("queue", ""),
 		Mode:    p.Options.String("mode", "fifo"),
-		Timeout: p.Options.Int("timeout", 1),
+		Timeout: p.Options.Integer("timeout", 1),
 	}
 
 	if err := rp.Valid(); err != nil {
@@ -85,11 +85,12 @@ func (r *Redis) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 	r.pipelines = make(map[*jobs.Pipeline]*pipeline)
 
 	for _, p := range pipelines {
-		if rp, err := makePipeline(p); err != nil {
+		rp, err := makePipeline(p)
+		if err != nil {
 			return err
-		} else {
-			r.pipelines[p] = rp
 		}
+
+		r.pipelines[p] = rp
 	}
 
 	r.exec = exec

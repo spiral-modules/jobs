@@ -116,36 +116,38 @@ func (s *Service) exec(j *Job) error {
 		return err
 	}
 
-	if _, err := s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx}); err != nil {
-		p, e, prr := s.getPipeline(j.Pipeline)
-		if prr != nil {
-			s.log.Errorf("[jobs] retry error `%s`: %s", j.ID, prr.Error())
-			return err
-		}
+	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
+	if err == nil {
 
-		if p.Retry > j.Attempt {
-			s.log.Warningf("[jobs] retrying `%s`: %s", j.ID, err.Error())
+		s.log.Debugf("[jobs] complete `%s`", j.ID)
+		return nil
+	}
 
-			j.Attempt++
-			if j.Options != nil {
-				if p.RetryDelay != 0 {
-					*j.Options.Delay = p.RetryDelay
-				} else {
-					j.Options.Delay = nil
-				}
-			}
-
-			e.Push(p, j)
-
-			return nil
-		}
-
-		s.log.Errorf("[jobs] error `%s`: %s", j.ID, err.Error())
+	p, e, prr := s.getPipeline(j.Pipeline)
+	if prr != nil {
+		s.log.Errorf("[jobs] retry error `%s`: %s", j.ID, prr.Error())
 		return err
 	}
 
-	s.log.Debugf("[jobs] complete `%s`", j.ID)
-	return nil
+	if p.Retry > j.Attempt {
+		s.log.Warningf("[jobs] retrying `%s`: %s", j.ID, err.Error())
+
+		j.Attempt++
+		if j.Options != nil {
+			if p.RetryDelay != 0 {
+				*j.Options.Delay = p.RetryDelay
+			} else {
+				j.Options.Delay = nil
+			}
+		}
+
+		e.Push(p, j)
+
+		return nil
+	}
+
+	s.log.Errorf("[jobs] error `%s`: %s", j.ID, err.Error())
+	return err
 }
 
 // return endpoint associated with given pipeline.
