@@ -1,4 +1,4 @@
-package endpoint
+package broker
 
 import (
 	"github.com/spiral/jobs"
@@ -80,7 +80,7 @@ func (p *pipeline) Valid() error {
 	return nil
 }
 
-// Handle configures endpoint with list of pipelines to listen and handler function.
+// Handle configures broker with list of pipelines to listen and handler function.
 func (r *Redis) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 	r.pipelines = make(map[*jobs.Pipeline]*pipeline)
 
@@ -97,7 +97,7 @@ func (r *Redis) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 	return nil
 }
 
-// Init configures local job endpoint.
+// Init configures local job broker.
 func (r *Redis) Init(cfg *RedisConfig) (bool, error) {
 	if !cfg.Enable {
 		return false, nil
@@ -137,7 +137,7 @@ func (r *Redis) Push(p *jobs.Pipeline, j *jobs.Job) error {
 	return nil
 }
 
-// Serve local endpoint.
+// Serve local broker.
 func (r *Redis) Serve() error {
 	// verify db connection
 	_, err := r.client.Ping().Result()
@@ -159,7 +159,7 @@ func (r *Redis) Serve() error {
 	return nil
 }
 
-// Stop local endpoint.
+// Stop local broker.
 func (r *Redis) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()

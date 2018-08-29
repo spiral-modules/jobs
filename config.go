@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Config defines settings for job endpoint, workers and routing PipelineOptions.
+// Config defines settings for job broker, workers and routing PipelineOptions.
 type Config struct {
 	// Enable enables jobs service.
 	Enable bool
@@ -14,14 +14,14 @@ type Config struct {
 	// Workers configures roadrunner server and worker pool.
 	Workers *roadrunner.ServerConfig
 
-	// Pipelines defines mapping between PHP job pipeline and associated job endpoint.
+	// Pipelines defines mapping between PHP job pipeline and associated job broker.
 	Pipelines map[string]*Pipeline
 }
 
-// Pipeline describes endpoint specific pipeline.
+// Pipeline describes broker specific pipeline.
 type Pipeline struct {
-	// Endpoint defines name of associated endpoint.
-	Endpoint string
+	// Broker defines name of associated broker.
+	Broker string
 
 	// Retry defined number of job retries in case of error. Default none.
 	Retry int
@@ -32,7 +32,7 @@ type Pipeline struct {
 	// Listen tells the service that this pipeline must be consumed by the service.
 	Listen bool
 
-	// Options are endpoint specific PipelineOptions.
+	// Options are broker specific PipelineOptions.
 	Options PipelineOptions
 }
 

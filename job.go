@@ -12,13 +12,13 @@ type Job struct {
 	// Attempt is number of job attempt if case of error.
 	Attempt int `json:"attempt"`
 
-	// Job contains name of job endpoint (usually PHP class).
+	// Job contains name of job broker (usually PHP class).
 	Job string `json:"job"`
 
 	// Pipeline associated with the job.
 	Pipeline string `json:"pipeline"`
 
-	// Payload is string data (usually JSON) passed to Job endpoint.
+	// Payload is string data (usually JSON) passed to Job broker.
 	Payload string `json:"payload"`
 
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.

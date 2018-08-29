@@ -1,4 +1,4 @@
-package endpoint
+package broker
 
 import (
 	"github.com/spiral/jobs"
@@ -16,7 +16,7 @@ type Local struct {
 	exec    jobs.Handler
 }
 
-// Handle configures endpoint with list of pipelines to listen and handler function. Local endpoint groups all pipelines
+// Handle configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
 // together.
 func (l *Local) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 	switch {
@@ -38,7 +38,7 @@ func (l *Local) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 	return nil
 }
 
-// Init configures local job endpoint.
+// Init configures local job broker.
 func (l *Local) Init() (bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -54,7 +54,7 @@ func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) error {
 	return nil
 }
 
-// Serve local endpoint.
+// Serve local broker.
 func (l *Local) Serve() error {
 	for i := 0; i < l.threads; i++ {
 		l.wg.Add(1)
@@ -65,7 +65,7 @@ func (l *Local) Serve() error {
 	return nil
 }
 
-// Stop local endpoint.
+// Stop local broker.
 func (l *Local) Stop() {
 	l.mu.Lock()
 	defer l.mu.Unlock()

@@ -5,27 +5,27 @@ rpc:
 jobs:
   enable: true
 
-  # local rr endpoint configuration
+  # local rr broker configuration
   workers:
     command: "php tests/handler.php"
     pool:
       numWorkers: 1
       maxJobs:    1
 
-  # list of endpoint pipelines associated with endpoints
+  # list of broker pipelines associated with endpoints
   pipelines:
     default:
-      endpoint: local
-      listen:   true
+      broker: local
+      listen: true
 
     redis:
-      endpoint: redis
-      listen:   true
+      broker: redis
+      listen: true
       options:
-        queue:  default
+        queue: default
 
-  # list of active endpoints and endpoint consumers
-  endpoints:
+  # list of active endpoints and broker consumers
+  brokers:
     redis:
       enable:   true
       address:  localhost:6379

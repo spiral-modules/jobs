@@ -12,8 +12,8 @@ import (
 // ID defines Jobs service public alias.
 const ID = "jobs"
 
-// EndpointsConfig defines config section related to endpoints configuration.
-const EndpointsConfig = "endpoints"
+// BrokersConfig defines config section related to brokers configuration.
+const BrokersConfig = "brokers"
 
 // Handle handles job execution.
 type Handler func(j *Job) error
@@ -24,12 +24,12 @@ type Service struct {
 	cfg       *Config
 	rr        *roadrunner.Server
 	container service.Container
-	endpoints map[string]Endpoint
+	brokers   map[string]Broker
 }
 
 // NewService creates new service for job handling.
-func NewService(log *logrus.Logger, endpoints map[string]Endpoint) *Service {
-	return &Service{log: log, endpoints: endpoints}
+func NewService(log *logrus.Logger, brokers map[string]Broker) *Service {
+	return &Service{log: log, brokers: brokers}
 }
 
 // Init configures job service.
@@ -53,10 +53,10 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 	// we are going to keep all handlers withing the container
 	// so we can easier manage their state and configuration
 	s.container = service.NewContainer(s.log)
-	for name, e := range s.endpoints {
+	for name, e := range s.brokers {
 		pipes := make([]*Pipeline, 0)
 		for _, p := range s.cfg.Pipelines {
-			if p.Endpoint == name {
+			if p.Broker == name {
 				pipes = append(pipes, p)
 			}
 		}
@@ -68,12 +68,12 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 		s.container.Register(name, e)
 	}
 
-	s.container.Init(cfg.Get(EndpointsConfig))
+	s.container.Init(cfg.Get(BrokersConfig))
 
 	return true, nil
 }
 
-// Serve serves local rr server and creates endpoint association.
+// Serve serves local rr server and creates broker association.
 func (s *Service) Serve() error {
 	if err := s.rr.Start(); err != nil {
 		return err
@@ -90,7 +90,7 @@ func (s *Service) Stop() {
 	s.log.Debugf("[jobs]: stopped")
 }
 
-// Push job to associated endpoint and return job id.
+// Push job to associated broker and return job id.
 func (s *Service) Push(j *Job) (string, error) {
 	pipeline, endpoint, err := s.getPipeline(j.Pipeline)
 	if err != nil {
@@ -150,16 +150,16 @@ func (s *Service) exec(j *Job) error {
 	return err
 }
 
-// return endpoint associated with given pipeline.
-func (s *Service) getPipeline(pipeline string) (*Pipeline, Endpoint, error) {
+// return broker associated with given pipeline.
+func (s *Service) getPipeline(pipeline string) (*Pipeline, Broker, error) {
 	pipe, ok := s.cfg.Pipelines[pipeline]
 	if !ok {
 		return nil, nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
 	}
 
-	h, ok := s.endpoints[pipe.Endpoint]
+	h, ok := s.brokers[pipe.Broker]
 	if !ok {
-		return nil, nil, fmt.Errorf("undefined endpoint `%s`", pipe)
+		return nil, nil, fmt.Errorf("undefined broker `%s`", pipe)
 	}
 
 	return pipe, h, nil

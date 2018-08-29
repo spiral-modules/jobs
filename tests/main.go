@@ -7,14 +7,14 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/endpoint"
+	"github.com/spiral/jobs/broker"
 )
 
 func main() {
 	rr.Container.Register(rpc.ID, &rpc.Service{})
-	rr.Container.Register(jobs.ID, jobs.NewService(rr.Logger, map[string]jobs.Endpoint{
-		"local": &endpoint.Local{},
-		"redis": &endpoint.Redis{},
+	rr.Container.Register(jobs.ID, jobs.NewService(rr.Logger, map[string]jobs.Broker{
+		"local": &broker.Local{},
+		"redis": &broker.Redis{},
 	}))
 
 	rr.Logger.Formatter = &logrus.TextFormatter{ForceColors: true}
