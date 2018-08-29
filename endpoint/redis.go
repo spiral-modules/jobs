@@ -181,7 +181,7 @@ func (r *Redis) listen(p *pipeline) error {
 					return err
 				}
 
-				go r.exec(j)
+				r.exec(j)
 			}
 		}
 	}
