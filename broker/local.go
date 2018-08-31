@@ -37,8 +37,8 @@ func (l *Local) Init() (bool, error) {
 // together.
 func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
 	switch {
-	case len(pipelines) < 1:
-		// no pipelines to handleThread
+	case len(pipelines) == 0:
+		// no pipelines to handled
 		return nil
 
 	case len(pipelines) == 1:
