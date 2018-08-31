@@ -7,7 +7,6 @@ import (
 	"time"
 	"encoding/json"
 	"sync"
-	"fmt"
 )
 
 // RedisConfig defines connection options to Redis server.
@@ -24,64 +23,20 @@ func (c *RedisConfig) Hydrate(cfg service.Config) error {
 }
 
 // Local run jobs using local goroutines.
+// @see https://hackage.haskell.org/package/hworker
+// @see https://github.com/illuminate/queue
 type Redis struct {
 	cfg       *RedisConfig
-	client    *redis.Client
+	client    redis.Cmdable
 	exec      jobs.Handler
+	fail      jobs.ErrorHandler
 	mu        sync.Mutex
 	pipelines map[*jobs.Pipeline]*pipeline
 	stop      chan interface{}
 }
 
-// redis specific pipeline configuration
-type pipeline struct {
-	// Listen the pipeline.
-	Listen bool
-
-	// Queue name.
-	Queue string
-
-	// Mode defines operating mode (fifo, lifo, broadcast)
-	Mode string
-
-	// Timeout defines listen timeout, defaults to 1.
-	Timeout int
-}
-
-func makePipeline(p *jobs.Pipeline) (*pipeline, error) {
-	rp := &pipeline{
-		Listen:  p.Listen,
-		Queue:   p.Options.String("queue", ""),
-		Mode:    p.Options.String("mode", "fifo"),
-		Timeout: p.Options.Integer("timeout", 1),
-	}
-
-	if err := rp.Valid(); err != nil {
-		return nil, err
-	}
-
-	return rp, nil
-}
-
-// Valid returns error if pipeline configuration is not valid.
-func (p *pipeline) Valid() error {
-	if p.Queue == "" {
-		return fmt.Errorf("missing `queue` option for redis pipeline")
-	}
-
-	if p.Mode != "fifo" && p.Mode != "lifo" {
-		return fmt.Errorf("undefined pipeline mode `%s` [fifo|lifo]", p.Mode)
-	}
-
-	if p.Timeout < 0 {
-		return fmt.Errorf("invalid pipeline timeout %v", p.Timeout)
-	}
-
-	return nil
-}
-
 // Handle configures broker with list of pipelines to listen and handler function.
-func (r *Redis) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
+func (r *Redis) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
 	r.pipelines = make(map[*jobs.Pipeline]*pipeline)
 
 	for _, p := range pipelines {
@@ -93,7 +48,8 @@ func (r *Redis) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 		r.pipelines[p] = rp
 	}
 
-	r.exec = exec
+	r.exec = h
+	r.fail = f
 	return nil
 }
 
@@ -104,6 +60,7 @@ func (r *Redis) Init(cfg *RedisConfig) (bool, error) {
 	}
 	r.cfg = cfg
 
+	// todo: cluster support
 	r.client = redis.NewClient(&redis.Options{
 		Addr:     r.cfg.Address,
 		Password: r.cfg.Password,
@@ -176,6 +133,7 @@ func (r *Redis) listen(p *pipeline) error {
 			return nil
 		default:
 			res := r.client.BLPop(time.Second*time.Duration(p.Timeout), p.Queue)
+
 			if len(res.Val()) == 2 {
 				j := &jobs.Job{}
 				if err := json.Unmarshal([]byte(res.Val()[1]), j); err != nil {

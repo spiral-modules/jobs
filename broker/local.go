@@ -14,11 +14,12 @@ type Local struct {
 	wg      sync.WaitGroup
 	jobs    chan *jobs.Job
 	exec    jobs.Handler
+	fail    jobs.ErrorHandler
 }
 
 // Handle configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
 // together.
-func (l *Local) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
+func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
 	switch {
 	case len(pipelines) < 1:
 		// no pipelines to handleThread
@@ -34,7 +35,8 @@ func (l *Local) Handle(pipelines []*jobs.Pipeline, exec jobs.Handler) error {
 		return errors.New("local queue handler expects exactly one pipeline")
 	}
 
-	l.exec = exec
+	l.exec = h
+	l.fail = f
 	return nil
 }
 
@@ -50,7 +52,8 @@ func (l *Local) Init() (bool, error) {
 
 // Push new job to queue
 func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) error {
-	l.jobs <- j
+	go func() { l.jobs <- j }()
+
 	return nil
 }
 
@@ -87,6 +90,13 @@ func (l *Local) listen() {
 			time.Sleep(time.Second * time.Duration(*j.Options.Delay))
 		}
 
-		l.exec(j)
+		// local broker does not have a way to confirm job re-execution
+		if err := l.exec(j); err != nil {
+			if j.CanRetry() {
+				l.jobs <- j
+			} else {
+				l.fail(j, err)
+			}
+		}
 	}
 }

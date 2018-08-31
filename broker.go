@@ -3,7 +3,7 @@ package jobs
 // Broker represents single broker abstraction.
 type Broker interface {
 	// Handle configures broker with list of pipelines to listen and handler function.
-	Handle(pipelines []*Pipeline, h Handler) error
+	Handle(pipelines []*Pipeline, h Handler, f ErrorHandler) error
 
 	// Push new job to the broker.
 	Push(p *Pipeline, j *Job) error

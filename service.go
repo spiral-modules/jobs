@@ -18,6 +18,9 @@ const BrokersConfig = "brokers"
 // Handle handles job execution.
 type Handler func(j *Job) error
 
+// Handle handles job execution.
+type ErrorHandler func(j *Job, err error) error
+
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
 	log       *logrus.Logger
@@ -61,7 +64,7 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 			}
 		}
 
-		if err := e.Handle(pipes, s.exec); err != nil {
+		if err := e.Handle(pipes, s.exec, s.fail); err != nil {
 			return false, err
 		}
 
@@ -92,7 +95,7 @@ func (s *Service) Stop() {
 
 // Push job to associated broker and return job id.
 func (s *Service) Push(j *Job) (string, error) {
-	pipeline, endpoint, err := s.getPipeline(j.Pipeline)
+	p, b, err := s.getPipeline(j.Pipeline)
 	if err != nil {
 		return "", err
 	}
@@ -105,7 +108,7 @@ func (s *Service) Push(j *Job) (string, error) {
 	j.ID = id.String()
 
 	s.log.Debugf("[jobs] new job `%s`", j.ID)
-	return j.ID, endpoint.Push(pipeline, j)
+	return j.ID, b.Push(p, j)
 }
 
 // exec executed job using local RR server. Make sure that service is started.
@@ -116,36 +119,18 @@ func (s *Service) exec(j *Job) error {
 		return err
 	}
 
+	j.Attempt++
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-
 		s.log.Debugf("[jobs] complete `%s`", j.ID)
 		return nil
 	}
 
-	p, e, prr := s.getPipeline(j.Pipeline)
-	if prr != nil {
-		s.log.Errorf("[jobs] retry error `%s`: %s", j.ID, prr.Error())
-		return err
-	}
+	return err
+}
 
-	if p.Retry > j.Attempt {
-		s.log.Warningf("[jobs] retrying `%s`: %s", j.ID, err.Error())
-
-		j.Attempt++
-		if j.Options != nil {
-			if p.RetryDelay != 0 {
-				*j.Options.Delay = p.RetryDelay
-			} else {
-				j.Options.Delay = nil
-			}
-		}
-
-		e.Push(p, j)
-
-		return nil
-	}
-
+// fail must be invoked when job is declared as failed.
+func (s *Service) fail(j *Job, err error) error {
 	s.log.Errorf("[jobs] error `%s`: %s", j.ID, err.Error())
 	return err
 }

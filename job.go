@@ -9,6 +9,9 @@ type Job struct {
 	// ID contains unique job id.
 	ID string `json:"id"`
 
+	// Maximum job retries
+	MaxRetries int `json:"maxRetries,omitempty"`
+
 	// Attempt is number of job attempt if case of error.
 	Attempt int `json:"attempt"`
 
@@ -23,6 +26,10 @@ type Job struct {
 
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
 	Options *Options `json:"options,omitempty"`
+}
+
+func (j *Job) CanRetry() bool {
+	return j.Attempt >= j.MaxRetries
 }
 
 // Body packs job payload into binary payload.
