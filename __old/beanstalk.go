@@ -1,19 +1,22 @@
-package broker
+package __old
 
 import (
 	"github.com/spiral/jobs"
 	"sync"
 	"github.com/beanstalkd/go-beanstalk"
 	"time"
+	"errors"
+	"encoding/json"
 )
 
 // Beanstalk run jobs using Beanstalk service.
 type Beanstalk struct {
-	mu   sync.Mutex
-	conn *beanstalk.Conn
-	wg   sync.WaitGroup
-	exec jobs.Handler
-	fail jobs.ErrorHandler
+	mu      sync.Mutex
+	conn    *beanstalk.Conn
+	threads int
+	wg      sync.WaitGroup
+	exec    jobs.Handler
+	fail    jobs.ErrorHandler
 }
 
 // Init configures local job broker.
@@ -28,20 +31,20 @@ func (b *Beanstalk) Init(cfg *BeanstalkConfig) (bool, error) {
 // Handle configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
 // together.
 func (b *Beanstalk) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
-	//switch {
-	//case len(pipelines) < 1:
-	//	// no pipelines to handleThread
-	//	return nil
-	//
-	//case len(pipelines) == 1:
-	//	b.threads = pipelines[0].Options.Integer("threads", 1)
-	//	if b.threads < 1 {
-	//		return errors.New("local queue handler threads must be 1 or higher")
-	//	}
-	//
-	//default:
-	//	return errors.New("local queue handler expects exactly one pipeline")
-	//}
+	switch {
+	case len(pipelines) < 1:
+		// no pipelines to handleThread
+		return nil
+
+	case len(pipelines) == 1:
+		b.threads = pipelines[0].Options.Integer("threads", 1)
+		if b.threads < 1 {
+			return errors.New("beanstalk queue handler threads must be 1 or higher")
+		}
+
+	default:
+		return errors.New("beanstalk queue handler expects exactly one pipeline")
+	}
 
 	b.exec = h
 	b.fail = f
@@ -57,10 +60,10 @@ func (b *Beanstalk) Serve() error {
 
 	b.conn = conn
 
-	//for i := 0; i < b.threads; i++ {
-	//	b.wg.Add(1)
-	//	go b.listen()
-	//}
+	for i := 0; i < b.threads; i++ {
+		b.wg.Add(1)
+		go b.listen()
+	}
 
 	b.wg.Wait()
 	b.conn.Close()
@@ -82,31 +85,35 @@ func (b *Beanstalk) Stop() {
 }
 
 // Push new job to queue
-func (b *Beanstalk) Push(p *jobs.Pipeline, j *jobs.Job) error {
-	id, err := b.conn.Put([]byte("hello"), 1, 0, 120*time.Second)
-
-
-	return nil
+func (b *Beanstalk) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
+	//job, err := json.Marshal(j)
+	//if err != nil {
+	//	return j
+	//}
+	//
+	//id, err := b.conn.Put([]byte("hello"), 1, 0, 120*time.Second)
+	//
+	//return nil
 }
 
-
 func (b *Beanstalk) listen() {
-	//defer b.wg.Done()
-	//for j := range b.jobs {
-	//	if j == nil {
+	defer b.wg.Done()
+
+	//for job := range b.jobs {
+	//	if job == nil {
 	//		return
 	//	}
 	//
-	//	if j.Options != nil && j.Options.Delay != nil {
-	//		time.Sleep(time.Second * time.Duration(*j.Options.Delay))
+	//	if job.Options != nil && job.Options.Delay != nil {
+	//		time.Sleep(time.Second * time.Duration(*job.Options.Delay))
 	//	}
 	//
 	//	// local broker does not have a way to confirm job re-execution
-	//	if err := b.exec(j); err != nil {
-	//		if j.CanRetry() {
-	//			b.jobs <- j
+	//	if err := b.exec(job); err != nil {
+	//		if job.CanRetry() {
+	//			b.jobs <- job
 	//		} else {
-	//			b.error(j, err)
+	//			b.error(job, err)
 	//		}
 	//	}
 	//}

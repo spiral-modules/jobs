@@ -17,14 +17,15 @@ jobs:
     default:
       broker: local
       listen: true
+      threads: 8
 
     beanstalk:
-      broker: beanstalk
-      listen: true
+      broker:  beanstalk
+      listen:  true
+      threads: 8
 
   # list of active endpoints and broker consumers
   brokers:
     beanstalk:
       enable:  true
       address: tcp://localhost:11300
-      threads: 1

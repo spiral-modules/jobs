@@ -7,9 +7,6 @@ import (
 
 // Job carries information about single job.
 type Job struct {
-	// ID contains unique job id.
-	ID string `json:"id"`
-
 	// Attempt is number of job attempt if case of error.
 	Attempt int `json:"attempt"`
 
@@ -32,12 +29,12 @@ func (j *Job) Body() []byte {
 }
 
 // Context pack job context (job, id) into binary payload.
-func (j *Job) Context() ([]byte, error) {
+func (j *Job) Context(id string) ([]byte, error) {
 	return json.Marshal(struct {
 		ID      string `json:"id"`
 		Job     string `json:"job"`
 		Attempt int    `json:"attempt"`
-	}{ID: j.ID, Job: j.Job, Attempt: j.Attempt})
+	}{ID: id, Job: j.Job, Attempt: j.Attempt})
 }
 
 // CanRetry must return true if broker is allowed to re-run the job.

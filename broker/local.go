@@ -13,9 +13,14 @@ type Local struct {
 	mu      sync.Mutex
 	threads int
 	wg      sync.WaitGroup
-	jobs    chan *jobs.Job
+	jobs    chan entry
 	exec    jobs.Handler
 	error   jobs.ErrorHandler
+}
+
+type entry struct {
+	id  string
+	job *jobs.Job
 }
 
 // Init configures local job broker.
@@ -23,7 +28,7 @@ func (l *Local) Init() (bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.jobs = make(chan *jobs.Job)
+	l.jobs = make(chan entry)
 
 	return true, nil
 }
@@ -79,30 +84,27 @@ func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	j.ID = id.String()
 
-	go func() { l.jobs <- j }()
+	go func() { l.jobs <- entry{id: id.String(), job: j} }()
 
-	return j.ID, nil
+	return id.String(), nil
 }
 
 func (l *Local) listen() {
 	defer l.wg.Done()
 	for j := range l.jobs {
-		if j == nil {
-			return
-		}
+		id, job := j.id, j.job
 
-		if j.Options.Delay != 0 {
-			time.Sleep(j.Options.DelayDuration())
+		if job.Options.Delay != 0 {
+			time.Sleep(job.Options.DelayDuration())
 		}
 
 		// local broker does not have a way to confirm job re-execution
-		if err := l.exec(j); err != nil {
-			if j.CanRetry() {
-				l.jobs <- j
+		if err := l.exec(id, job); err != nil {
+			if job.CanRetry() {
+				l.jobs <- entry{id: id, job: job}
 			} else {
-				l.error(j, err)
+				l.error(id, job, err)
 			}
 		}
 	}

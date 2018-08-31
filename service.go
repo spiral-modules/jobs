@@ -15,10 +15,10 @@ const ID = "jobs"
 const BrokersConfig = "brokers"
 
 // Handle handles job execution.
-type Handler func(j *Job) error
+type Handler func(id string, j *Job) error
 
 // Handle handles job execution.
-type ErrorHandler func(j *Job, err error) error
+type ErrorHandler func(id string, j *Job, err error) error
 
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
@@ -110,17 +110,17 @@ func (s *Service) Push(j *Job) (string, error) {
 }
 
 // exec executed job using local RR server. Make sure that service is started.
-func (s *Service) exec(j *Job) error {
-	ctx, err := j.Context()
+func (s *Service) exec(id string, j *Job) error {
+	ctx, err := j.Context(id)
 	if err != nil {
-		s.log.Errorf("[jobs] error `%s`: %s", j.ID, err)
+		s.log.Errorf("[jobs] error `%s`: %s", id, err)
 		return err
 	}
 
 	j.Attempt++
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.log.Debugf("[jobs] complete `%s`", j.ID)
+		s.log.Debugf("[jobs] complete `%s`", id)
 		return nil
 	}
 
@@ -129,8 +129,8 @@ func (s *Service) exec(j *Job) error {
 }
 
 // error must be invoked when job is declared as failed.
-func (s *Service) error(j *Job, err error) error {
-	s.log.Errorf("[jobs] error `%s`: %s", j.ID, err.Error())
+func (s *Service) error(id string, j *Job, err error) error {
+	s.log.Errorf("[jobs] error `%s`: %s", id, err.Error())
 	return err
 }
 
