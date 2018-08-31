@@ -100,16 +100,18 @@ func (l *Local) listen() {
 		}
 
 		// local broker does not support job timeouts yet
-		if err := l.exec(id, job); err != nil {
-			if job.CanRetry() {
-				if job.Options.RetryDelay != 0 {
-					time.Sleep(job.Options.RetryDuration())
-				}
+		if err := l.exec(id, job); err == nil {
+			continue
+		}
 
-				l.queue <- entry{id: id, job: job}
-			} else {
-				l.error(id, job, err)
+		if job.CanRetry() {
+			if job.Options.RetryDelay != 0 {
+				time.Sleep(job.Options.RetryDuration())
 			}
+
+			l.queue <- entry{id: id, job: job}
+		} else {
+			l.error(id, job, err)
 		}
 	}
 }
