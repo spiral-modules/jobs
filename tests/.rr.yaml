@@ -18,18 +18,13 @@ jobs:
       broker: local
       listen: true
 
-    redis:
-      broker: redis
+    beanstalk:
+      broker: beanstalk
       listen: true
-      options:
-        queue: default
 
   # list of active endpoints and broker consumers
   brokers:
-    redis:
-      enable:   true
-      address:  localhost:6379
-      password: ""
-      db:       0
-    beanstalkd:
-      enable:   true
+    beanstalk:
+      enable:  true
+      address: tcp://localhost:11300
+      threads: 1

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 	"errors"
+	"github.com/satori/go.uuid"
 )
 
 // Local run jobs using local goroutines.
@@ -14,7 +15,7 @@ type Local struct {
 	wg      sync.WaitGroup
 	jobs    chan *jobs.Job
 	exec    jobs.Handler
-	fail    jobs.ErrorHandler
+	error   jobs.ErrorHandler
 }
 
 // Init configures local job broker.
@@ -46,14 +47,7 @@ func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorH
 	}
 
 	l.exec = h
-	l.fail = f
-	return nil
-}
-
-// Push new job to queue
-func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) error {
-	go func() { l.jobs <- j }()
-
+	l.error = f
 	return nil
 }
 
@@ -79,6 +73,19 @@ func (l *Local) Stop() {
 	}
 }
 
+// Push new job to queue
+func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
+	id, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+	j.ID = id.String()
+
+	go func() { l.jobs <- j }()
+
+	return j.ID, nil
+}
+
 func (l *Local) listen() {
 	defer l.wg.Done()
 	for j := range l.jobs {
@@ -86,8 +93,8 @@ func (l *Local) listen() {
 			return
 		}
 
-		if j.Options != nil && j.Options.Delay != nil {
-			time.Sleep(time.Second * time.Duration(*j.Options.Delay))
+		if j.Options.Delay != 0 {
+			time.Sleep(j.Options.DelayDuration())
 		}
 
 		// local broker does not have a way to confirm job re-execution
@@ -95,7 +102,7 @@ func (l *Local) listen() {
 			if j.CanRetry() {
 				l.jobs <- j
 			} else {
-				l.fail(j, err)
+				l.error(j, err)
 			}
 		}
 	}

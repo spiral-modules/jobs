@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"fmt"
-	"github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner"
 	"github.com/spiral/roadrunner/service/rpc"
@@ -100,15 +99,14 @@ func (s *Service) Push(j *Job) (string, error) {
 		return "", err
 	}
 
-	id, err := uuid.NewV4()
+	id, err := b.Push(p, j)
 	if err != nil {
-		return "", err
+		s.log.Errorf("[jobs] %s", err.Error())
+	} else {
+		s.log.Debugf("[jobs] new job `%s`", id)
 	}
 
-	j.ID = id.String()
-
-	s.log.Debugf("[jobs] new job `%s`", j.ID)
-	return j.ID, b.Push(p, j)
+	return id, err
 }
 
 // exec executed job using local RR server. Make sure that service is started.
@@ -126,6 +124,7 @@ func (s *Service) exec(j *Job) error {
 		return nil
 	}
 
+	// broker can handle retry or register job as errored
 	return err
 }
 

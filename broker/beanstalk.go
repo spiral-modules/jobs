@@ -4,6 +4,7 @@ import (
 	"github.com/spiral/jobs"
 	"sync"
 	"github.com/beanstalkd/go-beanstalk"
+	"time"
 )
 
 // Beanstalk run jobs using Beanstalk service.
@@ -47,22 +48,14 @@ func (b *Beanstalk) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.Er
 	return nil
 }
 
-// Push new job to queue
-func (b *Beanstalk) Push(p *jobs.Pipeline, j *jobs.Job) error {
-	//go func() { b.jobs <- j }()
-
-	return nil
-}
-
 // Serve local broker.
 func (b *Beanstalk) Serve() error {
-	//conn, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
-	//if err != nil {
-//		return err
-	//}
+	conn, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
+	if err != nil {
+		return err
+	}
 
-	//b.conn = conn
-	//b.conn.Put()
+	b.conn = conn
 
 	//for i := 0; i < b.threads; i++ {
 	//	b.wg.Add(1)
@@ -88,6 +81,15 @@ func (b *Beanstalk) Stop() {
 	b.conn.Close()
 }
 
+// Push new job to queue
+func (b *Beanstalk) Push(p *jobs.Pipeline, j *jobs.Job) error {
+	id, err := b.conn.Put([]byte("hello"), 1, 0, 120*time.Second)
+
+
+	return nil
+}
+
+
 func (b *Beanstalk) listen() {
 	//defer b.wg.Done()
 	//for j := range b.jobs {
@@ -104,7 +106,7 @@ func (b *Beanstalk) listen() {
 	//		if j.CanRetry() {
 	//			b.jobs <- j
 	//		} else {
-	//			b.fail(j, err)
+	//			b.error(j, err)
 	//		}
 	//	}
 	//}
