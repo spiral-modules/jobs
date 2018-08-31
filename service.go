@@ -64,7 +64,7 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 			}
 		}
 
-		if err := e.Handle(pipes, s.exec, s.fail); err != nil {
+		if err := e.Handle(pipes, s.exec, s.error); err != nil {
 			return false, err
 		}
 
@@ -129,8 +129,8 @@ func (s *Service) exec(j *Job) error {
 	return err
 }
 
-// fail must be invoked when job is declared as failed.
-func (s *Service) fail(j *Job, err error) error {
+// error must be invoked when job is declared as failed.
+func (s *Service) error(j *Job, err error) error {
 	s.log.Errorf("[jobs] error `%s`: %s", j.ID, err.Error())
 	return err
 }

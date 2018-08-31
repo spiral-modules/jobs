@@ -31,3 +31,5 @@ jobs:
       address:  localhost:6379
       password: ""
       db:       0
+    beanstalkd:
+      enable:   true

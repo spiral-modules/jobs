@@ -17,6 +17,16 @@ type Local struct {
 	fail    jobs.ErrorHandler
 }
 
+// Init configures local job broker.
+func (l *Local) Init() (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.jobs = make(chan *jobs.Job)
+
+	return true, nil
+}
+
 // Handle configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
 // together.
 func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
@@ -38,16 +48,6 @@ func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorH
 	l.exec = h
 	l.fail = f
 	return nil
-}
-
-// Init configures local job broker.
-func (l *Local) Init() (bool, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.jobs = make(chan *jobs.Job)
-
-	return true, nil
 }
 
 // Push new job to queue

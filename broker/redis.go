@@ -2,25 +2,11 @@ package broker
 
 import (
 	"github.com/spiral/jobs"
-	"github.com/spiral/roadrunner/service"
 	"github.com/go-redis/redis"
 	"time"
 	"encoding/json"
 	"sync"
 )
-
-// RedisConfig defines connection options to Redis server.
-type RedisConfig struct {
-	Enable   bool
-	Address  string
-	Password string
-	DB       int
-}
-
-// Hydrate populates config with values.
-func (c *RedisConfig) Hydrate(cfg service.Config) error {
-	return cfg.Unmarshal(&c)
-}
 
 // Local run jobs using local goroutines.
 // @see https://hackage.haskell.org/package/hworker
@@ -33,6 +19,23 @@ type Redis struct {
 	mu        sync.Mutex
 	pipelines map[*jobs.Pipeline]*pipeline
 	stop      chan interface{}
+}
+
+// Init configures local job broker.
+func (r *Redis) Init(cfg *RedisConfig) (bool, error) {
+	if !cfg.Enable {
+		return false, nil
+	}
+	r.cfg = cfg
+
+	// todo: cluster support
+	r.client = redis.NewClient(&redis.Options{
+		Addr:     r.cfg.Address,
+		Password: r.cfg.Password,
+		DB:       r.cfg.DB,
+	})
+
+	return true, nil
 }
 
 // Handle configures broker with list of pipelines to listen and handler function.
@@ -51,23 +54,6 @@ func (r *Redis) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorH
 	r.exec = h
 	r.fail = f
 	return nil
-}
-
-// Init configures local job broker.
-func (r *Redis) Init(cfg *RedisConfig) (bool, error) {
-	if !cfg.Enable {
-		return false, nil
-	}
-	r.cfg = cfg
-
-	// todo: cluster support
-	r.client = redis.NewClient(&redis.Options{
-		Addr:     r.cfg.Address,
-		Password: r.cfg.Password,
-		DB:       r.cfg.DB,
-	})
-
-	return true, nil
 }
 
 // Push new job to queue
