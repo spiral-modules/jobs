@@ -8,12 +8,12 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-// Local run jobs using local goroutines.
+// Local run queue using local goroutines.
 type Local struct {
 	mu      sync.Mutex
 	threads int
 	wg      sync.WaitGroup
-	jobs    chan entry
+	queue   chan entry
 	exec    jobs.Handler
 	error   jobs.ErrorHandler
 }
@@ -28,7 +28,7 @@ func (l *Local) Init() (bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.jobs = make(chan entry)
+	l.queue = make(chan entry)
 
 	return true, nil
 }
@@ -72,9 +72,9 @@ func (l *Local) Stop() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.jobs != nil {
-		close(l.jobs)
-		l.jobs = nil
+	if l.queue != nil {
+		close(l.queue)
+		l.queue = nil
 	}
 }
 
@@ -85,24 +85,28 @@ func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	go func() { l.jobs <- entry{id: id.String(), job: j} }()
+	go func() { l.queue <- entry{id: id.String(), job: j} }()
 
 	return id.String(), nil
 }
 
 func (l *Local) listen() {
 	defer l.wg.Done()
-	for j := range l.jobs {
-		id, job := j.id, j.job
+	for q := range l.queue {
+		id, job := q.id, q.job
 
 		if job.Options.Delay != 0 {
 			time.Sleep(job.Options.DelayDuration())
 		}
 
-		// local broker does not have a way to confirm job re-execution
+		// local broker does not support job timeouts yet
 		if err := l.exec(id, job); err != nil {
 			if job.CanRetry() {
-				l.jobs <- entry{id: id, job: job}
+				if job.Options.RetryDelay != 0 {
+					time.Sleep(job.Options.RetryDuration())
+				}
+
+				l.queue <- entry{id: id, job: job}
 			} else {
 				l.error(id, job, err)
 			}

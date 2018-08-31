@@ -57,8 +57,8 @@ type Options struct {
 	MaxAttempts int `json:"maxAttempts,omitempty"`
 }
 
-// RetryDelayDuration returns retry delay duration in a form of time.Duration.
-func (o *Options) RetryDelayDuration() time.Duration {
+// RetryDuration returns retry delay duration in a form of time.Duration.
+func (o *Options) RetryDuration() time.Duration {
 	return time.Second * time.Duration(o.RetryDelay)
 }
 
