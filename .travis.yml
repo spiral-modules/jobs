@@ -9,7 +9,6 @@ services:
   - redis
 
 before_install:
-  - apt install beanstalkd
   - go version
   - sudo add-apt-repository -y ppa:ondrej/php
   - sudo apt-get update
@@ -19,6 +18,8 @@ before_install:
   - go build -o rr tests/main.go
 
 install:
+  - apt update
+  - apt install beanstalkd
   - sudo cp `which php7.1` `which php`
   - php -v
   - composer self-update
