@@ -9,8 +9,8 @@ services:
   - redis
 
 before_install:
-  - git clone git@github.com:beanstalkd/beanstalkd.git
-  - cd beanstalk
+  - git clone https://github.com/beanstalkd/beanstalkd.git
+  - cd beanstalkd
   - make
   - /beanstalkd &
   - cd ../
