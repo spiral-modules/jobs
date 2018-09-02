@@ -12,5 +12,5 @@ type Broker interface {
 	Stop()
 
 	// Push new job to the broker. Must return job id or error.
-	Push(p *Pipeline, j *Job) (string, error)
+	Push(p *Pipeline, j *Job) (id string, err error)
 }

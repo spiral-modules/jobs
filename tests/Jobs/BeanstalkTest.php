@@ -8,7 +8,7 @@
 
 namespace Spiral\Jobs\Tests;
 
-class LocalTest extends BaseTest
+class BeanstalkTest extends BaseTest
 {
-    const BROKER = "local";
+    const BROKER = "beanstalk";
 }

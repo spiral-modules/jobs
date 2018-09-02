@@ -7,14 +7,14 @@ import (
 
 // Job carries information about single job.
 type Job struct {
-	// Attempt is number of job attempt if case of error.
-	Attempt int `json:"attempt"`
-
 	// Job contains name of job broker (usually PHP class).
 	Job string `json:"job"`
 
 	// Pipeline associated with the job.
 	Pipeline string `json:"pipeline"`
+
+	// Attempt is number of job attempt if case of error.
+	Attempt int `json:"attempt"`
 
 	// Payload is string data (usually JSON) passed to Job broker.
 	Payload string `json:"payload"`

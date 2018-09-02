@@ -36,6 +36,7 @@ func (l *Local) Init() (bool, error) {
 // Handle configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
 // together.
 func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
+
 	switch {
 	case len(pipelines) == 0:
 		// no pipelines to handled
@@ -44,7 +45,7 @@ func (l *Local) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorH
 	case len(pipelines) == 1:
 		l.threads = pipelines[0].Options.Integer("threads", 1)
 		if l.threads < 1 {
-			return errors.New("local queue handler threads must be 1 or higher")
+			return errors.New("local queue `thread` number must be 1 or higher")
 		}
 
 	default:
@@ -74,7 +75,6 @@ func (l *Local) Stop() {
 
 	if l.queue != nil {
 		close(l.queue)
-		l.queue = nil
 	}
 }
 

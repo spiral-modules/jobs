@@ -14,15 +14,13 @@ jobs:
 
   # list of broker pipelines associated with endpoints
   pipelines:
-    default:
-      broker: local
-      listen: true
-      threads: 8
+    local:
+      broker:  local
+      listen:  true
 
     beanstalk:
       broker:  beanstalk
       listen:  true
-      threads: 8
 
   # list of active endpoints and broker consumers
   brokers:

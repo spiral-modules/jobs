@@ -60,6 +60,17 @@ func (o PipelineOptions) Integer(name string, d int) int {
 	return d
 }
 
+// Duration must return option value as time.Duration (seconbs) or return default value.
+func (o PipelineOptions) Duration(name string, d time.Duration) time.Duration {
+	if value, ok := o[name]; ok {
+		if str, ok := value.(int); ok {
+			return time.Second * time.Duration(str)
+		}
+	}
+
+	return d
+}
+
 // Hydrate populates config values.
 func (c *Config) Hydrate(cfg service.Config) error {
 	if err := cfg.Unmarshal(&c); err != nil {

@@ -13,7 +13,8 @@ import (
 func main() {
 	rr.Container.Register(rpc.ID, &rpc.Service{})
 	rr.Container.Register(jobs.ID, jobs.NewService(rr.Logger, map[string]jobs.Broker{
-		"local": &broker.Local{},
+		"local":     &broker.Local{},
+		"beanstalk": &broker.Beanstalk{},
 		//"redis": &broker.Redis{},
 	}))
 

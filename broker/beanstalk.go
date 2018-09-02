@@ -1,19 +1,23 @@
-package __old
+package broker
 
 import (
 	"github.com/spiral/jobs"
 	"sync"
 	"github.com/beanstalkd/go-beanstalk"
-	"time"
 	"errors"
+	"time"
 	"encoding/json"
+	"strconv"
 )
 
 // Beanstalk run jobs using Beanstalk service.
 type Beanstalk struct {
+	cfg     *BeanstalkConfig
 	mu      sync.Mutex
+	stop    chan interface{}
 	conn    *beanstalk.Conn
 	threads int
+	reserve time.Duration
 	wg      sync.WaitGroup
 	exec    jobs.Handler
 	fail    jobs.ErrorHandler
@@ -25,6 +29,7 @@ func (b *Beanstalk) Init(cfg *BeanstalkConfig) (bool, error) {
 		return false, nil
 	}
 
+	b.cfg = cfg
 	return true, nil
 }
 
@@ -37,9 +42,10 @@ func (b *Beanstalk) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.Er
 		return nil
 
 	case len(pipelines) == 1:
+		b.reserve = pipelines[0].Options.Duration("reserve", time.Second)
 		b.threads = pipelines[0].Options.Integer("threads", 1)
 		if b.threads < 1 {
-			return errors.New("beanstalk queue handler threads must be 1 or higher")
+			return errors.New("beanstalk queue `thread` number must be 1 or higher")
 		}
 
 	default:
@@ -53,12 +59,17 @@ func (b *Beanstalk) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.Er
 
 // Serve local broker.
 func (b *Beanstalk) Serve() error {
-	conn, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
+	conn, err := b.cfg.Conn()
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	b.conn = conn
+
+	b.mu.Lock()
+	b.stop = make(chan interface{})
+	b.mu.Unlock()
 
 	for i := 0; i < b.threads; i++ {
 		b.wg.Add(1)
@@ -66,55 +77,71 @@ func (b *Beanstalk) Serve() error {
 	}
 
 	b.wg.Wait()
-	b.conn.Close()
 
 	return nil
 }
 
 // Stop local broker.
 func (b *Beanstalk) Stop() {
-	//b.mu.Lock()
-	//defer b.mu.Unlock()
-	//
-	//if b.jobs != nil {
-	//	close(b.jobs)
-	//	b.jobs = nil
-	//}
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	b.conn.Close()
+	if b.stop != nil {
+		close(b.stop)
+	}
 }
 
 // Push new job to queue
 func (b *Beanstalk) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
-	//job, err := json.Marshal(j)
-	//if err != nil {
-	//	return j
-	//}
-	//
-	//id, err := b.conn.Put([]byte("hello"), 1, 0, 120*time.Second)
-	//
-	//return nil
+	data, err := json.Marshal(j)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := b.conn.Put(
+		data,
+		0,
+		j.Options.DelayDuration(),
+		j.Options.TimeoutDuration(),
+	)
+
+	return strconv.FormatUint(id, 10), nil
 }
 
 func (b *Beanstalk) listen() {
 	defer b.wg.Done()
+	var job *jobs.Job
 
-	//for job := range b.jobs {
-	//	if job == nil {
-	//		return
-	//	}
-	//
-	//	if job.Options != nil && job.Options.Delay != nil {
-	//		time.Sleep(time.Second * time.Duration(*job.Options.Delay))
-	//	}
-	//
-	//	// local broker does not have a way to confirm job re-execution
-	//	if err := b.exec(job); err != nil {
-	//		if job.CanRetry() {
-	//			b.jobs <- job
-	//		} else {
-	//			b.error(job, err)
-	//		}
-	//	}
-	//}
+	for {
+		select {
+		case <-b.stop:
+			return
+		default:
+			id, body, err := b.conn.Reserve(b.reserve)
+			if err != nil {
+				// need additional logging
+				continue
+			}
+
+			err = json.Unmarshal(body, job)
+			if err != nil {
+				// need additional logging
+				continue
+			}
+
+			// local broker does not support job timeouts yet
+			err = b.exec(strconv.FormatUint(id, 10), job)
+			if err == nil {
+				continue
+			}
+
+			if !job.CanRetry() {
+				b.conn.Bury(id, 0)
+				continue
+			}
+
+			// retry
+			b.conn.Release(id, 0, job.Options.RetryDuration())
+		}
+	}
 }
