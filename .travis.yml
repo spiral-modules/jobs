@@ -9,11 +9,7 @@ services:
   - redis
 
 before_install:
-  - git clone https://github.com/beanstalkd/beanstalkd.git
-  - cd beanstalkd
-  - make
-  - /beanstalkd &
-  - cd ../
+  - apt install beanstalkd
   - go version
   - sudo add-apt-repository -y ppa:ondrej/php
   - sudo apt-get update
