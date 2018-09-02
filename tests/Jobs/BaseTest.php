@@ -28,7 +28,7 @@ abstract class BaseTest extends TestCase
         }
     }
 
-    public function testLocal()
+    public function testJob()
     {
         $jobs = $this->makeJobs();
 
@@ -44,7 +44,7 @@ abstract class BaseTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
-    public function testLocalDelay()
+    public function testDelayJob()
     {
         $jobs = $this->makeJobs();
 
