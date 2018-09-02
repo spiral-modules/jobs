@@ -17,7 +17,7 @@ use Spiral\Jobs\Options;
 use Spiral\Jobs\Queue;
 use Spiral\Jobs\Tests\Fixtures\LocalJob;
 
-class BaseTest extends TestCase
+abstract class BaseTest extends TestCase
 {
     const BROKER = '';
 

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 	"encoding/json"
-	"strconv"
+	"fmt"
 )
 
 // Beanstalk run jobs using Beanstalk service.
@@ -105,7 +105,7 @@ func (b *Beanstalk) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		j.Options.TimeoutDuration(),
 	)
 
-	return strconv.FormatUint(id, 10), nil
+	return fmt.Sprintf("beanstalk:%v", id), nil
 }
 
 func (b *Beanstalk) listen() {
@@ -123,15 +123,16 @@ func (b *Beanstalk) listen() {
 				continue
 			}
 
-			err = json.Unmarshal(body, job)
+			err = json.Unmarshal(body, &job)
 			if err != nil {
 				// need additional logging
 				continue
 			}
 
 			// local broker does not support job timeouts yet
-			err = b.exec(strconv.FormatUint(id, 10), job)
+			err = b.exec(fmt.Sprintf("beanstalk:%v", id), job)
 			if err == nil {
+				b.conn.Delete(id)
 				continue
 			}
 
