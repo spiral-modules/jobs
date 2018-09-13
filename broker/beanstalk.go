@@ -138,7 +138,6 @@ func (b *Beanstalk) listen() {
 
 			if !job.CanRetry() {
 				b.conn.Bury(id, 0)
-    			l.error(id, job, err)
 				continue
 			}
 
