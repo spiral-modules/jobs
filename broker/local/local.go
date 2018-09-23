@@ -1,4 +1,4 @@
-package broker
+package local
 
 import (
 	"github.com/spiral/jobs"
@@ -7,14 +7,14 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-// Local run queue using local goroutines.
-type Local struct {
-	mu      sync.Mutex
-	threads int
-	wg      sync.WaitGroup
-	queue   chan entry
-	exe     jobs.Handler
-	err     jobs.ErrorHandler
+// Broker run queue using local goroutines.
+type Broker struct {
+	mu    sync.Mutex
+	cfg   *Config
+	wg    sync.WaitGroup
+	queue chan entry
+	exe   jobs.Handler
+	err   jobs.ErrorHandler
 }
 
 type entry struct {
@@ -23,43 +23,31 @@ type entry struct {
 }
 
 // Init configures local job broker.
-func (l *Local) Init() (bool, error) {
+func (l *Broker) Init(cfg *Config) (bool, error) {
+	if err := cfg.Valid(); err != nil {
+		return false, err
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.threads = 1
+	l.cfg = cfg
 	l.queue = make(chan entry)
 
 	return true, nil
 }
 
-// Listen configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
+// Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
 // together.
-func (l *Local) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
-
-	//switch {
-	//case len(pipelines) == 0:
-	//	// no pipelines to handled
-	//	return nil
-	//
-	//case len(pipelines) == 1:
-	//	l.threads = pipelines[0].Options.Integer("threads", 1)
-	//	if l.threads < 1 {
-	//		return errors.New("local queue `thread` number must be 1 or higher")
-	//	}
-	//
-	//default:
-	//	return errors.New("local queue handler expects exactly one pipeline")
-	//}
-
+func (l *Broker) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
 	l.exe = exe
 	l.err = err
 	return nil
 }
 
 // Serve local broker.
-func (l *Local) Serve() error {
-	for i := 0; i <= l.threads; i++ {
+func (l *Broker) Serve() error {
+	for i := 0; i <= l.cfg.Threads; i++ {
 		l.wg.Add(1)
 		go l.listen()
 	}
@@ -69,7 +57,7 @@ func (l *Local) Serve() error {
 }
 
 // Stop local broker.
-func (l *Local) Stop() {
+func (l *Broker) Stop() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -79,7 +67,7 @@ func (l *Local) Stop() {
 }
 
 // Push new job to queue
-func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
+func (l *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
@@ -92,7 +80,7 @@ func (l *Local) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	return id.String(), nil
 }
 
-func (l *Local) listen() {
+func (l *Broker) listen() {
 	defer l.wg.Done()
 	for q := range l.queue {
 		id, job := q.id, q.job

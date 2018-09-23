@@ -95,7 +95,9 @@ func (s *Service) Init(
 		cfg = &emptyConfig{}
 	}
 
-	s.brokers.Init(cfg)
+	if err := s.brokers.Init(cfg); err != nil {
+		return false, err
+	}
 
 	return true, nil
 }
