@@ -2,11 +2,17 @@ rpc:
   listen: "tcp://localhost:6001"
 
 jobs:
+  # worker pool configuration
   workers:
     command: "php handler.php"
     pool:
       numWorkers: 1
       maxJobs:    1
+
+  # broker configuration
+  brokers:
+    beanstalk:
+      address: tcp://localhost:11300
 
   # list of broker pipelines associated with endpoints
   pipelines:
@@ -23,6 +29,3 @@ jobs:
       handle:
         - "spiral.jobs.tests.beanstalk*"
 
-  brokers:
-    beanstalk:
-      address: tcp://localhost:11300
