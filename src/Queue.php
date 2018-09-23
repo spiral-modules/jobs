@@ -8,6 +8,7 @@
 
 namespace Spiral\Jobs;
 
+use Doctrine\Common\Inflector\Inflector;
 use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
 use Spiral\Jobs\Exception\JobException;
@@ -54,6 +55,11 @@ class Queue implements QueueInterface, SingletonInterface
      */
     private function jobName(JobInterface $job): string
     {
-        return str_replace('\\', '.', strtolower(get_class($job)));
+        $names = explode('\\', get_class($job));
+        $names = array_map(function (string $value) {
+            return Inflector::camelize($value);
+        }, $names);
+
+        return join('.', $names);
     }
 }

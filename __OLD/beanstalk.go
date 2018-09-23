@@ -33,7 +33,7 @@ func (b *Beanstalk) Init(cfg *BeanstalkConfig) (bool, error) {
 	return true, nil
 }
 
-// Handle configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
+// Listen configures broker with list of pipelines to listen and handler function. Local broker groups all pipelines
 // together.
 func (b *Beanstalk) Handle(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
 	switch {
