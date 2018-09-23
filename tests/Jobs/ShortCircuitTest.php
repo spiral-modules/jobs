@@ -42,7 +42,7 @@ class ShortCircuitTest extends TestCase
     }
 
     /**
-     * @expectedException \Spiral\Jobs\Exceptions\JobException
+     * @expectedException \Spiral\Jobs\Exception\JobException
      */
     public function testError()
     {

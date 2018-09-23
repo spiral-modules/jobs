@@ -12,7 +12,6 @@ use PHPUnit\Framework\TestCase;
 use Spiral\Core\Container;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
-use Spiral\Jobs\Configs\JobsConfig;
 use Spiral\Jobs\Options;
 use Spiral\Jobs\Queue;
 use Spiral\Jobs\Tests\Fixtures\LocalJob;
@@ -63,17 +62,11 @@ abstract class BaseTest extends TestCase
     }
 
     /**
-     * @expectedException \Spiral\Jobs\Exceptions\JobException
+     * @expectedException \Spiral\Jobs\Exception\JobException
      */
     public function testConnectionException()
     {
-        $jobs = new Queue(
-            new JobsConfig([
-                'pipelines' => [],
-                'default'   => static::BROKER
-            ]),
-            new RPC(new SocketRelay('localhost', 6002))
-        );
+        $jobs = new Queue(new RPC(new SocketRelay('localhost', 6002)));
 
         $jobs->push(new LocalJob([
             'data' => 100
@@ -82,13 +75,7 @@ abstract class BaseTest extends TestCase
 
     public function makeJobs(): Queue
     {
-        return new Queue(
-            new JobsConfig([
-                'pipelines' => [],
-                'default'   => static::BROKER
-            ]),
-            new RPC(new SocketRelay('localhost', 6001))
-        );
+        return new Queue(new RPC(new SocketRelay('localhost', 6001)));
     }
 
     private function waitForJob(): float

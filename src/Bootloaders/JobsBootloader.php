@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Bootloaders;
+namespace Spiral\Jobs\Bootloader;
 
 use Spiral\Jobs\Queue;
 use Spiral\Jobs\QueueInterface;

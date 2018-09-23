@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Exceptions;
+namespace Spiral\Jobs\Exception;
 
 class JobException extends \RuntimeException
 {
