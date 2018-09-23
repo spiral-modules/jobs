@@ -6,9 +6,8 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests;
+namespace Spiral\Jobs\Exception;
 
-class LocalTest extends BaseTest
+class JobException extends \RuntimeException
 {
-    const BROKER = "local";
 }

@@ -8,7 +8,7 @@
 
 namespace Spiral\Jobs;
 
-use Spiral\Jobs\Exceptions\JobException;
+use Spiral\Jobs\Exception\JobException;
 use Spiral\Core\ResolverInterface;
 
 /**

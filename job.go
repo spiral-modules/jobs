@@ -10,9 +10,6 @@ type Job struct {
 	// Job contains name of job broker (usually PHP class).
 	Job string `json:"job"`
 
-	// Pipeline associated with the job.
-	Pipeline string `json:"pipeline"`
-
 	// Attempt is number of job attempt if case of error.
 	Attempt int `json:"attempt"`
 

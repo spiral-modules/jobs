@@ -1,29 +1,28 @@
-rpc:
-  enable: true
-  listen: tcp://0.0.0.0:6001
-
 jobs:
-  enable: true
-
-  # local rr broker configuration
+  # worker pool configuration
   workers:
-    command: "php tests/handler.php"
+    command: "php handler.php"
     pool:
       numWorkers: 1
       maxJobs:    1
 
-  # list of broker pipelines associated with endpoints
-  pipelines:
-    local:
-      broker:  local
-      listen:  true
-
-    beanstalk:
-      broker:  beanstalk
-      listen:  true
-
-  # list of active endpoints and broker consumers
+  # broker configuration
   brokers:
     beanstalk:
-      enable:  true
       address: tcp://localhost:11300
+
+  # list of broker pipelines associated with endpoints
+  pipelines:
+    - broker: local
+      listen: true
+      handle:
+        - "spiral.jobs.tests.local"
+
+    - broker: beanstalk
+      listen: true
+      options:
+        tube:    default
+        threads: 1
+      handle:
+        - "spiral.jobs.tests.beanstalk*"
+

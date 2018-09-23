@@ -9,18 +9,18 @@
 namespace Spiral\Jobs\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Spiral\Core\Container;
 use Spiral\Jobs\Options;
 use Spiral\Jobs\ShortCircuit;
-use Spiral\Jobs\Tests\Fixtures\ErrorJob;
-use Spiral\Jobs\Tests\Fixtures\LocalJob;
-use Spiral\Core\Container;
+use Spiral\Jobs\Tests\Local\ErrorJob;
+use Spiral\Jobs\Tests\Local\Job;
 
 class ShortCircuitTest extends TestCase
 {
     protected function tearDown()
     {
-        if (file_exists(LocalJob::JOB_FILE)) {
-            unlink(LocalJob::JOB_FILE);
+        if (file_exists(Job::JOB_FILE)) {
+            unlink(Job::JOB_FILE);
         }
     }
 
@@ -28,21 +28,21 @@ class ShortCircuitTest extends TestCase
     {
         $jobs = new ShortCircuit();
 
-        $id = $jobs->push(new LocalJob([
+        $id = $jobs->push(new Job([
             'data' => 100
         ], new Container()));
 
         $this->assertNotEmpty($id);
 
-        $this->assertFileExists(LocalJob::JOB_FILE);
+        $this->assertFileExists(Job::JOB_FILE);
 
-        $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
+        $data = json_decode(file_get_contents(Job::JOB_FILE), true);
         $this->assertSame($id, $data['id']);
         $this->assertSame(100, $data['data']);
     }
 
     /**
-     * @expectedException \Spiral\Jobs\Exceptions\JobException
+     * @expectedException \Spiral\Jobs\Exception\JobException
      */
     public function testError()
     {
@@ -54,15 +54,15 @@ class ShortCircuitTest extends TestCase
     {
         $jobs = new ShortCircuit();
 
-        $id = $jobs->push(new LocalJob([
+        $id = $jobs->push(new Job([
             'data' => 100
         ], new Container()), new Options(1));
 
         $this->assertNotEmpty($id);
 
-        $this->assertFileExists(LocalJob::JOB_FILE);
+        $this->assertFileExists(Job::JOB_FILE);
 
-        $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
+        $data = json_decode(file_get_contents(Job::JOB_FILE), true);
         $this->assertSame($id, $data['id']);
         $this->assertSame(100, $data['data']);
     }

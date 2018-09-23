@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  beanstalk:
+    image: schickling/beanstalkd
+    ports:
+      - "11300:11300"
+
+  rabbitmq:
+    image: bitnami/rabbitmq:latest
+    ports:
+      - "15672:15672"
+    environment:
+      - RABBITMQ_PASSWORD=password

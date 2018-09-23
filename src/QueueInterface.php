@@ -18,7 +18,7 @@ interface QueueInterface
      *
      * @return string Job id.
      *
-     * @throws \Spiral\Jobs\Exceptions\JobException
+     * @throws \Spiral\Jobs\Exception\JobException
      */
     public function push(JobInterface $job, Options $options = null): string;
 }

@@ -8,6 +8,7 @@
 
 namespace Spiral\Jobs;
 
+use Doctrine\Common\Inflector\Inflector;
 use Spiral\Core\FactoryInterface;
 use Spiral\RoadRunner\Worker;
 
@@ -43,8 +44,7 @@ class Handler
             try {
                 $context = json_decode($context, true);
 
-                /** @var \Spiral\Jobs\JobInterface $job */
-                $job = $this->factory->make($context['job']);
+                $job = $this->makeJob($context['job']);
 
                 $job->unserialize($body);
                 $job->execute($context['id']);
@@ -54,5 +54,20 @@ class Handler
                 $this->worker->error((string)$e);
             }
         }
+    }
+
+    /**
+     * @codeCoverageIgnore
+     * @param string $job
+     * @return JobInterface
+     */
+    private function makeJob(string $job): JobInterface
+    {
+        $names = explode('.', $job);
+        $names = array_map(function (string $value) {
+            return Inflector::classify($value);
+        }, $names);
+
+        return $this->factory->make(join('\\', $names));
     }
 }

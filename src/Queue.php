@@ -8,29 +8,24 @@
 
 namespace Spiral\Jobs;
 
-use Spiral\Jobs\Configs\JobsConfig;
-use Spiral\Jobs\Exceptions\JobException;
+use Doctrine\Common\Inflector\Inflector;
 use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
-use Spiral\RoadRunner\Exceptions\RoadRunnerException;
+use Spiral\Jobs\Exception\JobException;
+use Spiral\RoadRunner\Exception\RoadRunnerException;
 
 class Queue implements QueueInterface, SingletonInterface
 {
     const RR_SERVICE = 'jobs';
 
-    /** @var JobsConfig */
-    private $config;
-
     /** @var RPC */
     private $rpc;
 
     /**
-     * @param JobsConfig $config
-     * @param RPC        $rpc
+     * @param RPC $rpc
      */
-    public function __construct(JobsConfig $config, RPC $rpc)
+    public function __construct(RPC $rpc)
     {
-        $this->config = $config;
         $this->rpc = $rpc;
     }
 
@@ -45,13 +40,26 @@ class Queue implements QueueInterface, SingletonInterface
             }
 
             return $this->rpc->call(self::RR_SERVICE . '.Push', [
-                'job'      => get_class($job),
-                'pipeline' => $this->config->jobPipeline(get_class($job)),
-                'payload'  => $job->serialize(),
-                'options'  => $options
+                'job'     => $this->jobName($job),
+                'payload' => $job->serialize(),
+                'options' => $options
             ]);
         } catch (RoadRunnerException|\Throwable $e) {
             throw new JobException($e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * @param JobInterface $job
+     * @return string
+     */
+    private function jobName(JobInterface $job): string
+    {
+        $names = explode('\\', get_class($job));
+        $names = array_map(function (string $value) {
+            return Inflector::camelize($value);
+        }, $names);
+
+        return join('.', $names);
     }
 }

@@ -4,58 +4,78 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner"
-	"github.com/spiral/roadrunner/service/rpc"
 	"github.com/spiral/roadrunner/service"
+	"github.com/spiral/roadrunner/service/env"
+	"github.com/spiral/roadrunner/service/rpc"
 )
 
-// ID defines Jobs service public alias.
-const ID = "jobs"
+const (
+	// ID defines Listen service public alias.
+	ID = "jobs"
 
-// BrokersConfig defines config section related to brokers configuration.
-const BrokersConfig = "brokers"
+	// indicates that job service is running
+	jobsKey = "rr_jobs"
+)
 
-// Handle handles job execution.
+// BrokersConfig defines config section related to Brokers configuration.
+const BrokersConfig = "Brokers"
+
+// Listen handles job execution.
 type Handler func(id string, j *Job) error
 
-// Handle handles job execution.
+// Listen handles job execution.
 type ErrorHandler func(id string, j *Job, err error) error
+
+type emptyConfig struct{}
+
+// Get is doing nothing.
+func (e *emptyConfig) Get(service string) service.Config {
+	return nil
+}
+
+// Unmarshal is doing nothing.
+func (e *emptyConfig) Unmarshal(out interface{}) error {
+	return nil
+}
 
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
-	log       *logrus.Logger
-	cfg       *Config
-	rr        *roadrunner.Server
-	container service.Container
-	brokers   map[string]Broker
-}
-
-// NewService creates new service for job handling.
-func NewService(log *logrus.Logger, brokers map[string]Broker) *Service {
-	return &Service{log: log, brokers: brokers}
+	// Brokers define list of available brokers.
+	Brokers map[string]Broker
+	cfg     *Config
+	env     env.Environment
+	log     *logrus.Logger
+	brokers service.Container
+	rr      *roadrunner.Server
 }
 
 // Init configures job service.
-func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) {
-	config := &Config{}
-	if err := config.Hydrate(cfg); err != nil {
+func (s *Service) Init(
+	c service.Config,
+	l *logrus.Logger,
+	r *rpc.Service,
+	e env.Environment,
+) (ok bool, err error) {
+	s.cfg = &Config{}
+	s.log = l
+	s.env = e
+
+	if err := s.cfg.Hydrate(c); err != nil {
 		return false, err
 	}
 
-	if !config.Enable {
-		return false, nil
-	}
-
-	s.cfg = config
-	if err := r.Register(ID, &rpcService{s}); err != nil {
-		return false, err
+	if r != nil {
+		if err := r.Register(ID, &rpcService{s}); err != nil {
+			return false, err
+		}
 	}
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
-	// we are going to keep all handlers withing the container
+	// we are going to keep all handlers withing the brokers
 	// so we can easier manage their state and configuration
-	s.container = service.NewContainer(s.log)
-	for name, e := range s.brokers {
+	s.brokers = service.NewContainer(s.log)
+	for name, e := range s.Brokers {
 		pipes := make([]*Pipeline, 0)
 		for _, p := range s.cfg.Pipelines {
 			if p.Broker == name {
@@ -63,47 +83,66 @@ func (s *Service) Init(cfg service.Config, r *rpc.Service) (ok bool, err error) 
 			}
 		}
 
-		if err := e.Handle(pipes, s.exec, s.error); err != nil {
+		if err := e.Listen(pipes, s.exec, s.error); err != nil {
 			return false, err
 		}
 
-		s.container.Register(name, e)
+		s.brokers.Register(name, e)
 	}
 
-	s.container.Init(cfg.Get(BrokersConfig))
+	cfg := c.Get(BrokersConfig)
+	if cfg == nil {
+		cfg = &emptyConfig{}
+	}
+
+	if err := s.brokers.Init(cfg); err != nil {
+		return false, err
+	}
 
 	return true, nil
 }
 
 // Serve serves local rr server and creates broker association.
 func (s *Service) Serve() error {
+	if s.env != nil {
+		values, err := s.env.GetEnv()
+		if err != nil {
+			return err
+		}
+
+		for k, v := range values {
+			s.cfg.Workers.SetEnv(k, v)
+		}
+
+		s.cfg.Workers.SetEnv(jobsKey, "true")
+	}
+
 	if err := s.rr.Start(); err != nil {
 		return err
 	}
+	defer s.rr.Stop()
 
-	return s.container.Serve()
+	return s.brokers.Serve()
 }
 
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
-	s.container.Stop()
-
-	s.rr.Stop()
-	s.log.Debugf("[jobs]: stopped")
+	s.brokers.Stop()
 }
 
 // Push job to associated broker and return job id.
 func (s *Service) Push(j *Job) (string, error) {
-	p, b, err := s.getPipeline(j.Pipeline)
+	p, b, err := s.getPipeline(j.Job)
 	if err != nil {
 		return "", err
 	}
 
 	id, err := b.Push(p, j)
+
 	if err != nil {
-		s.log.Errorf("[jobs] %s", err.Error())
+		s.log.Errorf("[jobs] `%s`: %s", j.Job, err.Error())
 	} else {
-		s.log.Debugf("[jobs] new job `%s`", id)
+		s.log.Debugf("[jobs] push `%s`.`%s`", j.Job, id)
 	}
 
 	return id, err
@@ -113,14 +152,15 @@ func (s *Service) Push(j *Job) (string, error) {
 func (s *Service) exec(id string, j *Job) error {
 	ctx, err := j.Context(id)
 	if err != nil {
-		s.log.Errorf("[jobs] error `%s`: %s", id, err)
+		s.log.Errorf("[jobs] fail `%s`.`%s`: %s", j.Job, id, err)
 		return err
 	}
 
 	j.Attempt++
+
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.log.Debugf("[jobs] complete `%s`", id)
+		s.log.Debugf("[jobs] done `%s`.`%s`", j.Job, id)
 		return nil
 	}
 
@@ -130,20 +170,27 @@ func (s *Service) exec(id string, j *Job) error {
 
 // error must be invoked when job is declared as failed.
 func (s *Service) error(id string, j *Job, err error) error {
-	s.log.Errorf("[jobs] error `%s`: %s", id, err.Error())
+	s.log.Errorf("[jobs] error `%s`.`%s`: %s", j.Job, id, err.Error())
 	return err
 }
 
 // return broker associated with given pipeline.
-func (s *Service) getPipeline(pipeline string) (*Pipeline, Broker, error) {
-	pipe, ok := s.cfg.Pipelines[pipeline]
-	if !ok {
-		return nil, nil, fmt.Errorf("undefined pipeline `%s`", pipeline)
+func (s *Service) getPipeline(job string) (*Pipeline, Broker, error) {
+	var pipe *Pipeline
+	for _, p := range s.cfg.Pipelines {
+		if p.Has(job) {
+			pipe = p
+			break
+		}
 	}
 
-	h, ok := s.brokers[pipe.Broker]
+	if pipe == nil {
+		return nil, nil, fmt.Errorf("unable to find pipeline for `%s`", job)
+	}
+
+	h, ok := s.Brokers[pipe.Broker]
 	if !ok {
-		return nil, nil, fmt.Errorf("undefined broker `%s`", pipe)
+		return nil, nil, fmt.Errorf("undefined broker `%s`", pipe.Broker)
 	}
 
 	return pipe, h, nil
