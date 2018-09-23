@@ -1,3 +1,6 @@
+rpc:
+  listen: "tcp://localhost:6001"
+
 jobs:
   workers:
     command: "php handler.php"
