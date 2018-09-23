@@ -57,6 +57,7 @@ class Handler
     }
 
     /**
+     * @codeCoverageIgnore
      * @param string $job
      * @return JobInterface
      */
