@@ -1,6 +1,3 @@
-rpc:
-  listen: "tcp://localhost:6001"
-
 jobs:
   # worker pool configuration
   workers:
