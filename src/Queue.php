@@ -11,7 +11,7 @@ namespace Spiral\Jobs;
 use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
 use Spiral\Jobs\Exception\JobException;
-use Spiral\RoadRunner\Exceptions\RoadRunnerException;
+use Spiral\RoadRunner\Exception\RoadRunnerException;
 
 class Queue implements QueueInterface, SingletonInterface
 {
