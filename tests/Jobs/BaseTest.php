@@ -14,16 +14,26 @@ use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
 use Spiral\Jobs\Options;
 use Spiral\Jobs\Queue;
-use Spiral\Jobs\Tests\Fixtures\LocalJob;
 
 abstract class BaseTest extends TestCase
 {
-    const BROKER = '';
+    const JOB       = null;
+    const ERROR_JOB = null;
+
+    private $job;
+    private $errorJob;
+
+    public function setUp()
+    {
+        $this->job = static::JOB;
+        $this->errorJob = static::ERROR_JOB;
+
+    }
 
     protected function tearDown()
     {
-        if (file_exists(LocalJob::JOB_FILE)) {
-            unlink(LocalJob::JOB_FILE);
+        if (file_exists((static::JOB)::JOB_FILE)) {
+            unlink((static::JOB)::JOB_FILE);
         }
     }
 
@@ -31,14 +41,14 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
-        $id = $jobs->push(new LocalJob(['data' => 100]));
+        $id = $jobs->push(new $this->job(['data' => 100]));
 
         $this->assertNotEmpty($id);
 
         $this->waitForJob();
-        $this->assertFileExists(LocalJob::JOB_FILE);
+        $this->assertFileExists($this->job::JOB_FILE);
 
-        $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
+        $data = json_decode(file_get_contents($this->job::JOB_FILE), true);
         $this->assertSame($id, $data['id']);
         $this->assertSame(100, $data['data']);
     }
@@ -47,16 +57,16 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
-        $id = $jobs->push(new LocalJob([
+        $id = $jobs->push(new $this->job([
             'data' => 100
         ]), new Options(1));
 
         $this->assertNotEmpty($id);
 
         $this->assertTrue($this->waitForJob() > 1);
-        $this->assertFileExists(LocalJob::JOB_FILE);
+        $this->assertFileExists($this->job::JOB_FILE);
 
-        $data = json_decode(file_get_contents(LocalJob::JOB_FILE), true);
+        $data = json_decode(file_get_contents($this->job::JOB_FILE), true);
         $this->assertSame($id, $data['id']);
         $this->assertSame(100, $data['data']);
     }
@@ -68,7 +78,7 @@ abstract class BaseTest extends TestCase
     {
         $jobs = new Queue(new RPC(new SocketRelay('localhost', 6002)));
 
-        $jobs->push(new LocalJob([
+        $jobs->push(new $this->job([
             'data' => 100
         ], new Container()));
     }
@@ -82,7 +92,7 @@ abstract class BaseTest extends TestCase
     {
         $start = microtime(true);
         $try = 0;
-        while (!file_exists(LocalJob::JOB_FILE) && $try < 10) {
+        while (!file_exists($this->job::JOB_FILE) && $try < 10) {
             usleep(250000);
             $try++;
         }

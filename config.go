@@ -11,7 +11,7 @@ type Config struct {
 	Workers *roadrunner.ServerConfig
 
 	// Pipelines defines mapping between PHP job pipeline and associated job broker.
-	Pipelines map[string]*Pipeline
+	Pipelines []*Pipeline
 }
 
 // Hydrate populates config values.

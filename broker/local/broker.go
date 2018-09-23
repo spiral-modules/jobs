@@ -22,6 +22,14 @@ type entry struct {
 	job *jobs.Job
 }
 
+// Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
+// together.
+func (l *Broker) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
+	l.exe = exe
+	l.err = err
+	return nil
+}
+
 // Init configures local job broker.
 func (l *Broker) Init(cfg *Config) (bool, error) {
 	if err := cfg.Valid(); err != nil {
@@ -37,17 +45,9 @@ func (l *Broker) Init(cfg *Config) (bool, error) {
 	return true, nil
 }
 
-// Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
-// together.
-func (l *Broker) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
-	l.exe = exe
-	l.err = err
-	return nil
-}
-
 // Serve local broker.
 func (l *Broker) Serve() error {
-	for i := 0; i <= l.cfg.Threads; i++ {
+	for i := 0; i < l.cfg.Threads; i++ {
 		l.wg.Add(1)
 		go l.listen()
 	}

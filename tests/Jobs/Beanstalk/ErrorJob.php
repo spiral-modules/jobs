@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests\Fixtures;
+namespace Spiral\Jobs\Tests\Beanstalk;
 
 use Spiral\Jobs\AbstractJob;
 

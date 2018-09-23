@@ -10,7 +10,7 @@ type Pipeline struct {
 	// Broker defines name of associated broker.
 	Broker string
 
-	// Handle define job matching pattern (i.e. - "app.jobs.email")
+	// Listen define job matching pattern (i.e. - "app.jobs.email")
 	Handle []string
 
 	// Retry defined number of job retries in case of error. Default none.

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// ID defines Handle service public alias.
+	// ID defines Listen service public alias.
 	ID = "jobs"
 
 	// indicates that job service is running

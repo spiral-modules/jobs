@@ -7,8 +7,19 @@ jobs:
 
   # list of broker pipelines associated with endpoints
   pipelines:
-    local:
-      broker: local
+    - broker: local
       listen: true
       handle:
-        - "spiral.jobs.tests.fixtures.local*"
+        - "spiral.jobs.tests.local"
+
+    - broker: beanstalk
+      listen: true
+      options:
+        tube:    default
+        threads: 1
+      handle:
+        - "spiral.jobs.tests.beanstalk*"
+
+  brokers:
+    beanstalk:
+      address: tcp://localhost:11300
