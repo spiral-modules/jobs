@@ -17,6 +17,7 @@ before_install:
   - sudo apt-get install -y php7.1-cli php7.1-xml php7.1-xdebug php7.1-dom
   - sudo cp `which php7.1` `which php`
   - go get ./...
+  - go build -o rr tests/main.go
 
 install:
   - sudo cp `which php7.1` `which php`
@@ -25,8 +26,8 @@ install:
   - composer self-update
   - composer install --no-interaction --ignore-platform-reqs
 
-#before_script:
-  #- go run tests/main.go serve -v -d -c tests/.rr.yaml &
+before_script:
+  - ./rr serve -c tests/.rr.yaml &
 
 script:
   - vendor/bin/phpunit --coverage-clover=coverage.xml

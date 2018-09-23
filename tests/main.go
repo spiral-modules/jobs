@@ -7,8 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/broker/local"
 	"github.com/spiral/jobs/broker/beanstalk"
+	"github.com/spiral/jobs/broker/local"
 )
 
 func main() {

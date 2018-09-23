@@ -1,8 +1,8 @@
 package jobs
 
 import (
-	"time"
 	"strings"
+	"time"
 )
 
 // Pipeline describes broker specific pipeline.

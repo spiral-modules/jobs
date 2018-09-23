@@ -1,11 +1,11 @@
 package beanstalk
 
 import (
+	"errors"
 	"github.com/spiral/roadrunner/service"
+	"github.com/xuri/aurora/beanstalk"
 	"strings"
 	"syscall"
-	"errors"
-	"github.com/xuri/aurora/beanstalk"
 )
 
 // Config defines beanstalk broker configuration.

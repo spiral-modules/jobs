@@ -1,8 +1,8 @@
 package local
 
 import (
-	"github.com/spiral/roadrunner/service"
 	"fmt"
+	"github.com/spiral/roadrunner/service"
 )
 
 // Config defines local broker configuration.

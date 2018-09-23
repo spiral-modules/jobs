@@ -1,10 +1,10 @@
 package local
 
 import (
+	"github.com/satori/go.uuid"
 	"github.com/spiral/jobs"
 	"sync"
 	"time"
-	"github.com/satori/go.uuid"
 )
 
 // Broker run queue using local goroutines.

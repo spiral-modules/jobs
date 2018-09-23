@@ -1,12 +1,12 @@
 package jobs
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner"
-	"github.com/spiral/roadrunner/service/rpc"
 	"github.com/spiral/roadrunner/service"
 	"github.com/spiral/roadrunner/service/env"
-	"fmt"
+	"github.com/spiral/roadrunner/service/rpc"
 )
 
 const (

@@ -1,9 +1,9 @@
 package beanstalk
 
 import (
-	"github.com/xuri/aurora/beanstalk"
-	"github.com/spiral/jobs"
 	"errors"
+	"github.com/spiral/jobs"
+	"github.com/xuri/aurora/beanstalk"
 )
 
 // Tube connects with singular queue channel in beanstalk.

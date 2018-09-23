@@ -1,11 +1,11 @@
 package beanstalk
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/xuri/aurora/beanstalk"
 	"sync"
-	"fmt"
-	"encoding/json"
 )
 
 // Broker run jobs using Broker service.
