@@ -25,7 +25,7 @@ install:
   - composer install --no-interaction --ignore-platform-reqs
 
 before_script:
-  - go run tests/main.go serve -c tests/.rr.yaml &
+  - go run tests/main.go serve -v -d -c tests/.rr.yaml &
 
 script:
   - vendor/bin/phpunit --coverage-clover=coverage.xml
