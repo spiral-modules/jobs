@@ -10,6 +10,7 @@ jobs:
   brokers:
     beanstalk:
       address:  tcp://localhost:11300
+      reserve:  1
 
     sqs:
       region:   us-west-1
