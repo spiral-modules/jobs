@@ -24,45 +24,45 @@ type entry struct {
 
 // Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
 // together.
-func (l *Broker) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
-	l.exe = exe
-	l.err = err
+func (b *Broker) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
+	b.exe = exe
+	b.err = err
 	return nil
 }
 
 // Init configures local job broker.
-func (l *Broker) Init(cfg *Config) (bool, error) {
+func (b *Broker) Init(cfg *Config) (bool, error) {
 	if err := cfg.Valid(); err != nil {
 		return false, err
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	l.cfg = cfg
-	l.queue = make(chan entry)
+	b.cfg = cfg
+	b.queue = make(chan entry)
 
 	return true, nil
 }
 
 // Serve local broker.
-func (l *Broker) Serve() error {
-	for i := 0; i < l.cfg.Threads; i++ {
-		l.wg.Add(1)
-		go l.listen()
+func (b *Broker) Serve() error {
+	for i := 0; i < b.cfg.Threads; i++ {
+		b.wg.Add(1)
+		go b.listen()
 	}
 
-	l.wg.Wait()
+	b.wg.Wait()
 	return nil
 }
 
 // Stop local broker.
-func (l *Broker) Stop() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+func (b *Broker) Stop() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	if l.queue != nil {
-		close(l.queue)
+	if b.queue != nil {
+		close(b.queue)
 	}
 }
 
@@ -80,23 +80,25 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	return id.String(), nil
 }
 
-func (l *Broker) listen() {
-	defer l.wg.Done()
-	for q := range l.queue {
+func (b *Broker) listen() {
+	defer b.wg.Done()
+	for q := range b.queue {
 		id, job := q.id, q.job
 
 		if job.Options.Delay != 0 {
 			time.Sleep(job.Options.DelayDuration())
 		}
 
+		// todo: move to goroutine
+
 		// local broker does not support job timeouts yet
-		err := l.exe(id, job)
+		err := b.exe(id, job)
 		if err == nil {
 			continue
 		}
 
 		if !job.CanRetry() {
-			l.err(id, job, err)
+			b.err(id, job, err)
 			continue
 		}
 
@@ -104,6 +106,6 @@ func (l *Broker) listen() {
 			time.Sleep(job.Options.RetryDuration())
 		}
 
-		l.queue <- entry{id: id, job: job}
+		b.queue <- entry{id: id, job: job}
 	}
 }
