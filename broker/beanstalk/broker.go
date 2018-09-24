@@ -145,6 +145,7 @@ func (b *Broker) listen(t *Tube) {
 
 			if !job.CanRetry() {
 				b.conn.Bury(id, 0)
+				b.err(fmt.Sprintf("%v", id), job, err)
 				continue
 			}
 

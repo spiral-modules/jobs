@@ -39,6 +39,17 @@ func (p *Pipeline) Has(job string) bool {
 
 type PipelineOptions map[string]interface{}
 
+// Bool must return option value as string or return default value.
+func (o PipelineOptions) Bool(name string, d bool) bool {
+	if value, ok := o[name]; ok {
+		if b, ok := value.(bool); ok {
+			return b
+		}
+	}
+
+	return d
+}
+
 // String must return option value as string or return default value.
 func (o PipelineOptions) String(name string, d string) string {
 	if value, ok := o[name]; ok {

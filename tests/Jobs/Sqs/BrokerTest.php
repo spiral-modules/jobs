@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests\Rabbit;
+namespace Spiral\Jobs\Tests\Sqs;
 
 use Spiral\Jobs\Tests\BaseTest;
 
