@@ -2,10 +2,10 @@ package sqs
 
 import (
 	"encoding/json"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
 	"sync"
-	"github.com/aws/aws-sdk-go/service/sqs"
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 // Broker run jobs using Broker service.
@@ -175,16 +175,14 @@ func (b *Broker) listen(q *Queue) {
 			err = b.exe(*result.Messages[0].MessageId, job)
 			if err == nil {
 				b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-					QueueUrl: q.URL, ReceiptHandle:
-					result.Messages[0].ReceiptHandle,
+					QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
 				})
 				continue
 			}
 
 			if !job.CanRetry() {
 				b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-					QueueUrl: q.URL, ReceiptHandle:
-					result.Messages[0].ReceiptHandle,
+					QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
 				})
 
 				b.err(*result.Messages[0].MessageId, job, err)
