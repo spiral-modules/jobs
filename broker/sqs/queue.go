@@ -3,6 +3,7 @@ package sqs
 import (
 	"errors"
 	"github.com/spiral/jobs"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 // Queue defines single SQS queue.
@@ -27,6 +28,14 @@ type Queue struct {
 
 	// Number of threads to serve tube with.
 	Threads int
+}
+
+// CreateAttributes must return queue create attributes.
+func (q *Queue) CreateAttributes() map[string]*string {
+	// todo: add more attributes
+	return map[string]*string{
+		"MessageRetentionPeriod": aws.String("86400"),
+	}
 }
 
 // NewTube creates new tube or returns an error

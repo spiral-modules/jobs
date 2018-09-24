@@ -1,12 +1,12 @@
 package sqs
 
 import (
-	"github.com/spiral/roadrunner/service"
 	"errors"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/spiral/roadrunner/service"
 )
 
 // Config defines sqs broker configuration.
@@ -26,10 +26,6 @@ type Config struct {
 
 // Session returns new AWS session.
 func (c *Config) Session() (*session.Session, error) {
-	if c.Key == "" || c.Secret == "" {
-		return session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
-	}
-
 	return session.NewSession(&aws.Config{
 		Region:      aws.String("us-west-2"),
 		Credentials: credentials.NewStaticCredentials(c.Key, c.Secret, ""),
@@ -58,12 +54,16 @@ func (c *Config) Hydrate(cfg service.Config) error {
 		return err
 	}
 
-	if c.Endpoint != "" {
-		return nil
-	}
-
 	if c.Region == "" {
 		return errors.New("SQS region is missing")
+	}
+
+	if c.Key == "" {
+		return errors.New("SQS key is missing")
+	}
+
+	if c.Secret == "" {
+		return errors.New("SQS secret is missing")
 	}
 
 	return nil
