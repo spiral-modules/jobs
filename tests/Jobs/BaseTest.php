@@ -27,7 +27,6 @@ abstract class BaseTest extends TestCase
     {
         $this->job = static::JOB;
         $this->errorJob = static::ERROR_JOB;
-
     }
 
     protected function tearDown()
@@ -41,6 +40,7 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
+for ($i=0;$i<10000;$i++)
         $id = $jobs->push(new $this->job(['data' => 100]));
 
         $this->assertNotEmpty($id);

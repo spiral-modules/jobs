@@ -3,7 +3,7 @@ jobs:
   workers:
     command: "php handler.php"
     pool:
-      numWorkers: 5
+      numWorkers: 2
       #maxJobs:    1
 
   # broker configuration

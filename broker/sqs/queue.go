@@ -22,7 +22,7 @@ type Queue struct {
 	// Attributes defines set of options to be used to create queue.
 	Attributes map[interface{}]interface{}
 
-	// Timeout - The duration (in seconds) that the received messages are hidden from subsequent. Default 600.
+	// Reserve - The duration (in seconds) that the received messages are hidden from subsequent. Default 600.
 	Timeout int
 
 	// WaitTime defines the number of seconds queue waits for job to arrive. Default 1.

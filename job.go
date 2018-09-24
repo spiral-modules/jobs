@@ -47,7 +47,7 @@ type Options struct {
 	// RetryDelay defines for how long job should be waiting until next retry. Defaults to none.
 	RetryDelay int `json:"retryDelay,omitempty"`
 
-	// Timeout defines for how broker should wait until treating job are failed. Defaults to 30 min.
+	// Reserve defines for how broker should wait until treating job are failed. Defaults to 30 min.
 	Timeout int `json:"timeout,omitempty"`
 
 	// Maximum job retries. Defaults to none.

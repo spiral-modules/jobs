@@ -145,7 +145,7 @@ func (s *Service) Push(j *Job) (string, error) {
 	if err != nil {
 		s.log.Errorf("[jobs] `%s`: %s", j.Job, err.Error())
 	} else {
-		s.log.Debugf("[jobs] push `%s`.`%s`", j.Job, id)
+		s.log.Debugf("[jobs] push `%s` [%s]", j.Job, id)
 	}
 
 	return id, err
@@ -163,7 +163,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.log.Debugf("[jobs] done `%s`.`%s`", j.Job, id)
+		s.log.Debugf("[jobs] done `%s` [%s]", j.Job, id)
 		return nil
 	}
 
@@ -173,7 +173,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 // error must be invoked when job is declared as failed.
 func (s *Service) error(id string, j *Job, err error) error {
-	s.log.Errorf("[jobs] error `%s`.`%s`: %s", j.Job, id, err.Error())
+	s.log.Errorf("[jobs] error `%s` [%s]: %s", j.Job, id, err.Error())
 	return err
 }
 

@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spiral/jobs"
-	"github.com/xuri/aurora/beanstalk"
+	"github.com/beanstalkd/go-beanstalk"
 	"sync"
+	"time"
 )
 
 // Broker run jobs using Broker service.
@@ -14,8 +15,8 @@ type Broker struct {
 	mu          sync.Mutex
 	stop        chan interface{}
 	conn        *beanstalk.Conn
-	wg          sync.WaitGroup
 	tubes       map[*jobs.Pipeline]*Tube
+	tubeset     *beanstalk.TubeSet
 	handlerPool chan jobs.Handler
 	err         jobs.ErrorHandler
 }
@@ -55,16 +56,18 @@ func (b *Broker) Serve() error {
 	b.stop = make(chan interface{})
 	b.mu.Unlock()
 
+	var names []string
 	for _, t := range b.tubes {
 		t.Tube.Conn = b.conn
 
 		if t.Listen {
-			b.wg.Add(1)
-			go b.listen(t)
+			names = append(names, t.Name)
 		}
 	}
 
-	b.wg.Wait()
+	if len(names) != 0 {
+		b.listen(beanstalk.NewTubeSet(b.conn, names...))
+	}
 	<-b.stop
 
 	return nil
@@ -113,8 +116,7 @@ func (b *Broker) registerTube(pipeline *jobs.Pipeline) error {
 }
 
 // listen jobs from given tube
-func (b *Broker) listen(t *Tube) {
-	defer b.wg.Done()
+func (b *Broker) listen(t *beanstalk.TubeSet) {
 	var job *jobs.Job
 	var handler jobs.Handler
 
@@ -123,9 +125,8 @@ func (b *Broker) listen(t *Tube) {
 		case <-b.stop:
 			return
 		default:
-			id, body, err := t.PeekReady()
+			id, body, err := t.Reserve(time.Duration(b.cfg.Reserve) * time.Second)
 			if err != nil {
-				// need additional logging
 				continue
 			}
 
@@ -146,7 +147,7 @@ func (b *Broker) listen(t *Tube) {
 				}
 
 				if !job.CanRetry() {
-					b.conn.Bury(id, 0)
+					b.conn.Delete(id)
 					b.err(fmt.Sprintf("%v", id), job, err)
 					return
 				}
