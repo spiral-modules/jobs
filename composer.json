@@ -11,6 +11,7 @@
   ],
   "require": {
     "php": "^7.1",
+    "ramsey/uuid": "^3.8"
     "spiral/common": "^1.0",
     "spiral/roadrunner": "^1.1",
     "doctrine/inflector": "^1.3"
