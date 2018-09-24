@@ -26,16 +26,16 @@ jobs:
 
     - listen: true
       broker: beanstalk
-      handle:
-        - "spiral.jobs.tests.beanstalk.*"
       options:
         tube: default
+      handle:
+        - "spiral.jobs.tests.beanstalk.*"
 
     - listen: true
       broker: sqs
-      handle:
-        - "spiral.jobs.tests.sqs.*"
       options:
         queue: default
         attributes:
           MessageRetentionPeriod: "86400"
+      handle:
+        - "spiral.jobs.tests.sqs.*"
