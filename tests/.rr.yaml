@@ -20,11 +20,6 @@ jobs:
   # list of broker pipelines associated with endpoints
   pipelines:
     - listen: true
-      broker: local
-      handle:
-        - "spiral.jobs.tests.local.*"
-
-    - listen: true
       broker: beanstalk
       options:
         tube: default
@@ -39,3 +34,8 @@ jobs:
           MessageRetentionPeriod: "86400"
       handle:
         - "spiral.jobs.tests.sqs.*"
+
+    - listen: true
+      broker: local
+      handle:
+        - "spiral.jobs.tests.local.*"
