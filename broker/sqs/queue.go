@@ -16,8 +16,8 @@ type Queue struct {
 	// Create indicates that queue must be automatically created.
 	Create bool
 
-	// Configure defines set of options to be used to create queue.
-	Configure map[interface{}]interface{}
+	// Attributes defines set of options to be used to create queue.
+	Attributes map[interface{}]interface{}
 
 	// Indicates that tube must be listened.
 	Listen bool
@@ -36,7 +36,7 @@ type Queue struct {
 func (q *Queue) CreateAttributes() (attr map[string]*string) {
 	attr = make(map[string]*string)
 
-	for k, v := range q.Configure {
+	for k, v := range q.Attributes {
 		if ks, ok := k.(string); ok {
 			if vs, ok := v.(string); ok {
 				attr[ks] = &vs
@@ -66,10 +66,10 @@ func NewQueue(p *jobs.Pipeline) (*Queue, error) {
 		Threads:  p.Options.Integer("threads", 1),
 	}
 
-	if configureOptions, ok := p.Options["configure"]; ok {
-		if configure, ok := configureOptions.(map[interface{}]interface{}); ok {
+	if attrOptions, ok := p.Options["attributes"]; ok {
+		if attributes, ok := attrOptions.(map[interface{}]interface{}); ok {
 			q.Create = true
-			q.Configure = configure
+			q.Attributes = attributes
 		}
 	}
 
