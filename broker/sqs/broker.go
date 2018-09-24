@@ -145,9 +145,6 @@ func (b *Broker) listen(q *Queue) {
 			return
 		default:
 			result, err := b.sqs.ReceiveMessage(&sqs.ReceiveMessageInput{
-				AttributeNames: []*string{
-					aws.String(sqs.MessageSystemAttributeNameApproximateReceiveCount),
-				},
 				QueueUrl:            q.URL,
 				MaxNumberOfMessages: aws.Int64(1),
 				VisibilityTimeout:   aws.Int64(int64(q.Timeout)),
