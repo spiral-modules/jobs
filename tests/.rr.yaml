@@ -22,21 +22,21 @@ jobs:
     - broker: local
       listen: true
       handle:
-        - "spiral.jobs.tests.local"
+        - "spiral.jobs.tests.local.*"
 
     - broker: beanstalk
       listen: true
       handle:
-        - "spiral.jobs.tests.beanstalk*"
+        - "spiral.jobs.tests.beanstalk.*"
       options:
-        tube:    default
-        threads: 1
+        tube: default
 
     - broker: sqs
       listen: true
       handle:
-        - "spiral.jobs.tests.sqs*"
+        - "spiral.jobs.tests.sqs.*"
       options:
-        queue:   default
-        create:  true
-        threads: 1
+        queue:  default
+        create: true
+        configure:
+          MessageRetentionPeriod: "86400"
