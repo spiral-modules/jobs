@@ -12,7 +12,10 @@ jobs:
       address: tcp://localhost:11300
 
     sqs:
+      region: us-west-1
       endpoint: http://localhost:9324
+      key:      api-key
+      secret:   api-secret
 
   # list of broker pipelines associated with endpoints
   pipelines:
@@ -23,17 +26,17 @@ jobs:
 
     - broker: beanstalk
       listen: true
+      handle:
+        - "spiral.jobs.tests.beanstalk*"
       options:
         tube:    default
         threads: 1
-      handle:
-        - "spiral.jobs.tests.beanstalk*"
 
     - broker: sqs
       listen: true
+      handle:
+        - "spiral.jobs.tests.sqs*"
       options:
         queue:   default
         create:  true
         threads: 1
-      handle:
-        - "spiral.jobs.tests.sqs*"

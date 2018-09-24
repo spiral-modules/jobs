@@ -126,12 +126,9 @@ func (b *Broker) registerQueue(pipeline *jobs.Pipeline) error {
 
 // createQueue creates sqs queue.
 func (b *Broker) createQueue(q *Queue) error {
-	// todo: support more parameters, handle already exists queue
 	_, err := b.sqs.CreateQueue(&sqs.CreateQueueInput{
-		QueueName: aws.String(q.Queue),
-		Attributes: map[string]*string{
-			"MessageRetentionPeriod": aws.String("86400"),
-		},
+		QueueName:  aws.String(q.Queue),
+		Attributes: q.CreateAttributes(),
 	})
 
 	return err
