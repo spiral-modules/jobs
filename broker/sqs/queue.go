@@ -68,6 +68,7 @@ func NewQueue(p *jobs.Pipeline) (*Queue, error) {
 
 	if configureOptions, ok := p.Options["configure"]; ok {
 		if configure, ok := configureOptions.(map[interface{}]interface{}); ok {
+			q.Create = true
 			q.Configure = configure
 		}
 	}

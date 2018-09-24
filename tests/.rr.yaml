@@ -36,7 +36,6 @@ jobs:
       handle:
         - "spiral.jobs.tests.sqs.*"
       options:
-        queue:  default
-        create: true
+        queue: default
         configure:
           MessageRetentionPeriod: "86400"
