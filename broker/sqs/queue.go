@@ -7,6 +7,9 @@ import (
 
 // Queue defines single SQS queue.
 type Queue struct {
+	// Indicates that tube must be listened.
+	Listen bool
+
 	// Queue is queue name.
 	Queue string
 
@@ -19,17 +22,11 @@ type Queue struct {
 	// Attributes defines set of options to be used to create queue.
 	Attributes map[interface{}]interface{}
 
-	// Indicates that tube must be listened.
-	Listen bool
-
-	// Timeout - The duration (in seconds) that the received messages are hidden from subsequent. Default 600.
+	// Reserve - The duration (in seconds) that the received messages are hidden from subsequent. Default 600.
 	Timeout int
 
 	// WaitTime defines the number of seconds queue waits for job to arrive. Default 1.
 	WaitTime int
-
-	// Number of threads to serve tube with.
-	Threads int
 }
 
 // CreateAttributes must return queue create attributes.
@@ -58,12 +55,11 @@ func NewQueue(p *jobs.Pipeline) (*Queue, error) {
 	}
 
 	q := &Queue{
+		Listen:   p.Listen,
 		Queue:    p.Options.String("queue", ""),
 		Create:   p.Options.Bool("create", true),
-		Listen:   p.Listen,
 		Timeout:  p.Options.Integer("timeout", 600),
 		WaitTime: p.Options.Integer("waitTime", 1),
-		Threads:  p.Options.Integer("threads", 1),
 	}
 
 	if attrOptions, ok := p.Options["attributes"]; ok {

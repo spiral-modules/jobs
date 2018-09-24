@@ -3,7 +3,7 @@ package beanstalk
 import (
 	"errors"
 	"github.com/spiral/roadrunner/service"
-	"github.com/xuri/aurora/beanstalk"
+	"github.com/beanstalkd/go-beanstalk"
 	"strings"
 	"syscall"
 )
@@ -12,6 +12,9 @@ import (
 type Config struct {
 	// Address of beanstalk server.
 	Address string
+
+	// Reserve timeout in seconds.
+	Reserve int
 }
 
 // Hydrate config values.

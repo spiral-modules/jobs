@@ -4,25 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spiral/jobs"
-	"github.com/xuri/aurora/beanstalk"
+	"github.com/beanstalkd/go-beanstalk"
 	"sync"
+	"time"
 )
 
 // Broker run jobs using Broker service.
 type Broker struct {
-	cfg   *Config
-	mu    sync.Mutex
-	stop  chan interface{}
-	conn  *beanstalk.Conn
-	wg    sync.WaitGroup
-	tubes map[*jobs.Pipeline]*Tube
-	exe   jobs.Handler
-	err   jobs.ErrorHandler
+	cfg         *Config
+	mu          sync.Mutex
+	stop        chan interface{}
+	conn        *beanstalk.Conn
+	tubes       map[*jobs.Pipeline]*Tube
+	tubeset     *beanstalk.TubeSet
+	handlerPool chan jobs.Handler
+	err         jobs.ErrorHandler
 }
 
 // Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
 // together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
+func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
 	b.tubes = make(map[*jobs.Pipeline]*Tube)
 	for _, p := range pipelines {
 		if err := b.registerTube(p); err != nil {
@@ -30,8 +31,8 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.Error
 		}
 	}
 
-	b.exe = h
-	b.err = f
+	b.handlerPool = pool
+	b.err = err
 	return nil
 }
 
@@ -55,18 +56,18 @@ func (b *Broker) Serve() error {
 	b.stop = make(chan interface{})
 	b.mu.Unlock()
 
+	var names []string
 	for _, t := range b.tubes {
 		t.Tube.Conn = b.conn
 
 		if t.Listen {
-			for i := 0; i < t.Threads; i++ {
-				b.wg.Add(1)
-				go b.listen(t)
-			}
+			names = append(names, t.Name)
 		}
 	}
 
-	b.wg.Wait()
+	if len(names) != 0 {
+		b.listen(beanstalk.NewTubeSet(b.conn, names...))
+	}
 	<-b.stop
 
 	return nil
@@ -115,18 +116,17 @@ func (b *Broker) registerTube(pipeline *jobs.Pipeline) error {
 }
 
 // listen jobs from given tube
-func (b *Broker) listen(t *Tube) {
-	defer b.wg.Done()
+func (b *Broker) listen(t *beanstalk.TubeSet) {
 	var job *jobs.Job
+	var handler jobs.Handler
 
 	for {
 		select {
 		case <-b.stop:
 			return
 		default:
-			id, body, err := t.PeekReady()
+			id, body, err := t.Reserve(time.Duration(b.cfg.Reserve) * time.Second)
 			if err != nil {
-				// need additional logging
 				continue
 			}
 
@@ -136,21 +136,25 @@ func (b *Broker) listen(t *Tube) {
 				continue
 			}
 
-			// local broker does not support job timeouts yet
-			err = b.exe(fmt.Sprintf("%v", id), job)
-			if err == nil {
-				b.conn.Delete(id)
-				continue
-			}
+			handler = <-b.handlerPool
+			go func() {
+				err = handler(fmt.Sprintf("%v", id), job)
+				b.handlerPool <- handler
 
-			if !job.CanRetry() {
-				b.conn.Bury(id, 0)
-				b.err(fmt.Sprintf("%v", id), job, err)
-				continue
-			}
+				if err == nil {
+					b.conn.Delete(id)
+					return
+				}
 
-			// retry
-			b.conn.Release(id, 0, job.Options.RetryDuration())
+				if !job.CanRetry() {
+					b.conn.Delete(id)
+					b.err(fmt.Sprintf("%v", id), job, err)
+					return
+				}
+
+				// retry
+				b.conn.Release(id, 0, job.Options.RetryDuration())
+			}()
 		}
 	}
 }

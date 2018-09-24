@@ -27,7 +27,6 @@ abstract class BaseTest extends TestCase
     {
         $this->job = static::JOB;
         $this->errorJob = static::ERROR_JOB;
-
     }
 
     protected function tearDown()

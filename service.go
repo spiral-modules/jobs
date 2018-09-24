@@ -47,21 +47,24 @@ type Service struct {
 	log     *logrus.Logger
 	brokers service.Container
 	rr      *roadrunner.Server
+	exePool chan Handler
 }
 
 // Init configures job service.
-func (s *Service) Init(
-	c service.Config,
-	l *logrus.Logger,
-	r *rpc.Service,
-	e env.Environment,
-) (ok bool, err error) {
+func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env.Environment) (ok bool, err error) {
 	s.cfg = &Config{}
 	s.log = l
 	s.env = e
 
 	if err := s.cfg.Hydrate(c); err != nil {
 		return false, err
+	}
+
+	// Configuring worker pools
+	s.exePool = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
+
+	for i := int64(0); i < s.cfg.Workers.Pool.NumWorkers; i++ {
+		s.exePool <- s.exec
 	}
 
 	if r != nil {
@@ -83,7 +86,7 @@ func (s *Service) Init(
 			}
 		}
 
-		if err := e.Listen(pipes, s.exec, s.error); err != nil {
+		if err := e.Listen(pipes, s.exePool, s.error); err != nil {
 			return false, err
 		}
 
@@ -142,7 +145,7 @@ func (s *Service) Push(j *Job) (string, error) {
 	if err != nil {
 		s.log.Errorf("[jobs] `%s`: %s", j.Job, err.Error())
 	} else {
-		s.log.Debugf("[jobs] push `%s`.`%s`", j.Job, id)
+		s.log.Debugf("[jobs] push `%s` [%s]", j.Job, id)
 	}
 
 	return id, err
@@ -160,7 +163,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.log.Debugf("[jobs] done `%s`.`%s`", j.Job, id)
+		s.log.Debugf("[jobs] done `%s` [%s]", j.Job, id)
 		return nil
 	}
 
@@ -170,7 +173,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 // error must be invoked when job is declared as failed.
 func (s *Service) error(id string, j *Job, err error) error {
-	s.log.Errorf("[jobs] error `%s`.`%s`: %s", j.Job, id, err.Error())
+	s.log.Errorf("[jobs] error `%s` [%s]: %s", j.Job, id, err.Error())
 	return err
 }
 
