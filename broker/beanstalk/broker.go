@@ -100,7 +100,7 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("beanstalk:%v", id), err
+	return fmt.Sprintf("%v", id), err
 }
 
 // registerTube new beanstalk pipeline
@@ -137,7 +137,7 @@ func (b *Broker) listen(t *Tube) {
 			}
 
 			// local broker does not support job timeouts yet
-			err = b.exe(fmt.Sprintf("beanstalk:%v", id), job)
+			err = b.exe(fmt.Sprintf("%v", id), job)
 			if err == nil {
 				b.conn.Delete(id)
 				continue
@@ -145,6 +145,7 @@ func (b *Broker) listen(t *Tube) {
 
 			if !job.CanRetry() {
 				b.conn.Bury(id, 0)
+				b.err(fmt.Sprintf("%v", id), job, err)
 				continue
 			}
 

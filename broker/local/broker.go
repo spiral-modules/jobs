@@ -67,7 +67,7 @@ func (l *Broker) Stop() {
 }
 
 // Push new job to queue
-func (l *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
+func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
@@ -75,7 +75,7 @@ func (l *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 	// todo: handle stop
 
-	go func() { l.queue <- entry{id: id.String(), job: j} }()
+	go func() { b.queue <- entry{id: id.String(), job: j} }()
 
 	return id.String(), nil
 }

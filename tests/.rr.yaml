@@ -11,6 +11,9 @@ jobs:
     beanstalk:
       address: tcp://localhost:11300
 
+    sqs:
+      endpoint: http://localhost:9324
+
   # list of broker pipelines associated with endpoints
   pipelines:
     - broker: local
@@ -26,3 +29,11 @@ jobs:
       handle:
         - "spiral.jobs.tests.beanstalk*"
 
+    - broker: sqs
+      listen: true
+      options:
+        queue:   default
+        create:  true
+        threads: 1
+      handle:
+        - "spiral.jobs.tests.sqs*"

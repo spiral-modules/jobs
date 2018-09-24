@@ -19,7 +19,7 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return cfg.Unmarshal(c)
 }
 
-// Listener creates new rpc socket Listener.
+// Conn creates new rpc socket Listener.
 func (c *Config) Conn() (*beanstalk.Conn, error) {
 	dsn := strings.Split(c.Address, "://")
 	if len(dsn) != 2 {

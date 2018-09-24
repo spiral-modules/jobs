@@ -9,6 +9,7 @@ import (
 	"github.com/spiral/jobs"
 	"github.com/spiral/jobs/broker/beanstalk"
 	"github.com/spiral/jobs/broker/local"
+	"github.com/spiral/jobs/broker/sqs"
 )
 
 func main() {
@@ -17,6 +18,7 @@ func main() {
 		Brokers: map[string]jobs.Broker{
 			"local":     &local.Broker{},
 			"beanstalk": &beanstalk.Broker{},
+			"sqs":       &sqs.Broker{},
 		},
 	})
 
