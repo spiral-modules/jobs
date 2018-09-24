@@ -10,19 +10,19 @@ import (
 
 // Broker run jobs using Broker service.
 type Broker struct {
-	cfg   *Config
-	mu    sync.Mutex
-	stop  chan interface{}
-	sqs   *sqs.SQS
-	wg    sync.WaitGroup
-	queue map[*jobs.Pipeline]*Queue
-	exe   jobs.Handler
-	err   jobs.ErrorHandler
+	cfg         *Config
+	mu          sync.Mutex
+	stop        chan interface{}
+	sqs         *sqs.SQS
+	wg          sync.WaitGroup
+	queue       map[*jobs.Pipeline]*Queue
+	handlerPool chan jobs.Handler
+	err         jobs.ErrorHandler
 }
 
 // Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
 // together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.ErrorHandler) error {
+func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
 	b.queue = make(map[*jobs.Pipeline]*Queue)
 	for _, p := range pipelines {
 		if err := b.registerQueue(p); err != nil {
@@ -30,8 +30,8 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, h jobs.Handler, f jobs.Error
 		}
 	}
 
-	b.exe = h
-	b.err = f
+	b.handlerPool = pool
+	b.err = err
 	return nil
 }
 
@@ -70,10 +70,8 @@ func (b *Broker) Serve() (err error) {
 		q.URL = url.QueueUrl
 
 		if q.Listen {
-			for i := 0; i < q.Threads; i++ {
-				b.wg.Add(1)
-				go b.listen(q)
-			}
+			b.wg.Add(1)
+			go b.listen(q)
 		}
 	}
 
@@ -138,7 +136,7 @@ func (b *Broker) createQueue(q *Queue) error {
 func (b *Broker) listen(q *Queue) {
 	defer b.wg.Done()
 	var job *jobs.Job
-
+	var handler jobs.Handler
 	for {
 		select {
 		case <-b.stop:
@@ -166,34 +164,39 @@ func (b *Broker) listen(q *Queue) {
 				continue
 			}
 
-			err = b.exe(*result.Messages[0].MessageId, job)
-			if err == nil {
-				b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-					QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
+			handler = <-b.handlerPool
+			go func() {
+				err = handler(*result.Messages[0].MessageId, job)
+				b.handlerPool <- handler
+
+				if err == nil {
+					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
+						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
+					})
+					return
+				}
+
+				if !job.CanRetry() {
+					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
+						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
+					})
+
+					b.err(*result.Messages[0].MessageId, job, err)
+					return
+				}
+
+				data, err := json.Marshal(job)
+				if err != nil {
+					return
+				}
+
+				// retry job
+				b.sqs.SendMessage(&sqs.SendMessageInput{
+					DelaySeconds: aws.Int64(int64(job.Options.RetryDelay)),
+					MessageBody:  aws.String(string(data)),
+					QueueUrl:     q.URL,
 				})
-				continue
-			}
-
-			if !job.CanRetry() {
-				b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-					QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
-				})
-
-				b.err(*result.Messages[0].MessageId, job, err)
-				continue
-			}
-
-			data, err := json.Marshal(job)
-			if err != nil {
-				continue
-			}
-
-			// retry job
-			b.sqs.SendMessage(&sqs.SendMessageInput{
-				DelaySeconds: aws.Int64(int64(job.Options.RetryDelay)),
-				MessageBody:  aws.String(string(data)),
-				QueueUrl:     q.URL,
-			})
+			}()
 		}
 	}
 }

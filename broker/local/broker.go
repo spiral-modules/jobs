@@ -9,12 +9,11 @@ import (
 
 // Broker run queue using local goroutines.
 type Broker struct {
-	mu    sync.Mutex
-	cfg   *Config
-	wg    sync.WaitGroup
-	queue chan entry
-	exe   jobs.Handler
-	err   jobs.ErrorHandler
+	mu          sync.Mutex
+	wg          sync.WaitGroup
+	queue       chan entry
+	handlerPool chan jobs.Handler
+	err         jobs.ErrorHandler
 }
 
 type entry struct {
@@ -24,35 +23,59 @@ type entry struct {
 
 // Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
 // together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, exe jobs.Handler, err jobs.ErrorHandler) error {
-	b.exe = exe
+func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
+	b.handlerPool = pool
 	b.err = err
 	return nil
 }
 
 // Init configures local job broker.
-func (b *Broker) Init(cfg *Config) (bool, error) {
-	if err := cfg.Valid(); err != nil {
-		return false, err
-	}
-
+func (b *Broker) Init() (bool, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.cfg = cfg
 	b.queue = make(chan entry)
-
 	return true, nil
 }
 
 // Serve local broker.
 func (b *Broker) Serve() error {
-	for i := 0; i < b.cfg.Threads; i++ {
-		b.wg.Add(1)
-		go b.listen()
+	b.mu.Lock()
+	b.queue = make(chan entry)
+	b.mu.Unlock()
+
+	var handler jobs.Handler
+	for q := range b.queue {
+		id, job := q.id, q.job
+
+		if job.Options.Delay != 0 {
+			time.Sleep(job.Options.DelayDuration())
+		}
+
+		// wait for free handler
+		handler = <-b.handlerPool
+
+		go func() {
+			err := handler(id, job)
+			b.handlerPool <- handler
+
+			if err == nil {
+				return
+			}
+
+			if !job.CanRetry() {
+				b.err(id, job, err)
+				return
+			}
+
+			if job.Options.RetryDelay != 0 {
+				time.Sleep(job.Options.RetryDuration())
+			}
+
+			b.queue <- entry{id: id, job: job}
+		}()
 	}
 
-	b.wg.Wait()
 	return nil
 }
 
@@ -73,39 +96,7 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	// todo: handle stop
-
 	go func() { b.queue <- entry{id: id.String(), job: j} }()
 
 	return id.String(), nil
-}
-
-func (b *Broker) listen() {
-	defer b.wg.Done()
-	for q := range b.queue {
-		id, job := q.id, q.job
-
-		if job.Options.Delay != 0 {
-			time.Sleep(job.Options.DelayDuration())
-		}
-
-		// todo: move to goroutine
-
-		// local broker does not support job timeouts yet
-		err := b.exe(id, job)
-		if err == nil {
-			continue
-		}
-
-		if !job.CanRetry() {
-			b.err(id, job, err)
-			continue
-		}
-
-		if job.Options.RetryDelay != 0 {
-			time.Sleep(job.Options.RetryDuration())
-		}
-
-		b.queue <- entry{id: id, job: job}
-	}
 }

@@ -7,7 +7,7 @@ import (
 
 // Config defines settings for job broker, workers and routing PipelineOptions.
 type Config struct {
-	// Workers configures roadrunner server and worker pool.
+	// Workers configures roadrunner server and worker busy.
 	Workers *roadrunner.ServerConfig
 
 	// Pipelines defines mapping between PHP job pipeline and associated job broker.

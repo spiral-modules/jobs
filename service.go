@@ -47,21 +47,24 @@ type Service struct {
 	log     *logrus.Logger
 	brokers service.Container
 	rr      *roadrunner.Server
+	exePool chan Handler
 }
 
 // Init configures job service.
-func (s *Service) Init(
-	c service.Config,
-	l *logrus.Logger,
-	r *rpc.Service,
-	e env.Environment,
-) (ok bool, err error) {
+func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env.Environment) (ok bool, err error) {
 	s.cfg = &Config{}
 	s.log = l
 	s.env = e
 
 	if err := s.cfg.Hydrate(c); err != nil {
 		return false, err
+	}
+
+	// Configuring worker pools
+	s.exePool = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
+
+	for i := int64(0); i < s.cfg.Workers.Pool.NumWorkers; i++ {
+		s.exePool <- s.exec
 	}
 
 	if r != nil {
@@ -83,7 +86,7 @@ func (s *Service) Init(
 			}
 		}
 
-		if err := e.Listen(pipes, s.exec, s.error); err != nil {
+		if err := e.Listen(pipes, s.exePool, s.error); err != nil {
 			return false, err
 		}
 
