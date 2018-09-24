@@ -26,9 +26,9 @@ type Config struct {
 
 // Session returns new AWS session.
 func (c *Config) Session() (*session.Session, error) {
-	if c.Key == "" || c.Secret == "" {
-		return session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
-	}
+	//if c.Key == "" || c.Secret == "" {
+	//	return session.NewSession(&aws.Config{Region: aws.String("us-west-2")})
+	//}
 
 	return session.NewSession(&aws.Config{
 		Region:      aws.String("us-west-2"),
