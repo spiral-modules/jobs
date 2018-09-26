@@ -3,8 +3,9 @@ package beanstalk
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/spiral/jobs"
 	"github.com/beanstalkd/go-beanstalk"
+	"github.com/spiral/jobs"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -138,17 +139,31 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 
 			handler = <-b.handlerPool
 			go func() {
-				err = handler(fmt.Sprintf("%v", id), job)
+				jerr := handler(fmt.Sprintf("%v", id), job)
 				b.handlerPool <- handler
 
-				if err == nil {
+				if jerr == nil {
 					b.conn.Delete(id)
 					return
 				}
 
-				if !job.CanRetry() {
-					b.conn.Delete(id)
+				stats, err := b.conn.StatsJob(id)
+				if err != nil {
+					b.conn.Bury(id, 0)
 					b.err(fmt.Sprintf("%v", id), job, err)
+					return
+				}
+
+				if job.Attempt, err = strconv.Atoi(stats["reserves"]); err != nil {
+					job.Attempt++
+					b.conn.Bury(id, 0)
+					b.err(fmt.Sprintf("%v", id), job, err)
+					return
+				}
+
+				if !job.CanRetry() {
+					b.conn.Bury(id, 0)
+					b.err(fmt.Sprintf("%v", id), job, jerr)
 					return
 				}
 

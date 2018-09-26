@@ -166,10 +166,10 @@ func (b *Broker) listen(q *Queue) {
 
 			handler = <-b.handlerPool
 			go func() {
-				err = handler(*result.Messages[0].MessageId, job)
+				jerr := handler(*result.Messages[0].MessageId, job)
 				b.handlerPool <- handler
 
-				if err == nil {
+				if jerr == nil {
 					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
 						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
 					})
@@ -181,7 +181,7 @@ func (b *Broker) listen(q *Queue) {
 						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
 					})
 
-					b.err(*result.Messages[0].MessageId, job, err)
+					b.err(*result.Messages[0].MessageId, job, jerr)
 					return
 				}
 
@@ -189,6 +189,10 @@ func (b *Broker) listen(q *Queue) {
 				if err != nil {
 					return
 				}
+
+				b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
+					QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
+				})
 
 				// retry job
 				b.sqs.SendMessage(&sqs.SendMessageInput{

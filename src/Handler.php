@@ -10,6 +10,7 @@ namespace Spiral\Jobs;
 
 use Doctrine\Common\Inflector\Inflector;
 use Spiral\Core\FactoryInterface;
+use Spiral\Exceptions\ConsoleHandler;
 use Spiral\RoadRunner\Worker;
 
 /***
@@ -51,7 +52,7 @@ class Handler
 
                 $this->worker->send("ok");
             } catch (\Throwable $e) {
-                $this->worker->error((string)$e);
+                $this->handleException($this->worker, $e);
             }
         }
     }
@@ -69,5 +70,16 @@ class Handler
         }, $names);
 
         return $this->factory->make(join('\\', $names));
+    }
+
+    /**
+     * @param Worker     $worker
+     * @param \Throwable $e
+     */
+    protected function handleException(Worker $worker, \Throwable $e)
+    {
+        // Explaining exception to the user
+        $handler = new ConsoleHandler(STDERR);
+        $worker->error($handler->renderException($e, ConsoleHandler::VERBOSITY_VERBOSE));
     }
 }

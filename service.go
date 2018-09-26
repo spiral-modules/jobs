@@ -75,11 +75,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
-	s.rr.Listen(func(event int, ctx interface{}) {
-		if event == roadrunner.EventStderrOutput {
-			logrus.Warning(string(ctx.([]byte)))
-		}
-	})
+	s.rr.Listen(Listener(s.log))
 
 	// we are going to keep all handlers withing the brokers
 	// so we can easier manage their state and configuration
@@ -159,13 +155,13 @@ func (s *Service) Push(j *Job) (string, error) {
 
 // exec executed job using local RR server. Make sure that service is started.
 func (s *Service) exec(id string, j *Job) error {
+	j.Attempt++
+
 	ctx, err := j.Context(id)
 	if err != nil {
 		s.log.Errorf("[jobs] fail `%s`.`%s`: %s", j.Job, id, err)
 		return err
 	}
-
-	j.Attempt++
 
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
@@ -179,7 +175,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 // error must be invoked when job is declared as failed.
 func (s *Service) error(id string, j *Job, err error) error {
-	s.log.Errorf("[jobs] error `%s` [%s]: %s", j.Job, id, err.Error())
+	s.log.Errorf("[jobs] fail `%s` [%s] (attempt: %v): \n%s", j.Job, id, j.Attempt, err.Error())
 	return err
 }
 
