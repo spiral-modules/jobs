@@ -21,80 +21,33 @@
 package cmd
 
 import (
-	tm "github.com/buger/goterm"
 	"github.com/spf13/cobra"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/cmd/util"
-	"net/rpc"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-	"github.com/spiral/jobs"
-)
-
-var (
-	interactive bool
-	stopSignal  = make(chan os.Signal, 1)
 )
 
 func init() {
-	workersCommand := &cobra.Command{
-		Use:   "jobs:workers",
-		Short: "List workers associated with RoadRunner Jobs service",
-		RunE:  workersHandler,
-	}
-
-	workersCommand.Flags().BoolVarP(
-		&interactive,
-		"interactive",
-		"i",
-		false,
-		"render interactive workers table",
-	)
-
-	rr.CLI.AddCommand(workersCommand)
-
-	signal.Notify(stopSignal, syscall.SIGTERM)
-	signal.Notify(stopSignal, syscall.SIGINT)
+	rr.CLI.AddCommand(&cobra.Command{
+		Use:   "jobs:reset",
+		Short: "Reload RoadRunner worker pool for the Jobs service",
+		RunE:  reloadHandler,
+	})
 }
 
-func workersHandler(cmd *cobra.Command, args []string) (err error) {
-	defer func() {
-		if r, ok := recover().(error); ok {
-			err = r
-		}
-	}()
-
+func reloadHandler(cmd *cobra.Command, args []string) error {
 	client, err := util.RPCClient(rr.Container)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	if !interactive {
-		showWorkers(client)
-		return nil
+	util.Printf("<green>restarting jobs worker pool</reset>: ")
+
+	var r string
+	if err := client.Call("jobs.Reset", true, &r); err != nil {
+		return err
 	}
 
-	tm.Clear()
-	for {
-		select {
-		case <-stopSignal:
-			return nil
-		case <-time.NewTicker(time.Millisecond * 500).C:
-			tm.MoveCursor(1, 1)
-			showWorkers(client)
-			tm.Flush()
-		}
-	}
-}
-
-func showWorkers(client *rpc.Client) {
-	var r jobs.WorkerList
-	if err := client.Call("jobs.Workers", true, &r); err != nil {
-		panic(err)
-	}
-
-	util.WorkerTable(r.Workers).Render()
+	util.Printf("<green+hb>done</reset>\n")
+	return nil
 }
