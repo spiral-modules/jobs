@@ -92,7 +92,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	}
 
 	if r != nil {
-		if err := r.Register(ID, &rpcService{s}); err != nil {
+		if err := r.Register(ID, &rpcServer{s}); err != nil {
 			return false, err
 		}
 	}
