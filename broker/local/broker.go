@@ -100,3 +100,8 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 	return id.String(), nil
 }
+
+// Stat must fetch statistics about given pipeline or return error.
+func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
+	return nil, nil
+}

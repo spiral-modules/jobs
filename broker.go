@@ -13,4 +13,16 @@ type Broker interface {
 
 	// Push new job to the broker. Must return job id or error.
 	Push(p *Pipeline, j *Job) (id string, err error)
+
+	// Stat must fetch statistics about given pipeline or return error.
+	Stat(p *Pipeline) (stats *PipelineStat, err error)
+}
+
+type PipelineStat struct {
+	Name          string
+	Details       string
+	JobsTotal     int
+	JobsDelayed   int
+	JobsErrored   int
+	JobsCompleted int
 }

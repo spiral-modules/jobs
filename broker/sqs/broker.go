@@ -111,6 +111,11 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	return *result.MessageId, nil
 }
 
+// Stat must fetch statistics about given pipeline or return error.
+func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
+	return nil, nil
+}
+
 // registerTube new beanstalk pipeline
 func (b *Broker) registerQueue(pipeline *jobs.Pipeline) error {
 	queue, err := NewQueue(pipeline)

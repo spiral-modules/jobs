@@ -66,7 +66,14 @@ func (b *Broker) Serve() error {
 	}
 
 	if len(names) != 0 {
-		b.listen(beanstalk.NewTubeSet(b.conn, names...))
+		// separate connection for job consuming
+		tconn, err := b.cfg.Conn()
+		if err != nil {
+			return err
+		}
+		defer tconn.Close()
+
+		b.listen(beanstalk.NewTubeSet(tconn, names...))
 	}
 	<-b.stop
 
@@ -102,6 +109,11 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	}
 
 	return fmt.Sprintf("%v", id), err
+}
+
+// Stat must fetch statistics about given pipeline or return error.
+func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
+	return nil, nil
 }
 
 // registerTube new beanstalk pipeline
