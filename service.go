@@ -15,10 +15,40 @@ const (
 
 	// indicates that job service is running
 	jobsKey = "rr_jobs"
+
+	// EventJobAdded thrown when new job has been added. JobEvent is passed as context.
+	EventJobAdded = iota + 1500
+
+	// EventPushError caused when job can not be registered.
+	EventPushError
+
+	// EventJobComplete thrown when job execution is successfully completed. JobEvent is passed as context.
+	EventJobComplete
+
+	// EventJobError thrown on all job related errors. See ErrorEvent as context.
+	EventJobError
 )
 
-// BrokersConfig defines config section related to Brokers configuration.
-const BrokersConfig = "Brokers"
+// JobEvent represent job event.
+type JobEvent struct {
+	// ID is job id.
+	ID string
+
+	// Job is failed job.
+	Job *Job
+}
+
+// ErrorEvent represents singular Job error event.
+type ErrorEvent struct {
+	// ID is job id.
+	ID string
+
+	// Job is failed job.
+	Job *Job
+
+	// Error - associated error, if any.
+	Error error
+}
 
 // Listen handles job execution.
 type Handler func(id string, j *Job) error
@@ -26,34 +56,28 @@ type Handler func(id string, j *Job) error
 // Listen handles job execution.
 type ErrorHandler func(id string, j *Job, err error) error
 
-type emptyConfig struct{}
-
-// Get is doing nothing.
-func (e *emptyConfig) Get(service string) service.Config {
-	return nil
-}
-
-// Unmarshal is doing nothing.
-func (e *emptyConfig) Unmarshal(out interface{}) error {
-	return nil
-}
-
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
 	// Brokers define list of available brokers.
 	Brokers map[string]Broker
 	cfg     *Config
 	env     env.Environment
-	log     *logrus.Logger
-	brokers service.Container
+	logger  *logrus.Logger
+	lsns    []func(event int, ctx interface{})
 	rr      *roadrunner.Server
+	brokers service.Container
 	exePool chan Handler
+}
+
+// AddListener attaches server event watcher.
+func (s *Service) AddListener(l func(event int, ctx interface{})) {
+	s.lsns = append(s.lsns, l)
 }
 
 // Init configures job service.
 func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env.Environment) (ok bool, err error) {
 	s.cfg = &Config{}
-	s.log = l
+	s.logger = l
 	s.env = e
 
 	if err := s.cfg.Hydrate(c); err != nil {
@@ -77,7 +101,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	// we are going to keep all handlers withing the brokers
 	// so we can easier manage their state and configuration
-	s.brokers = service.NewContainer(s.log)
+	s.brokers = service.NewContainer(s.logger)
 	for name, e := range s.Brokers {
 		pipes := make([]*Pipeline, 0)
 		for _, p := range s.cfg.Pipelines {
@@ -93,7 +117,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 		s.brokers.Register(name, e)
 	}
 
-	cfg := c.Get(BrokersConfig)
+	cfg := c.Get(BrokerConfig)
 	if cfg == nil {
 		cfg = &emptyConfig{}
 	}
@@ -120,6 +144,8 @@ func (s *Service) Serve() error {
 		s.cfg.Workers.SetEnv(jobsKey, "true")
 	}
 
+	s.rr.Listen(s.throw)
+
 	if err := s.rr.Start(); err != nil {
 		return err
 	}
@@ -143,9 +169,9 @@ func (s *Service) Push(j *Job) (string, error) {
 	id, err := b.Push(p, j)
 
 	if err != nil {
-		s.log.Errorf("[jobs] `%s`: %s", j.Job, err.Error())
+		s.throw(EventPushError, &ErrorEvent{Job: j, Error: err})
 	} else {
-		s.log.Debugf("[jobs] push `%s` [%s]", j.Job, id)
+		s.throw(EventJobAdded, &JobEvent{ID: id, Job: j})
 	}
 
 	return id, err
@@ -155,15 +181,12 @@ func (s *Service) Push(j *Job) (string, error) {
 func (s *Service) exec(id string, j *Job) error {
 	ctx, err := j.Context(id)
 	if err != nil {
-		s.log.Errorf("[jobs] fail `%s`.`%s`: %s", j.Job, id, err)
-		return err
+		return s.error(id, j, err)
 	}
-
-	j.Attempt++
 
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.log.Debugf("[jobs] done `%s` [%s]", j.Job, id)
+		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j})
 		return nil
 	}
 
@@ -173,7 +196,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 // error must be invoked when job is declared as failed.
 func (s *Service) error(id string, j *Job, err error) error {
-	s.log.Errorf("[jobs] error `%s` [%s]: %s", j.Job, id, err.Error())
+	s.throw(EventJobError, &ErrorEvent{ID: id, Job: j, Error: err})
 	return err
 }
 
@@ -197,4 +220,16 @@ func (s *Service) getPipeline(job string) (*Pipeline, Broker, error) {
 	}
 
 	return pipe, h, nil
+}
+
+// throw handles service, server and pool events.
+func (s *Service) throw(event int, ctx interface{}) {
+	for _, l := range s.lsns {
+		l(event, ctx)
+	}
+
+	if event == roadrunner.EventServerFailure {
+		// underlying rr server is dead
+		s.Stop()
+	}
 }

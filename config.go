@@ -5,6 +5,11 @@ import (
 	"github.com/spiral/roadrunner/service"
 )
 
+const (
+	// BrokerConfig defines config section related to Brokers configuration.
+	BrokerConfig = "brokers"
+)
+
 // Config defines settings for job broker, workers and routing PipelineOptions.
 type Config struct {
 	// Workers configures roadrunner server and worker busy.
@@ -27,4 +32,16 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	c.Workers.InitDefaults()
 
 	return c.Workers.Pool.Valid()
+}
+
+type emptyConfig struct{}
+
+// Get is doing nothing.
+func (e *emptyConfig) Get(service string) service.Config {
+	return nil
+}
+
+// Unmarshal is doing nothing.
+func (e *emptyConfig) Unmarshal(out interface{}) error {
+	return nil
 }

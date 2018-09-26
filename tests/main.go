@@ -10,6 +10,9 @@ import (
 	"github.com/spiral/jobs/broker/beanstalk"
 	"github.com/spiral/jobs/broker/local"
 	"github.com/spiral/jobs/broker/sqs"
+
+	// additional commands and debug handlers
+	_ "github.com/spiral/jobs/cmd"
 )
 
 func main() {
