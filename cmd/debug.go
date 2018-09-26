@@ -55,67 +55,10 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventJobError:
 		e := ctx.(*jobs.ErrorEvent)
 		s.logger.Error(util.Sprintf(
-			"jobs.<red>%s</reset> <white+hb>%s</reset> <red+hb>%s</reset>",
+			"jobs.<red>%s</reset> <white+hb>%s</reset> <yellow>%s</reset>",
 			e.Job.Job,
 			e.ID,
 			e.Error.Error(),
 		))
 	}
-
-	//// http events
-	//switch event {
-	//case rrhttp.EventResponse:
-	//	e := ctx.(*rrhttp.ResponseEvent)
-	//	s.logger.Info(util.Sprintf(
-	//		"<cyan+h>%s</reset> %s <white+hb>%s</reset> %s",
-	//		e.Request.RemoteAddr,
-	//		statusColor(e.Response.Status),
-	//		e.Request.Method,
-	//		e.Request.URI,
-	//	))
-	//case rrhttp.EventError:
-	//	e := ctx.(*rrhttp.ErrorEvent)
-	//
-	//	if _, ok := e.Error.(roadrunner.JobError); ok {
-	//		s.logger.Info(util.Sprintf(
-	//			"%s <white+hb>%s</reset> %s",
-	//			statusColor(500),
-	//			e.Request.Method,
-	//			uri(e.Request),
-	//		))
-	//	} else {
-	//		s.logger.Info(util.Sprintf(
-	//			"%s <white+hb>%s</reset> %s <red>%s</reset>",
-	//			statusColor(500),
-	//			e.Request.Method,
-	//			uri(e.Request),
-	//			e.Error,
-	//		))
-	//	}
-	//}
 }
-
-//
-//func statusColor(status int) string {
-//	if status < 300 {
-//		return util.Sprintf("<green>%v</reset>", status)
-//	}
-//
-//	if status < 400 {
-//		return util.Sprintf("<cyan>%v</reset>", status)
-//	}
-//
-//	if status < 500 {
-//		return util.Sprintf("<yellow>%v</reset>", status)
-//	}
-//
-//	return util.Sprintf("<red>%v</reset>", status)
-//}
-//
-//func uri(r *http.Request) string {
-//	if r.TLS != nil {
-//		return fmt.Sprintf("https://%s%s", r.Host, r.URL.String())
-//	}
-//
-//	return fmt.Sprintf("http://%s%s", r.Host, r.URL.String())
-//}
