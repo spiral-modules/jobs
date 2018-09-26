@@ -75,6 +75,12 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
+	s.rr.Listen(func(event int, ctx interface{}) {
+		if event == roadrunner.EventStderrOutput {
+			logrus.Warning(string(ctx.([]byte)))
+		}
+	})
+
 	// we are going to keep all handlers withing the brokers
 	// so we can easier manage their state and configuration
 	s.brokers = service.NewContainer(s.log)
