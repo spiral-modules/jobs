@@ -10,7 +10,6 @@ namespace Spiral\Jobs;
 
 use Doctrine\Common\Inflector\Inflector;
 use Spiral\Core\FactoryInterface;
-use Spiral\Exceptions\ConsoleHandler;
 use Spiral\RoadRunner\Worker;
 
 /***
@@ -78,8 +77,6 @@ class Handler
      */
     protected function handleException(Worker $worker, \Throwable $e)
     {
-        // Explaining exception to the user
-        $handler = new ConsoleHandler(STDERR);
-        $worker->error($handler->renderException($e, ConsoleHandler::VERBOSITY_VERBOSE));
+        $worker->error((string)$e);
     }
 }
