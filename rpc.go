@@ -13,6 +13,12 @@ type WorkerList struct {
 	Workers []*util.State `json:"workers"`
 }
 
+// PipelineList contains list of pipeline stats.
+type PipelineList struct {
+	// Pipelines is list of pipeline stats.
+	Pipelines []*PipelineStat `json:"pipelines"`
+}
+
 // Push job to the queue.
 func (s *rpcServer) Push(j *Job, id *string) (err error) {
 	*id, err = s.svc.Push(j)
@@ -36,5 +42,24 @@ func (rpc *rpcServer) Workers(list bool, r *WorkerList) (err error) {
 	}
 
 	r.Workers, err = util.ServerState(rpc.svc.rr)
+	return err
+}
+
+// Workers returns list of active workers and their stats.
+func (rpc *rpcServer) Stat(list bool, l *PipelineList) (err error) {
+	if rpc.svc == nil || rpc.svc.rr == nil {
+		return errors.New("jobs server is not running")
+	}
+
+	*l = PipelineList{}
+	for _, p := range rpc.svc.cfg.Pipelines {
+		stat, err := rpc.svc.Brokers[p.Broker].Stat(p)
+		if err != nil {
+			return err
+		}
+
+		l.Pipelines = append(l.Pipelines, stat)
+	}
+
 	return err
 }

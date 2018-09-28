@@ -10,9 +10,6 @@ type Job struct {
 	// Job contains name of job broker (usually PHP class).
 	Job string `json:"job"`
 
-	// Attempt is number of job attempt if case of error.
-	Attempt int `json:"attempt"`
-
 	// Payload is string data (usually JSON) passed to Job broker.
 	Payload string `json:"payload"`
 
@@ -28,10 +25,9 @@ func (j *Job) Body() []byte {
 // Context pack job context (job, id) into binary payload.
 func (j *Job) Context(id string) ([]byte, error) {
 	return json.Marshal(struct {
-		ID      string `json:"id"`
-		Job     string `json:"job"`
-		Attempt int    `json:"attempt"`
-	}{ID: id, Job: j.Job, Attempt: j.Attempt})
+		ID  string `json:"id"`
+		Job string `json:"job"`
+	}{ID: id, Job: j.Job})
 }
 
 // CanRetry must return true if broker is allowed to re-run the job.
@@ -44,14 +40,14 @@ type Options struct {
 	// Delay defines time duration to delay execution for. Defaults to none.
 	Delay int `json:"delay,omitempty"`
 
+	// Maximum job retries. Defaults to none.
+	MaxAttempts int `json:"maxAttempts,omitempty"`
+
 	// RetryDelay defines for how long job should be waiting until next retry. Defaults to none.
 	RetryDelay int `json:"retryDelay,omitempty"`
 
 	// Reserve defines for how broker should wait until treating job are failed. Defaults to 30 min.
 	Timeout int `json:"timeout,omitempty"`
-
-	// Maximum job retries. Defaults to none.
-	MaxAttempts int `json:"maxAttempts,omitempty"`
 }
 
 // RetryDuration returns retry delay duration in a form of time.Duration.

@@ -7,6 +7,7 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 	"sync"
 	"time"
+	"strconv"
 )
 
 // Broker run jobs using Broker service.
@@ -16,7 +17,7 @@ type Broker struct {
 	stop        chan interface{}
 	conn        *beanstalk.Conn
 	tubes       map[*jobs.Pipeline]*Tube
-	tubeset     *beanstalk.TubeSet
+	tubeSet     *beanstalk.TubeSet
 	handlerPool chan jobs.Handler
 	err         jobs.ErrorHandler
 }
@@ -56,16 +57,15 @@ func (b *Broker) Serve() error {
 	b.stop = make(chan interface{})
 	b.mu.Unlock()
 
-	var names []string
+	var listen []string
 	for _, t := range b.tubes {
 		t.Tube.Conn = b.conn
-
 		if t.Listen {
-			names = append(names, t.Name)
+			listen = append(listen, t.Name)
 		}
 	}
 
-	if len(names) != 0 {
+	if len(listen) != 0 {
 		// separate connection for job consuming
 		tconn, err := b.cfg.Conn()
 		if err != nil {
@@ -73,7 +73,7 @@ func (b *Broker) Serve() error {
 		}
 		defer tconn.Close()
 
-		b.listen(beanstalk.NewTubeSet(tconn, names...))
+		b.listen(beanstalk.NewTubeSet(tconn, listen...))
 	}
 	<-b.stop
 
@@ -113,7 +113,37 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 // Stat must fetch statistics about given pipeline or return error.
 func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
-	return nil, nil
+	values, err := b.tubes[p].Stats()
+	if err != nil {
+		return nil, err
+	}
+
+	stats = &jobs.PipelineStat{
+		Name:    "beanstalk",
+		Details: b.tubes[p].Name,
+	}
+
+	if v, err := strconv.Atoi(values["total-jobs"]); err == nil {
+		stats.Total = int64(v)
+	}
+
+	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
+		stats.Pending = int64(v)
+	}
+
+	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
+		stats.Active += int64(v)
+	}
+
+	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
+		stats.Delayed = int64(v)
+	}
+
+	if v, err := strconv.Atoi(values["current-jobs-buried"]); err == nil {
+		stats.Failed = int64(v)
+	}
+
+	return stats, nil
 }
 
 // registerTube new beanstalk pipeline
@@ -154,18 +184,18 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 				b.handlerPool <- handler
 
 				if err == nil {
-					b.conn.Delete(id)
+					t.Conn.Delete(id)
 					return
 				}
 
 				if !job.CanRetry() {
 					b.err(fmt.Sprintf("%v", id), job, err)
-					b.conn.Delete(id)
+					t.Conn.Delete(id)
 					return
 				}
 
 				// retry
-				b.conn.Release(id, 0, job.Options.RetryDuration())
+				t.Conn.Release(id, 0, job.Options.RetryDuration())
 			}()
 		}
 	}

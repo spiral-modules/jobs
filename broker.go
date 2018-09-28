@@ -19,10 +19,12 @@ type Broker interface {
 }
 
 type PipelineStat struct {
-	Name          string
-	Details       string
-	JobsTotal     int
-	JobsDelayed   int
-	JobsErrored   int
-	JobsCompleted int
+	Name      string
+	Details   string
+	Total     int64
+	Pending   int64
+	Active    int64
+	Delayed   int64
+	Failed    int64
+	Completed int64
 }

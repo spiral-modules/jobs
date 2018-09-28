@@ -5,6 +5,7 @@ import (
 	"github.com/spiral/jobs"
 	"sync"
 	"time"
+	"sync/atomic"
 )
 
 // Broker run queue using local goroutines.
@@ -14,11 +15,13 @@ type Broker struct {
 	queue       chan entry
 	handlerPool chan jobs.Handler
 	err         jobs.ErrorHandler
+	stat        *jobs.PipelineStat
 }
 
 type entry struct {
-	id  string
-	job *jobs.Job
+	id      string
+	attempt int
+	job     *jobs.Job
 }
 
 // Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
@@ -35,6 +38,8 @@ func (b *Broker) Init() (bool, error) {
 	defer b.mu.Unlock()
 
 	b.queue = make(chan entry)
+	b.stat = &jobs.PipelineStat{Name: "local", Details: "in-memory"}
+
 	return true, nil
 }
 
@@ -60,11 +65,13 @@ func (b *Broker) Serve() error {
 			b.handlerPool <- handler
 
 			if err == nil {
+				atomic.AddInt64(&b.stat.Completed, 1)
 				return
 			}
 
 			if !job.CanRetry() {
 				b.err(id, job, err)
+				atomic.AddInt64(&b.stat.Failed, 1)
 				return
 			}
 
@@ -98,10 +105,16 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 	go func() { b.queue <- entry{id: id.String(), job: j} }()
 
+	atomic.AddInt64(&b.stat.Total, 1)
+	if j.Options.Delay != 0 {
+		// todo: must be interactive
+		atomic.AddInt64(&b.stat.Delayed, 1)
+	}
+
 	return id.String(), nil
 }
 
 // Stat must fetch statistics about given pipeline or return error.
 func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
-	return nil, nil
+	return b.stat, nil
 }

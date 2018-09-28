@@ -58,15 +58,15 @@ type ErrorHandler func(id string, j *Job, err error) error
 
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
-	// Brokers define list of available brokers.
-	Brokers map[string]Broker
-	cfg     *Config
-	env     env.Environment
-	logger  *logrus.Logger
-	lsns    []func(event int, ctx interface{})
-	rr      *roadrunner.Server
-	brokers service.Container
-	exePool chan Handler
+	// Brokers define list of available container.
+	Brokers   map[string]Broker
+	cfg       *Config
+	env       env.Environment
+	logger    *logrus.Logger
+	lsns      []func(event int, ctx interface{})
+	rr        *roadrunner.Server
+	container service.Container
+	exePool   chan Handler
 }
 
 // AddListener attaches server event watcher.
@@ -99,9 +99,9 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
-	// we are going to keep all handlers withing the brokers
+	// we are going to keep all handlers withing the container
 	// so we can easier manage their state and configuration
-	s.brokers = service.NewContainer(s.logger)
+	s.container = service.NewContainer(s.logger)
 	for name, e := range s.Brokers {
 		pipes := make([]*Pipeline, 0)
 		for _, p := range s.cfg.Pipelines {
@@ -114,7 +114,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 			return false, err
 		}
 
-		s.brokers.Register(name, e)
+		s.container.Register(name, e)
 	}
 
 	cfg := c.Get(BrokerConfig)
@@ -122,7 +122,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 		cfg = &emptyConfig{}
 	}
 
-	if err := s.brokers.Init(cfg); err != nil {
+	if err := s.container.Init(cfg); err != nil {
 		return false, err
 	}
 
@@ -151,12 +151,12 @@ func (s *Service) Serve() error {
 	}
 	defer s.rr.Stop()
 
-	return s.brokers.Serve()
+	return s.container.Serve()
 }
 
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
-	s.brokers.Stop()
+	s.container.Stop()
 }
 
 // Push job to associated broker and return job id.
