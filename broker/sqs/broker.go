@@ -176,30 +176,26 @@ func (b *Broker) listen(q *Queue) {
 
 				if err == nil {
 					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
+						QueueUrl:      q.URL,
+						ReceiptHandle: result.Messages[0].ReceiptHandle,
 					})
 					return
 				}
 
 				if !job.CanRetry() {
-					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
-					})
-
 					b.err(*result.Messages[0].MessageId, job, err)
+					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
+						QueueUrl:      q.URL,
+						ReceiptHandle: result.Messages[0].ReceiptHandle,
+					})
 					return
 				}
 
-				data, err := json.Marshal(job)
-				if err != nil {
-					return
-				}
-
-				// retry job
-				b.sqs.SendMessage(&sqs.SendMessageInput{
-					DelaySeconds: aws.Int64(int64(job.Options.RetryDelay)),
-					MessageBody:  aws.String(string(data)),
-					QueueUrl:     q.URL,
+				// request to return message back to query after some delay
+				b.sqs.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+					QueueUrl:          q.URL,
+					ReceiptHandle:     result.Messages[0].ReceiptHandle,
+					VisibilityTimeout: aws.Int64(int64(job.Options.RetryDelay)),
 				})
 			}()
 		}

@@ -159,8 +159,8 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 				}
 
 				if !job.CanRetry() {
-					b.conn.Delete(id)
 					b.err(fmt.Sprintf("%v", id), job, err)
+					b.conn.Delete(id)
 					return
 				}
 
