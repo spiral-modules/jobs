@@ -67,7 +67,13 @@ func (b *Broker) Serve() error {
 	}
 
 	if len(names) != 0 {
-		b.listen(beanstalk.NewTubeSet(b.conn, names...))
+		tconn, err := b.cfg.Conn()
+		if err != nil {
+			return err
+		}
+		defer tconn.Close()
+		
+		b.listen(beanstalk.NewTubeSet(tconn, names...))
 	}
 	<-b.stop
 
