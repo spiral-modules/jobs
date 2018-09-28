@@ -15,16 +15,14 @@ type Broker interface {
 	Push(p *Pipeline, j *Job) (id string, err error)
 
 	// Stat must fetch statistics about given pipeline or return error.
-	Stat(p *Pipeline) (stats *PipelineStat, err error)
+	Stat(p *Pipeline) (stat *PipelineStat, err error)
 }
 
 type PipelineStat struct {
-	Name      string
-	Details   string
-	Total     int64
-	Pending   int64
-	Active    int64
-	Delayed   int64
-	Failed    int64
-	Completed int64
+	Name    string
+	Details string
+	Pending int64
+	Active  int64
+	Delayed int64
+	Failed  int64
 }

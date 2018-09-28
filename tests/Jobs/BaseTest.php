@@ -42,7 +42,7 @@ abstract class BaseTest extends TestCase
 
 
 for($i=0;$i<10000;$i++)
-        $id = $jobs->push(new $this->job(['data' => 100]));
+        $id = $jobs->push(new $this->job(['data' => 100]), new Options(1));
 
         $this->assertNotEmpty($id);
 

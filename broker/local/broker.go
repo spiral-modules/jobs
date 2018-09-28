@@ -54,18 +54,21 @@ func (b *Broker) Serve() error {
 		id, job := q.id, q.job
 
 		if job.Options.Delay != 0 {
+			atomic.AddInt64(&b.stat.Delayed, 1)
 			time.Sleep(job.Options.DelayDuration())
+			atomic.AddInt64(&b.stat.Delayed, ^int64(0))
 		}
 
 		// wait for free handler
 		handler = <-b.handlerPool
+		atomic.AddInt64(&b.stat.Active, 1)
 
 		go func() {
+			defer atomic.AddInt64(&b.stat.Active, ^int64(0))
 			err := handler(id, job)
 			b.handlerPool <- handler
 
 			if err == nil {
-				atomic.AddInt64(&b.stat.Completed, 1)
 				return
 			}
 
@@ -105,16 +108,10 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 	go func() { b.queue <- entry{id: id.String(), job: j} }()
 
-	atomic.AddInt64(&b.stat.Total, 1)
-	if j.Options.Delay != 0 {
-		// todo: must be interactive
-		atomic.AddInt64(&b.stat.Delayed, 1)
-	}
-
 	return id.String(), nil
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
+func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
 	return b.stat, nil
 }

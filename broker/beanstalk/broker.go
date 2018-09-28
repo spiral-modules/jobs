@@ -112,38 +112,34 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
+func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
 	values, err := b.tubes[p].Stats()
 	if err != nil {
 		return nil, err
 	}
 
-	stats = &jobs.PipelineStat{
+	stat = &jobs.PipelineStat{
 		Name:    "beanstalk",
 		Details: b.tubes[p].Name,
 	}
 
-	if v, err := strconv.Atoi(values["total-jobs"]); err == nil {
-		stats.Total = int64(v)
-	}
-
 	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
-		stats.Pending = int64(v)
+		stat.Pending = int64(v)
 	}
 
 	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
-		stats.Active += int64(v)
+		stat.Active = int64(v)
 	}
 
 	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
-		stats.Delayed = int64(v)
+		stat.Delayed = int64(v)
 	}
 
 	if v, err := strconv.Atoi(values["current-jobs-buried"]); err == nil {
-		stats.Failed = int64(v)
+		stat.Failed = int64(v)
 	}
 
-	return stats, nil
+	return stat, nil
 }
 
 // registerTube new beanstalk pipeline

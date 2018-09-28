@@ -99,21 +99,16 @@ func showStats(client *rpc.Client) {
 // WorkerTable renders table with information about rr server workers.
 func StatTable(pipelines []*jobs.PipelineStat) *tablewriter.Table {
 	tw := tablewriter.NewWriter(os.Stdout)
-	tw.SetHeader([]string{"Pipeline", "Total", "Pending", "Delayed", "Failed", "Completed"})
+	tw.SetHeader([]string{"Pipeline", "Pending", "Active", "Delayed", "Failed"})
 	tw.SetColMinWidth(0, 30)
 
 	for _, p := range pipelines {
-		if p == nil {
-			continue
-		}
-
 		tw.Append([]string{
 			renderName(p),
-			humanize.Comma(p.Total),
-			humanize.Comma(p.Pending),
-			humanize.Comma(p.Delayed),
-			humanize.Comma(p.Failed),
-			humanize.Comma(p.Total - p.Pending - p.Failed),
+			util.Sprintf("<magenta>%s</reset>", humanize.Comma(p.Pending)),
+			util.Sprintf("<green>%s</reset>", humanize.Comma(p.Active)),
+			util.Sprintf("<yellow>%s</reset>", humanize.Comma(p.Delayed)),
+			util.Sprintf("<red>%s</reset>", humanize.Comma(p.Failed)),
 		})
 	}
 

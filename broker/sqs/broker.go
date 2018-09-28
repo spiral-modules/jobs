@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
 	"sync"
+	"strconv"
 )
 
 // Broker run jobs using Broker service.
@@ -112,8 +113,42 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stats *jobs.PipelineStat, err error) {
-	return nil, nil
+func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
+	r, err := b.sqs.GetQueueAttributes(&sqs.GetQueueAttributesInput{
+		QueueUrl: b.queue[p].URL,
+		AttributeNames: []*string{
+			aws.String("ApproximateNumberOfMessages"),
+			aws.String("ApproximateNumberOfMessagesDelayed"),
+			aws.String("ApproximateNumberOfMessagesNotVisible"),
+		},
+	})
+
+	stat = &jobs.PipelineStat{
+		Name:    "sqs",
+		Details: b.queue[p].Queue,
+	}
+
+	for a, v := range r.Attributes {
+		if a == "ApproximateNumberOfMessages" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Pending = int64(v)
+			}
+		}
+
+		if a == "ApproximateNumberOfMessagesNotVisible" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Active = int64(v)
+			}
+		}
+
+		if a == "ApproximateNumberOfMessagesDelayed" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Delayed = int64(v)
+			}
+		}
+	}
+
+	return stat, nil
 }
 
 // registerTube new beanstalk pipeline
@@ -184,10 +219,14 @@ func (b *Broker) listen(q *Queue) {
 
 				if !job.CanRetry() {
 					b.err(*result.Messages[0].MessageId, job, err)
+
+					// todo: move to deleted ?
+
 					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
 						QueueUrl:      q.URL,
 						ReceiptHandle: result.Messages[0].ReceiptHandle,
 					})
+
 					return
 				}
 
