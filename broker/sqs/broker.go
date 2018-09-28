@@ -189,6 +189,8 @@ func (b *Broker) listen(q *Queue) {
 				WaitTimeSeconds:     aws.Int64(int64(q.WaitTime)),
 			})
 
+			// todo: change visibility window if not ready yet
+
 			if err != nil {
 				// need additional logging
 				continue
