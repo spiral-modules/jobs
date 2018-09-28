@@ -6,7 +6,7 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
-namespace Spiral\Jobs\Tests\Beanstalk;
+namespace Spiral\Jobs\Tests\Local;
 
 use Spiral\Jobs\AbstractJob;
 
@@ -16,6 +16,7 @@ class Job extends AbstractJob
 
     public function do(string $id)
     {
+            usleep(200000);
         file_put_contents(self::JOB_FILE, json_encode(
             $this->data + compact('id')
         ));

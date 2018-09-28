@@ -12,6 +12,7 @@ import (
 type Broker struct {
 	mu          sync.Mutex
 	wg          sync.WaitGroup
+	stopped     bool
 	queue       chan entry
 	handlerPool chan jobs.Handler
 	err         jobs.ErrorHandler
@@ -54,31 +55,34 @@ func (b *Broker) Serve() error {
 		id, job := q.id, q.job
 
 		if job.Options.Delay != 0 {
-			atomic.AddInt64(&b.stat.Delayed, 1)
 			time.Sleep(job.Options.DelayDuration())
 			atomic.AddInt64(&b.stat.Delayed, ^int64(0))
 		}
 
 		// wait for free handler
 		handler = <-b.handlerPool
-		atomic.AddInt64(&b.stat.Active, 1)
 
+		atomic.AddInt64(&b.stat.Active, 1)
 		go func() {
 			defer atomic.AddInt64(&b.stat.Active, ^int64(0))
+
 			err := handler(id, job)
 			b.handlerPool <- handler
 
 			if err == nil {
+				atomic.AddInt64(&b.stat.Pending, ^int64(0))
 				return
 			}
 
 			if !job.CanRetry() {
 				b.err(id, job, err)
+				atomic.AddInt64(&b.stat.Pending, ^int64(0))
 				atomic.AddInt64(&b.stat.Failed, 1)
 				return
 			}
 
 			if job.Options.RetryDelay != 0 {
+				atomic.AddInt64(&b.stat.Delayed, 1)
 				time.Sleep(job.Options.RetryDuration())
 			}
 
@@ -94,8 +98,10 @@ func (b *Broker) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.queue != nil {
+	if !b.stopped {
+		//todo: send to close channel
 		close(b.queue)
+		b.stopped = true
 	}
 }
 
@@ -104,6 +110,12 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
+	}
+
+	if j.Options.Delay != 0 {
+		atomic.AddInt64(&b.stat.Delayed, 1)
+	} else {
+		atomic.AddInt64(&b.stat.Pending, 1)
 	}
 
 	go func() { b.queue <- entry{id: id.String(), job: j} }()
