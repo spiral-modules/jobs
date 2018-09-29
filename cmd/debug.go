@@ -53,21 +53,21 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventJobAdded:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
-			"jobs.<magenta+h>PUSH</reset> <cyan>%s</reset> <white+hb>%s</reset>",
+			"job.<magenta+h>PUSH</reset> <cyan>%s</reset> <white+hb>%s</reset>",
 			e.Job.Job,
 			e.ID,
 		))
 	case jobs.EventJobComplete:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
-			"jobs.<green+h>DONE</reset> <cyan>%s</reset> <white+hb>%s</reset>",
+			"job.<green+h>DONE</reset> <cyan>%s</reset> <white+hb>%s</reset>",
 			e.Job.Job,
 			e.ID,
 		))
 	case jobs.EventPushError:
 		e := ctx.(*jobs.ErrorEvent)
 		s.logger.Error(util.Sprintf(
-			"jobs.<red>ERRO</reset> <cyan>%s</reset> <red+hb>%s</reset>",
+			"job.<red>ERRO</reset> <cyan>%s</reset> <red+hb>%s</reset>",
 			e.Job.Job,
 			e.Error.Error(),
 		))
@@ -75,7 +75,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventJobError:
 		e := ctx.(*jobs.ErrorEvent)
 		s.logger.Error(util.Sprintf(
-			"jobs.<red>ERRO</reset> <cyan>%s</reset> <white+hb>%s</reset> <yellow>%s</reset>",
+			"job.<red>ERRO</reset> <cyan>%s</reset> <white+hb>%s</reset> <yellow>%s</reset>",
 			e.Job.Job,
 			e.ID,
 			e.Error.Error(),
