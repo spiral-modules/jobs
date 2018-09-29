@@ -123,10 +123,7 @@ func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
 		},
 	})
 
-	stat = &jobs.PipelineStat{
-		Name:    "sqs",
-		Details: b.queue[p].Queue,
-	}
+	stat = &jobs.PipelineStat{Pipeline: b.queue[p].Queue}
 
 	for a, v := range r.Attributes {
 		if a == "ApproximateNumberOfMessages" {

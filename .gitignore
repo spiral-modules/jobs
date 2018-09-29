@@ -5,3 +5,4 @@ vendor/
 *.db
 clover.xml
 .DS_Store
+tests/.rr-test.yml

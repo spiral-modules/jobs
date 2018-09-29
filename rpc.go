@@ -58,6 +58,7 @@ func (rpc *rpcServer) Stat(list bool, l *PipelineList) (err error) {
 			return err
 		}
 
+		stat.Broker = p.Broker
 		l.Pipelines = append(l.Pipelines, stat)
 	}
 

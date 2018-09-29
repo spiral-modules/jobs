@@ -39,7 +39,7 @@ func (b *Broker) Init() (bool, error) {
 	defer b.mu.Unlock()
 
 	b.queue = make(chan entry)
-	b.stat = &jobs.PipelineStat{Name: "local", Details: "in-memory"}
+	b.stat = &jobs.PipelineStat{Pipeline: "in-memory"}
 
 	return true, nil
 }
@@ -77,7 +77,6 @@ func (b *Broker) Serve() error {
 			if !job.CanRetry() {
 				b.err(id, job, err)
 				atomic.AddInt64(&b.stat.Pending, ^int64(0))
-				atomic.AddInt64(&b.stat.Failed, 1)
 				return
 			}
 

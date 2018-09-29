@@ -19,10 +19,9 @@ type Broker interface {
 }
 
 type PipelineStat struct {
-	Name    string
-	Details string
-	Pending int64
-	Active  int64
-	Delayed int64
-	Failed  int64
+	Broker   string
+	Pipeline string
+	Pending  int64
+	Active   int64
+	Delayed  int64
 }

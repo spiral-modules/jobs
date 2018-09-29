@@ -50,14 +50,10 @@ func NewQueue(p *jobs.Pipeline) (*Queue, error) {
 		return nil, errors.New("missing `queue` parameter on sqs pipeline")
 	}
 
-	if p.Options.Integer("threads", 1) < 1 {
-		return nil, errors.New("invalid `threads` value for sqs pipeline, must be 1 or greater")
-	}
-
 	q := &Queue{
 		Listen:   p.Listen,
 		Queue:    p.Options.String("queue", ""),
-		Create:   p.Options.Bool("create", true),
+		Create:   p.Options.Bool("create", false),
 		Timeout:  p.Options.Integer("timeout", 600),
 		WaitTime: p.Options.Integer("waitTime", 1),
 	}

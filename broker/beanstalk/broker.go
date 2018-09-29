@@ -2,7 +2,6 @@ package beanstalk
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/beanstalkd/go-beanstalk"
 	"sync"
@@ -108,7 +107,7 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%v", id), err
+	return jID(id), err
 }
 
 // Stat must fetch statistics about given pipeline or return error.
@@ -118,10 +117,7 @@ func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
 		return nil, err
 	}
 
-	stat = &jobs.PipelineStat{
-		Name:    "beanstalk",
-		Details: b.tubes[p].Name,
-	}
+	stat = &jobs.PipelineStat{Pipeline: b.tubes[p].Name}
 
 	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
 		stat.Pending = int64(v)
@@ -133,10 +129,6 @@ func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
 
 	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
 		stat.Delayed = int64(v)
-	}
-
-	if v, err := strconv.Atoi(values["current-jobs-buried"]); err == nil {
-		stat.Failed = int64(v)
 	}
 
 	return stat, nil
@@ -176,7 +168,8 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 
 			handler = <-b.handlerPool
 			go func() {
-				err = handler(fmt.Sprintf("%v", id), job)
+				t.Conn.Touch(id)
+				err = handler(jID(id), job)
 				b.handlerPool <- handler
 
 				if err == nil {
@@ -185,7 +178,7 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 				}
 
 				if !job.CanRetry() {
-					b.err(fmt.Sprintf("%v", id), job, err)
+					b.err(jID(id), job, err)
 					t.Conn.Delete(id)
 					return
 				}
@@ -195,4 +188,8 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 			}()
 		}
 	}
+}
+
+func jID(id uint64) string {
+	return strconv.FormatUint(id, 10)
 }
