@@ -3,7 +3,7 @@ package jobs
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spiral/roadrunner"
-	"github.com/spiral/roadrunner/cmd/rr/utils"
+	"github.com/spiral/roadrunner/cmd/util"
 	"strings"
 )
 
@@ -20,13 +20,13 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	switch event {
 	case roadrunner.EventWorkerKill:
 		w := ctx.(*roadrunner.Worker)
-		s.logger.Warning(utils.Sprintf(
+		s.logger.Warning(util.Sprintf(
 			"<white+hb>worker.%v</reset> <yellow>killed</red>",
 			*w.Pid,
 		))
 	case roadrunner.EventWorkerError:
 		err := ctx.(roadrunner.WorkerError)
-		s.logger.Error(utils.Sprintf(
+		s.logger.Error(util.Sprintf(
 			"<white+hb>worker.%v</reset> <red>%s</reset>",
 			*err.Worker.Pid,
 			err.Caused,
@@ -36,7 +36,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	// outputs
 	switch event {
 	case roadrunner.EventStderrOutput:
-		s.logger.Warning(utils.Sprintf(
+		s.logger.Warning(util.Sprintf(
 			"<yellow>%s</reset>",
 			strings.Trim(string(ctx.([]byte)), "\r\n"),
 		))
@@ -45,15 +45,15 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	// rr server events
 	switch event {
 	case roadrunner.EventServerFailure:
-		s.logger.Error(utils.Sprintf("<red>server is dead</reset>"))
+		s.logger.Error(util.Sprintf("<red>server is dead</reset>"))
 	}
 
 	// pool events
 	switch event {
 	case roadrunner.EventPoolConstruct:
-		s.logger.Debug(utils.Sprintf("<cyan>new worker pool</reset>"))
+		s.logger.Debug(util.Sprintf("<cyan>new worker pool</reset>"))
 	case roadrunner.EventPoolError:
-		s.logger.Error(utils.Sprintf("<red>%s</reset>", ctx))
+		s.logger.Error(util.Sprintf("<red>%s</reset>", ctx))
 	}
 
 	//s.logger.Warning(event, ctx)
