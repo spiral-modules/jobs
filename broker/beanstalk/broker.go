@@ -72,7 +72,7 @@ func (b *Broker) Serve() error {
 			return err
 		}
 		defer tconn.Close()
-		
+
 		b.listen(beanstalk.NewTubeSet(tconn, names...))
 	}
 	<-b.stop
@@ -149,32 +149,32 @@ func (b *Broker) listen(t *beanstalk.TubeSet) {
 				b.handlerPool <- handler
 
 				if jerr == nil {
-					b.conn.Delete(id)
+					t.Conn.Delete(id)
 					return
 				}
 
-				stats, err := b.conn.StatsJob(id)
+				stats, err := t.Conn.StatsJob(id)
 				if err != nil {
-					b.conn.Bury(id, 0)
+					t.Conn.Bury(id, 0)
 					b.err(fmt.Sprintf("%v", id), job, err)
 					return
 				}
 
 				if job.Attempt, err = strconv.Atoi(stats["reserves"]); err != nil {
 					job.Attempt++
-					b.conn.Bury(id, 0)
+					t.Conn.Bury(id, 0)
 					b.err(fmt.Sprintf("%v", id), job, err)
 					return
 				}
 
 				if !job.CanRetry() {
-					b.conn.Bury(id, 0)
+					t.Conn.Bury(id, 0)
 					b.err(fmt.Sprintf("%v", id), job, jerr)
 					return
 				}
 
 				// retry
-				b.conn.Release(id, 0, job.Options.RetryDuration())
+				t.Conn.Release(id, 0, job.Options.RetryDuration())
 			}()
 		}
 	}

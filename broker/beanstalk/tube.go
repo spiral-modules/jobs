@@ -2,8 +2,8 @@ package beanstalk
 
 import (
 	"errors"
-	"github.com/spiral/jobs"
 	"github.com/beanstalkd/go-beanstalk"
+	"github.com/spiral/jobs"
 )
 
 // Tube connects with singular queue channel in beanstalk.
