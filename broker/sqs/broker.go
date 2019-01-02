@@ -5,20 +5,20 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
-	"sync"
 	"strconv"
+	"sync"
 )
 
 // Broker run jobs using Broker service.
 type Broker struct {
-	cfg         *Config
-	mu          sync.Mutex
-	stop        chan interface{}
-	sqs         *sqs.SQS
-	wg          sync.WaitGroup
-	queue       map[*jobs.Pipeline]*Queue
-	handlerPool chan jobs.Handler
-	err         jobs.ErrorHandler
+	cfg      *Config
+	mu       sync.Mutex
+	stop     chan interface{}
+	sqs      *sqs.SQS
+	wg       sync.WaitGroup
+	queue    map[*jobs.Pipeline]*Queue
+	execPool chan jobs.Handler
+	err      jobs.ErrorHandler
 }
 
 // Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
@@ -31,7 +31,7 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err 
 		}
 	}
 
-	b.handlerPool = pool
+	b.execPool = pool
 	b.err = err
 	return nil
 }
@@ -60,10 +60,7 @@ func (b *Broker) Serve() (err error) {
 			}
 		}
 
-		url, err := b.sqs.GetQueueUrl(&sqs.GetQueueUrlInput{
-			QueueName: aws.String(q.Queue),
-		})
-
+		url, err := b.sqs.GetQueueUrl(&sqs.GetQueueUrlInput{QueueName: aws.String(q.Queue)})
 		if err != nil {
 			return err
 		}
@@ -113,7 +110,7 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
+func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	r, err := b.sqs.GetQueueAttributes(&sqs.GetQueueAttributesInput{
 		QueueUrl: b.queue[p].URL,
 		AttributeNames: []*string{
@@ -123,12 +120,12 @@ func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
 		},
 	})
 
-	stat = &jobs.PipelineStat{Pipeline: b.queue[p].Queue}
+	stat = &jobs.Stat{Pipeline: b.queue[p].Queue}
 
 	for a, v := range r.Attributes {
 		if a == "ApproximateNumberOfMessages" {
 			if v, err := strconv.Atoi(*v); err == nil {
-				stat.Pending = int64(v)
+				stat.Queue = int64(v)
 			}
 		}
 
@@ -173,7 +170,7 @@ func (b *Broker) createQueue(q *Queue) error {
 func (b *Broker) listen(q *Queue) {
 	defer b.wg.Done()
 	var job *jobs.Job
-	var handler jobs.Handler
+	var h jobs.Handler
 	for {
 		select {
 		case <-b.stop:
@@ -187,6 +184,7 @@ func (b *Broker) listen(q *Queue) {
 			})
 
 			// todo: change visibility window if not ready yet
+			// todo: must be floating window
 
 			if err != nil {
 				// need additional logging
@@ -203,10 +201,10 @@ func (b *Broker) listen(q *Queue) {
 				continue
 			}
 
-			handler = <-b.handlerPool
-			go func() {
-				err = handler(*result.Messages[0].MessageId, job)
-				b.handlerPool <- handler
+			h = <-b.execPool
+			go func(h jobs.Handler) {
+				err = h(*result.Messages[0].MessageId, job)
+				b.execPool <- h
 
 				if err == nil {
 					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
@@ -216,7 +214,7 @@ func (b *Broker) listen(q *Queue) {
 					return
 				}
 
-				if !job.CanRetry() {
+				if !job.CanRetry(1) {
 					b.err(*result.Messages[0].MessageId, job, err)
 
 					// todo: move to deleted ?
@@ -235,7 +233,7 @@ func (b *Broker) listen(q *Queue) {
 					ReceiptHandle:     result.Messages[0].ReceiptHandle,
 					VisibilityTimeout: aws.Int64(int64(job.Options.RetryDelay)),
 				})
-			}()
+			}(h)
 		}
 	}
 }

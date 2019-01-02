@@ -43,9 +43,7 @@ func (c *Config) SQS() (*sqs.SQS, error) {
 		return sqs.New(sess), nil
 	}
 
-	return sqs.New(sess, &aws.Config{
-		Endpoint: aws.String(c.Endpoint),
-	}), nil
+	return sqs.New(sess, &aws.Config{Endpoint: aws.String(c.Endpoint)}), nil
 }
 
 // Hydrate config values.

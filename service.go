@@ -9,52 +9,14 @@ import (
 	"github.com/spiral/roadrunner/service/rpc"
 )
 
-const (
-	// ID defines Listen service public alias.
-	ID = "jobs"
-
-	// indicates that job service is running
-	jobsKey = "rr_jobs"
-
-	// EventJobAdded thrown when new job has been added. JobEvent is passed as context.
-	EventJobAdded = iota + 1500
-
-	// EventPushError caused when job can not be registered.
-	EventPushError
-
-	// EventJobComplete thrown when job execution is successfully completed. JobEvent is passed as context.
-	EventJobComplete
-
-	// EventJobError thrown on all job related errors. See ErrorEvent as context.
-	EventJobError
-)
-
-// JobEvent represent job event.
-type JobEvent struct {
-	// ID is job id.
-	ID string
-
-	// Job is failed job.
-	Job *Job
-}
-
-// ErrorEvent represents singular Job error event.
-type ErrorEvent struct {
-	// ID is job id.
-	ID string
-
-	// Job is failed job.
-	Job *Job
-
-	// Error - associated error, if any.
-	Error error
-}
+// ID defines Listen service public alias.
+const ID = "jobs"
 
 // Listen handles job execution.
 type Handler func(id string, j *Job) error
 
 // Listen handles job execution.
-type ErrorHandler func(id string, j *Job, err error) error
+type ErrorHandler func(id string, j *Job, err error)
 
 // Service manages job execution and connection to multiple job pipelines.
 type Service struct {
@@ -66,7 +28,7 @@ type Service struct {
 	lsns      []func(event int, ctx interface{})
 	rr        *roadrunner.Server
 	container service.Container
-	exePool   chan Handler
+	execs     chan Handler
 }
 
 // AddListener attaches server event watcher.
@@ -85,10 +47,10 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	}
 
 	// Configuring worker pools
-	s.exePool = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
+	s.execs = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
 
 	for i := int64(0); i < s.cfg.Workers.Pool.NumWorkers; i++ {
-		s.exePool <- s.exec
+		s.execs <- s.exec
 	}
 
 	if r != nil {
@@ -110,7 +72,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 			}
 		}
 
-		if err := e.Listen(pipes, s.exePool, s.error); err != nil {
+		if err := e.Listen(pipes, s.execs, s.error); err != nil {
 			return false, err
 		}
 
@@ -123,7 +85,8 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	}
 
 	if err := s.container.Init(cfg); err != nil {
-		return false, err
+		// container will show error
+		return false, nil
 	}
 
 	return true, nil
@@ -141,7 +104,7 @@ func (s *Service) Serve() error {
 			s.cfg.Workers.SetEnv(k, v)
 		}
 
-		s.cfg.Workers.SetEnv(jobsKey, "true")
+		s.cfg.Workers.SetEnv("rr_jobs", "true")
 	}
 
 	s.rr.Listen(s.throw)
@@ -149,7 +112,6 @@ func (s *Service) Serve() error {
 	if err := s.rr.Start(); err != nil {
 		return err
 	}
-	defer s.rr.Stop()
 
 	return s.container.Serve()
 }
@@ -157,11 +119,12 @@ func (s *Service) Serve() error {
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
 	s.container.Stop()
+	s.rr.Stop()
 }
 
 // Push job to associated broker and return job id.
 func (s *Service) Push(j *Job) (string, error) {
-	p, b, err := s.getPipeline(j.Job)
+	p, b, err := s.findPipeline(j.Job)
 	if err != nil {
 		return "", err
 	}
@@ -181,7 +144,8 @@ func (s *Service) Push(j *Job) (string, error) {
 func (s *Service) exec(id string, j *Job) error {
 	ctx, err := j.Context(id)
 	if err != nil {
-		return s.error(id, j, err)
+		s.error(id, j, err)
+		return err
 	}
 
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
@@ -195,13 +159,12 @@ func (s *Service) exec(id string, j *Job) error {
 }
 
 // error must be invoked when job is declared as failed.
-func (s *Service) error(id string, j *Job, err error) error {
+func (s *Service) error(id string, j *Job, err error) {
 	s.throw(EventJobError, &ErrorEvent{ID: id, Job: j, Error: err})
-	return err
 }
 
 // return broker associated with given pipeline.
-func (s *Service) getPipeline(job string) (*Pipeline, Broker, error) {
+func (s *Service) findPipeline(job string) (*Pipeline, Broker, error) {
 	var pipe *Pipeline
 	for _, p := range s.cfg.Pipelines {
 		if p.Has(job) {

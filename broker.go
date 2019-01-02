@@ -15,13 +15,25 @@ type Broker interface {
 	Push(p *Pipeline, j *Job) (id string, err error)
 
 	// Stat must fetch statistics about given pipeline or return error.
-	Stat(p *Pipeline) (stat *PipelineStat, err error)
+	Stat(p *Pipeline) (stat *Stat, err error)
 }
 
-type PipelineStat struct {
-	Broker   string
+// Stat contains information about pipeline job numbers.
+type Stat struct {
+	// Broken is name of associated broker.
+	Broker string
+
+	// Pipeline name.
 	Pipeline string
-	Pending  int64
-	Active   int64
-	Delayed  int64
+
+	// Queue defines number of pending jobs.
+	Queue int64
+
+	// Active defines number of jobs which are currently being processed.
+	Active int64
+
+	// Delayed defines number of jobs which are being processed.
+	Delayed int64
 }
+
+// todo: freeze

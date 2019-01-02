@@ -2,10 +2,11 @@ package beanstalk
 
 import (
 	"errors"
-	"github.com/spiral/roadrunner/service"
 	"github.com/beanstalkd/go-beanstalk"
+	"github.com/spiral/roadrunner/service"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Config defines beanstalk broker configuration.
@@ -15,6 +16,15 @@ type Config struct {
 
 	// Reserve timeout in seconds.
 	Reserve int
+
+	// Connections defines number of open connections to beanstalk server. Default 5.
+	Connections int
+}
+
+// InitDefaults sets missing values to their default values.
+func (c *Config) InitDefaults() error {
+	c.Connections = 5
+	return nil
 }
 
 // Hydrate config values.
@@ -34,4 +44,9 @@ func (c *Config) Conn() (*beanstalk.Conn, error) {
 	}
 
 	return beanstalk.Dial(dsn[0], dsn[1])
+}
+
+// ReserveDuration returns number of seconds to reserve the job.
+func (c *Config) ReserveDuration() time.Duration {
+	return time.Duration(c.Reserve) * time.Second
 }

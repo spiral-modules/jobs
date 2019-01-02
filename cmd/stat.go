@@ -22,17 +22,17 @@ package cmd
 
 import (
 	tm "github.com/buger/goterm"
+	"github.com/dustin/go-humanize"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/spiral/jobs"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/cmd/util"
 	"net/rpc"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"github.com/spiral/jobs"
-	"github.com/olekukonko/tablewriter"
-	"os"
-	"github.com/dustin/go-humanize"
 )
 
 func init() {
@@ -97,17 +97,17 @@ func showStats(client *rpc.Client) {
 }
 
 // WorkerTable renders table with information about rr server workers.
-func StatTable(pipelines []*jobs.PipelineStat) *tablewriter.Table {
+func StatTable(pipelines []*jobs.Stat) *tablewriter.Table {
 	tw := tablewriter.NewWriter(os.Stdout)
-	tw.SetHeader([]string{"Broker", "Pipeline", "Pending", "Delayed", "Active"})
+	tw.SetHeader([]string{"Broker", "Pipeline", "Queue", "Delayed", "Active"})
 
 	for _, p := range pipelines {
 		tw.Append([]string{
 			util.Sprintf("<white+hb>%s</reset>", p.Broker),
 			util.Sprintf("<cyan>%s</reset>", p.Pipeline),
-			util.Sprintf("<magenta>%s</reset>", humanize.Comma(p.Pending)),
-			util.Sprintf("<green>%s</reset>", humanize.Comma(p.Active)),
+			util.Sprintf("<magenta>%s</reset>", humanize.Comma(p.Queue)),
 			util.Sprintf("<yellow>%s</reset>", humanize.Comma(p.Delayed)),
+			util.Sprintf("<green>%s</reset>", humanize.Comma(p.Active)),
 		})
 	}
 

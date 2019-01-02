@@ -4,19 +4,18 @@ import (
 	"github.com/satori/go.uuid"
 	"github.com/spiral/jobs"
 	"sync"
-	"time"
 	"sync/atomic"
+	"time"
 )
 
 // Broker run queue using local goroutines.
 type Broker struct {
-	mu          sync.Mutex
-	wg          sync.WaitGroup
-	stopped     bool
-	queue       chan entry
-	handlerPool chan jobs.Handler
-	err         jobs.ErrorHandler
-	stat        *jobs.PipelineStat
+	mu       sync.Mutex
+	wg       sync.WaitGroup
+	queue    chan entry
+	stat     *jobs.Stat
+	execPool chan jobs.Handler
+	report   jobs.ErrorHandler
 }
 
 type entry struct {
@@ -27,9 +26,9 @@ type entry struct {
 
 // Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
 // together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
-	b.handlerPool = pool
-	b.err = err
+func (b *Broker) Listen(pipelines []*jobs.Pipeline, execPool chan jobs.Handler, err jobs.ErrorHandler) error {
+	b.execPool = execPool
+	b.report = err
 	return nil
 }
 
@@ -39,7 +38,7 @@ func (b *Broker) Init() (bool, error) {
 	defer b.mu.Unlock()
 
 	b.queue = make(chan entry)
-	b.stat = &jobs.PipelineStat{Pipeline: "in-memory"}
+	b.stat = &jobs.Stat{Pipeline: ":memory:"}
 
 	return true, nil
 }
@@ -50,43 +49,32 @@ func (b *Broker) Serve() error {
 	b.queue = make(chan entry)
 	b.mu.Unlock()
 
-	var handler jobs.Handler
-	for q := range b.queue {
-		id, job := q.id, q.job
-
-		if job.Options.Delay != 0 {
-			time.Sleep(job.Options.DelayDuration())
-			atomic.AddInt64(&b.stat.Delayed, ^int64(0))
-		}
-
-		// wait for free handler
-		handler = <-b.handlerPool
+	var h jobs.Handler
+	for e := range b.queue {
+		// wait for free h
+		h = <-b.execPool
 
 		atomic.AddInt64(&b.stat.Active, 1)
-		go func() {
+		go func(e entry, handler jobs.Handler) {
 			defer atomic.AddInt64(&b.stat.Active, ^int64(0))
+			e.attempt++
 
-			err := handler(id, job)
-			b.handlerPool <- handler
+			err := handler(e.id, e.job)
+			b.execPool <- handler
 
 			if err == nil {
-				atomic.AddInt64(&b.stat.Pending, ^int64(0))
+				atomic.AddInt64(&b.stat.Queue, ^int64(0))
 				return
 			}
 
-			if !job.CanRetry() {
-				b.err(id, job, err)
-				atomic.AddInt64(&b.stat.Pending, ^int64(0))
+			if e.job.CanRetry(e.attempt) {
+				b.schedule(e.id, e.attempt, e.job, e.job.Options.RetryDuration())
 				return
 			}
 
-			if job.Options.RetryDelay != 0 {
-				atomic.AddInt64(&b.stat.Delayed, 1)
-				time.Sleep(job.Options.RetryDuration())
-			}
-
-			b.queue <- entry{id: id, job: job}
-		}()
+			b.report(e.id, e.job, err)
+			atomic.AddInt64(&b.stat.Queue, ^int64(0))
+		}(e, h)
 	}
 
 	return nil
@@ -97,10 +85,9 @@ func (b *Broker) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if !b.stopped {
-		//todo: send to close channel
+	if b.queue != nil {
 		close(b.queue)
-		b.stopped = true
+		b.queue = nil
 	}
 }
 
@@ -111,18 +98,34 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	if j.Options.Delay != 0 {
-		atomic.AddInt64(&b.stat.Delayed, 1)
-	} else {
-		atomic.AddInt64(&b.stat.Pending, 1)
-	}
-
-	go func() { b.queue <- entry{id: id.String(), job: j} }()
-
+	go b.schedule(id.String(), 0, j, j.Options.DelayDuration())
 	return id.String(), nil
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
+func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	return b.stat, nil
+}
+
+// addJob adds job to queue
+func (b *Broker) schedule(id string, attempt int, j *jobs.Job, delay time.Duration) {
+	if delay == 0 {
+		atomic.AddInt64(&b.stat.Queue, 1)
+		b.queue <- entry{id: id, job: j}
+		return
+	}
+
+	atomic.AddInt64(&b.stat.Delayed, 1)
+
+	time.Sleep(delay)
+
+	atomic.AddInt64(&b.stat.Delayed, ^int64(0))
+	atomic.AddInt64(&b.stat.Queue, 1)
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.queue != nil {
+		b.queue <- entry{id: id, attempt: attempt, job: j}
+	}
 }

@@ -29,7 +29,9 @@ func (c *Config) Hydrate(cfg service.Config) error {
 		c.Workers = &roadrunner.ServerConfig{}
 	}
 
-	c.Workers.InitDefaults()
+	if err := c.Workers.InitDefaults(); err != nil {
+		return err
+	}
 
 	return c.Workers.Pool.Valid()
 }

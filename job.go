@@ -31,8 +31,9 @@ func (j *Job) Context(id string) ([]byte, error) {
 }
 
 // CanRetry must return true if broker is allowed to re-run the job.
-func (j *Job) CanRetry() bool {
-	return false //j.Attempt >= j.Options.MaxAttempts
+func (j *Job) CanRetry(attempts int) bool {
+	return false
+	//return j.Options.MaxAttempts > attempts
 }
 
 // Options carry information about how to handle given job.

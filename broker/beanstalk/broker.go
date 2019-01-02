@@ -2,28 +2,28 @@ package beanstalk
 
 import (
 	"encoding/json"
-	"github.com/spiral/jobs"
 	"github.com/beanstalkd/go-beanstalk"
-	"sync"
-	"time"
+	"github.com/spiral/jobs"
 	"strconv"
+	"strings"
+	"sync"
 )
 
 // Broker run jobs using Broker service.
 type Broker struct {
-	cfg         *Config
-	mu          sync.Mutex
-	stop        chan interface{}
-	conn        *beanstalk.Conn
-	tubes       map[*jobs.Pipeline]*Tube
-	tubeSet     *beanstalk.TubeSet
-	handlerPool chan jobs.Handler
-	err         jobs.ErrorHandler
+	cfg      *Config
+	mu       sync.Mutex
+	connPool *jobs.ConnPool
+	execPool chan jobs.Handler
+	report   jobs.ErrorHandler
+	stop     chan interface{}
+	tubes    map[*jobs.Pipeline]*Tube
+	tubeSet  *beanstalk.TubeSet
 }
 
 // Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
 // together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
+func (b *Broker) Listen(pipelines []*jobs.Pipeline, execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	b.tubes = make(map[*jobs.Pipeline]*Tube)
 	for _, p := range pipelines {
 		if err := b.registerTube(p); err != nil {
@@ -31,26 +31,28 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err 
 		}
 	}
 
-	b.handlerPool = pool
-	b.err = err
+	b.execPool = execPool
+	b.report = err
 	return nil
 }
 
 // Init configures local job broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
+	b.connPool = &jobs.ConnPool{
+		NumConn: cfg.Connections,
+		Open:    func() (c interface{}, e error) { return b.cfg.Conn() },
+		Close:   func(c interface{}) { c.(*beanstalk.Conn).Close() },
+	}
+
 	return true, nil
 }
 
 // Serve tubes.
-func (b *Broker) Serve() error {
-	conn, err := b.cfg.Conn()
-	if err != nil {
+func (b *Broker) Serve() (err error) {
+	if err = b.connPool.Init(); err != nil {
 		return err
 	}
-	defer conn.Close()
-
-	b.conn = conn
 
 	b.mu.Lock()
 	b.stop = make(chan interface{})
@@ -58,25 +60,31 @@ func (b *Broker) Serve() error {
 
 	var listen []string
 	for _, t := range b.tubes {
-		t.Tube.Conn = b.conn
 		if t.Listen {
 			listen = append(listen, t.Name)
 		}
 	}
 
 	if len(listen) != 0 {
-		// separate connection for job consuming
-		tconn, err := b.cfg.Conn()
-		if err != nil {
-			return err
+		// conn will be provided later
+		b.tubeSet = beanstalk.NewTubeSet(nil, listen...)
+
+		for {
+			select {
+			case <-b.stop:
+				return
+			default:
+				err = b.connPool.Exec(b.consume)
+				if err != nil {
+					return
+				}
+			}
 		}
-		defer tconn.Close()
-
-		b.listen(beanstalk.NewTubeSet(tconn, listen...))
+	} else {
+		<-b.stop
 	}
-	<-b.stop
 
-	return nil
+	return err
 }
 
 // Stop serving.
@@ -87,6 +95,8 @@ func (b *Broker) Stop() {
 	if b.stop != nil {
 		close(b.stop)
 	}
+
+	b.connPool.Destroy()
 }
 
 // Push new job to queue
@@ -96,42 +106,40 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	id, err := b.tubes[p].Put(
-		data,
-		0,
-		j.Options.DelayDuration(),
-		j.Options.TimeoutDuration(),
-	)
+	var id uint64
 
-	if err != nil {
-		return "", err
-	}
+	// execute operation on first free conn
+	err = b.connPool.Exec(func(c interface{}) error {
+		t := b.tubes[p]
 
-	return jID(id), err
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		t.Conn = c.(*beanstalk.Conn)
+
+		id, err = t.Put(data, 0, j.Options.DelayDuration(), j.Options.TimeoutDuration())
+		return wrapErr(err, false)
+	})
+
+	return jid(id), err
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.PipelineStat, err error) {
-	values, err := b.tubes[p].Stats()
-	if err != nil {
-		return nil, err
-	}
+func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	stat = &jobs.PipelineStat{Pipeline: b.tubes[p].Name}
+	err = b.connPool.Exec(func(c interface{}) error {
+		t := b.tubes[p]
 
-	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
-		stat.Pending = int64(v)
-	}
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		t.Conn = c.(*beanstalk.Conn)
 
-	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
-		stat.Active = int64(v)
-	}
+		stat, err = t.fetchStats()
+		return wrapErr(err, false)
+	})
 
-	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
-		stat.Delayed = int64(v)
-	}
-
-	return stat, nil
+	return
 }
 
 // registerTube new beanstalk pipeline
@@ -145,51 +153,71 @@ func (b *Broker) registerTube(pipeline *jobs.Pipeline) error {
 	return nil
 }
 
-// listen jobs from given tube
-func (b *Broker) listen(t *beanstalk.TubeSet) {
-	var job *jobs.Job
-	var handler jobs.Handler
+// consume job from the server
+func (b *Broker) consume(c interface{}) error {
+	b.tubeSet.Conn = c.(*beanstalk.Conn)
+	id, body, err := b.tubeSet.Reserve(b.cfg.ReserveDuration())
 
-	for {
-		select {
-		case <-b.stop:
-			return
-		default:
-			id, body, err := t.Reserve(time.Duration(b.cfg.Reserve) * time.Second)
-			if err != nil {
-				continue
-			}
-
-			err = json.Unmarshal(body, &job)
-			if err != nil {
-				// need additional logging
-				continue
-			}
-
-			handler = <-b.handlerPool
-			go func() {
-				t.Conn.Touch(id)
-				err = handler(jID(id), job)
-				b.handlerPool <- handler
-
-				if err == nil {
-					t.Conn.Delete(id)
-					return
-				}
-
-				if !job.CanRetry() {
-					b.err(jID(id), job, err)
-					t.Conn.Delete(id)
-					return
-				}
-
-				// retry
-				t.Conn.Release(id, 0, job.Options.RetryDuration())
-			}()
-		}
+	if err != nil {
+		// timeout or other soft error
+		return wrapErr(err, true)
 	}
+
+	var j *jobs.Job
+	err = json.Unmarshal(body, &j)
+	if err != nil {
+		// unable to unmarshal
+		return nil
+	}
+
+	go func(h jobs.Handler, c *beanstalk.Conn) {
+		err = h(jid(id), j)
+		b.execPool <- h
+
+		if err == nil {
+			c.Delete(id)
+			return
+		}
+
+		// number of reserves
+		stat, _ := c.StatsJob(id)
+		reserves, _ := strconv.Atoi(stat["reserves"])
+
+		if j.CanRetry(reserves) {
+			// retrying
+			c.Release(id, 0, j.Options.RetryDuration())
+			return
+		}
+
+		b.report(jid(id), j, err)
+		c.Bury(id, 0)
+	}(<-b.execPool, b.tubeSet.Conn)
+
+	return nil
 }
 
-func jID(id uint64) string {
+// jid converts job id into string.
+func jid(id uint64) string {
+	if id == 0 {
+		return ""
+	}
 	return strconv.FormatUint(id, 10)
+}
+
+// wrapError into conn error when detected. softErr would not wrap any of no connection errors.
+func wrapErr(err error, hide bool) error {
+	if err == nil {
+		return nil
+	}
+
+	// yeaaah...
+	if strings.Contains(err.Error(), "pipe error") || strings.Contains(err.Error(), "EOF") {
+		return jobs.ConnErr(err)
+	}
+
+	if hide {
+		return nil
+	}
+
+	return err
 }

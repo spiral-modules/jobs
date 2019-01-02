@@ -23,9 +23,9 @@ package cmd
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spiral/jobs"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/cmd/util"
-	"github.com/spiral/jobs"
 )
 
 func init() {
@@ -57,6 +57,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Job.Job,
 			e.ID,
 		))
+
 	case jobs.EventJobComplete:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
@@ -64,6 +65,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Job.Job,
 			e.ID,
 		))
+
 	case jobs.EventPushError:
 		e := ctx.(*jobs.ErrorEvent)
 		s.logger.Error(util.Sprintf(

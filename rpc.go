@@ -16,7 +16,7 @@ type WorkerList struct {
 // PipelineList contains list of pipeline stats.
 type PipelineList struct {
 	// Pipelines is list of pipeline stats.
-	Pipelines []*PipelineStat `json:"pipelines"`
+	Pipelines []*Stat `json:"pipelines"`
 }
 
 // Push job to the queue.
