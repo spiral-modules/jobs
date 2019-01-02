@@ -170,6 +170,8 @@ func (b *Broker) consume(c interface{}) error {
 		return nil
 	}
 
+	// todo: add touch
+
 	go func(h jobs.Handler, c *beanstalk.Conn) {
 		err = h(jid(id), j)
 		b.execPool <- h
