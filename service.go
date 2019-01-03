@@ -99,6 +99,7 @@ func (s *Service) Serve() error {
 	if err := s.rr.Start(); err != nil {
 		return err
 	}
+	defer s.rr.Stop()
 
 	if len(s.cfg.Consume) != 0 {
 		s.log.Debugf("[jobs] consuming `%s`", strings.Join(s.cfg.Consume, "`, `"))
@@ -110,7 +111,6 @@ func (s *Service) Serve() error {
 // stop all pipelines and rr server.
 func (s *Service) Stop() {
 	s.services.Stop()
-	s.rr.Stop()
 }
 
 // Push job to associated broker and return job id.

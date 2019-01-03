@@ -74,8 +74,6 @@ func (b *Broker) Consume(pipes []*jobs.Pipeline, execPool chan jobs.Handler, err
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// WTF
-
 	for _, pipe := range pipes {
 		q, ok := b.queues[pipe]
 		if !ok {
@@ -89,6 +87,7 @@ func (b *Broker) Consume(pipes []*jobs.Pipeline, execPool chan jobs.Handler, err
 		}
 
 		if atomic.LoadInt32(&b.running) == 1 {
+			// resume consuming
 			go q.serve()
 		}
 	}
