@@ -4,21 +4,28 @@ import (
 	"encoding/json"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/cpool"
 	"strconv"
-	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Broker run jobs using Broker service.
 type Broker struct {
+	status   int32
 	cfg      *Config
-	mu       sync.Mutex
-	connPool *jobs.ConnPool
+	connPool *cpool.ConnPool
 	execPool chan jobs.Handler
-	report   jobs.ErrorHandler
+	err      jobs.ErrorHandler
+	mu       sync.Mutex
 	stop     chan interface{}
 	tubes    map[*jobs.Pipeline]*Tube
 	tubeSet  *beanstalk.TubeSet
+}
+
+// Status returns broken status.
+func (b *Broker) Status() jobs.BrokerStatus {
+	return jobs.BrokerStatus(atomic.LoadInt32(&b.status))
 }
 
 // Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
@@ -32,14 +39,14 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, execPool chan jobs.Handler, 
 	}
 
 	b.execPool = execPool
-	b.report = err
+	b.err = err
 	return nil
 }
 
 // Init configures local job broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
-	b.connPool = &jobs.ConnPool{
+	b.connPool = &cpool.ConnPool{
 		NumConn: cfg.Connections,
 		Open:    func() (c interface{}, e error) { return b.cfg.Conn() },
 		Close:   func(c interface{}) { c.(*beanstalk.Conn).Close() },
@@ -48,7 +55,7 @@ func (b *Broker) Init(cfg *Config) (bool, error) {
 	return true, nil
 }
 
-// Serve tubes.
+// serve tubes.
 func (b *Broker) Serve() (err error) {
 	if err = b.connPool.Init(); err != nil {
 		return err
@@ -64,6 +71,9 @@ func (b *Broker) Serve() (err error) {
 			listen = append(listen, t.Name)
 		}
 	}
+
+	// ready to accept jobs
+	atomic.StoreInt32(&b.status, int32(jobs.StatusReady))
 
 	if len(listen) != 0 {
 		// conn will be provided later
@@ -87,10 +97,12 @@ func (b *Broker) Serve() (err error) {
 	return err
 }
 
-// Stop serving.
+// stop serving.
 func (b *Broker) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	atomic.StoreInt32(&b.status, int32(jobs.StatusRegistered))
 
 	if b.stop != nil {
 		close(b.stop)
@@ -117,7 +129,7 @@ func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
 		t.Conn = c.(*beanstalk.Conn)
 
 		id, err = t.Put(data, 0, j.Options.DelayDuration(), j.Options.TimeoutDuration())
-		return wrapErr(err, false)
+		return pushErr(err, false)
 	})
 
 	return jid(id), err
@@ -136,7 +148,7 @@ func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		t.Conn = c.(*beanstalk.Conn)
 
 		stat, err = t.fetchStats()
-		return wrapErr(err, false)
+		return pushErr(err, false)
 	})
 
 	return
@@ -160,7 +172,7 @@ func (b *Broker) consume(c interface{}) error {
 
 	if err != nil {
 		// timeout or other soft error
-		return wrapErr(err, true)
+		return pushErr(err, true)
 	}
 
 	var j *jobs.Job
@@ -171,6 +183,7 @@ func (b *Broker) consume(c interface{}) error {
 	}
 
 	// todo: add touch
+	// todo: add wg
 
 	go func(h jobs.Handler, c *beanstalk.Conn) {
 		err = h(jid(id), j)
@@ -191,7 +204,7 @@ func (b *Broker) consume(c interface{}) error {
 			return
 		}
 
-		b.report(jid(id), j, err)
+		b.err(jid(id), j, err)
 		c.Bury(id, 0)
 	}(<-b.execPool, b.tubeSet.Conn)
 
@@ -207,14 +220,14 @@ func jid(id uint64) string {
 }
 
 // wrapError into conn error when detected. softErr would not wrap any of no connection errors.
-func wrapErr(err error, hide bool) error {
+func pushErr(err error, hide bool) error {
 	if err == nil {
 		return nil
 	}
 
 	// yeaaah...
-	if strings.Contains(err.Error(), "pipe error") || strings.Contains(err.Error(), "EOF") {
-		return jobs.ConnErr(err)
+	if cpool.IsPipeError(err) {
+		return cpool.PipeErr{Err: err}
 	}
 
 	if hide {

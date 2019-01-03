@@ -23,6 +23,7 @@ package cmd
 import (
 	tm "github.com/buger/goterm"
 	"github.com/spf13/cobra"
+	"github.com/spiral/jobs"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/cmd/util"
 	"net/rpc"
@@ -30,7 +31,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"github.com/spiral/jobs"
 )
 
 var (

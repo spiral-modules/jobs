@@ -7,10 +7,12 @@ import (
 	"github.com/spiral/jobs"
 	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 // Broker run jobs using Broker service.
 type Broker struct {
+	status   int32
 	cfg      *Config
 	mu       sync.Mutex
 	stop     chan interface{}
@@ -19,6 +21,11 @@ type Broker struct {
 	queue    map[*jobs.Pipeline]*Queue
 	execPool chan jobs.Handler
 	err      jobs.ErrorHandler
+}
+
+// Status returns broken status.
+func (b *Broker) Status() jobs.BrokerStatus {
+	return jobs.BrokerStatus(atomic.LoadInt32(&b.status))
 }
 
 // Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
@@ -42,7 +49,7 @@ func (b *Broker) Init(cfg *Config) (bool, error) {
 	return true, nil
 }
 
-// Serve tubes.
+// serve tubes.
 func (b *Broker) Serve() (err error) {
 	b.sqs, err = b.cfg.SQS()
 	if err != nil {
@@ -73,16 +80,21 @@ func (b *Broker) Serve() (err error) {
 		}
 	}
 
+	// ready to accept jobs
+	atomic.StoreInt32(&b.status, int32(jobs.StatusReady))
+
 	b.wg.Wait()
 	<-b.stop
 
 	return nil
 }
 
-// Stop serving.
+// stop serving.
 func (b *Broker) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	atomic.StoreInt32(&b.status, int32(jobs.StatusRegistered))
 
 	if b.stop != nil {
 		close(b.stop)

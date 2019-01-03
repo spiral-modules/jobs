@@ -50,21 +50,21 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	}
 
 	switch event {
-	case jobs.EventJobAdded:
-		e := ctx.(*jobs.JobEvent)
-		s.logger.Info(util.Sprintf(
-			"job.<magenta+h>PUSH</reset> <cyan>%s</reset> <white+hb>%s</reset>",
-			e.Job.Job,
-			e.ID,
-		))
+	case jobs.EventPushComplete:
+		//e := ctx.(*jobs.JobEvent)
+		// s.logger.Info(util.Sprintf(
+		// 	"job.<magenta+h>PUSH</reset> <cyan>%s</reset> <white+hb>%s</reset>",
+		// 	e.Job.Job,
+		// 	e.ID,
+		// ))
 
 	case jobs.EventJobComplete:
-		e := ctx.(*jobs.JobEvent)
-		s.logger.Info(util.Sprintf(
-			"job.<green+h>DONE</reset> <cyan>%s</reset> <white+hb>%s</reset>",
-			e.Job.Job,
-			e.ID,
-		))
+		// e := ctx.(*jobs.JobEvent)
+		// s.logger.Info(util.Sprintf(
+		// 	"job.<green+h>DONE</reset> <cyan>%s</reset> <white+hb>%s</reset>",
+		// 	e.Job.Job,
+		// 	e.ID,
+		// ))
 
 	case jobs.EventPushError:
 		e := ctx.(*jobs.ErrorEvent)

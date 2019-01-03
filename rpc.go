@@ -20,8 +20,8 @@ type PipelineList struct {
 }
 
 // Push job to the queue.
-func (s *rpcServer) Push(j *Job, id *string) (err error) {
-	*id, err = s.svc.Push(j)
+func (rpc *rpcServer) Push(j *Job, id *string) (err error) {
+	*id, err = rpc.svc.Push(j)
 	return
 }
 
@@ -35,6 +35,9 @@ func (rpc *rpcServer) Reset(reset bool, r *string) error {
 	return rpc.svc.rr.Reset()
 }
 
+// todo: stop
+// todo: resume
+
 // Workers returns list of active workers and their stats.
 func (rpc *rpcServer) Workers(list bool, r *WorkerList) (err error) {
 	if rpc.svc == nil || rpc.svc.rr == nil {
@@ -45,20 +48,21 @@ func (rpc *rpcServer) Workers(list bool, r *WorkerList) (err error) {
 	return err
 }
 
-// Workers returns list of active workers and their stats.
+// Stat returns list of active workers and their stats.
 func (rpc *rpcServer) Stat(list bool, l *PipelineList) (err error) {
 	if rpc.svc == nil || rpc.svc.rr == nil {
 		return errors.New("jobs server is not running")
 	}
 
 	*l = PipelineList{}
-	for _, p := range rpc.svc.cfg.Pipelines {
-		stat, err := rpc.svc.Brokers[p.Broker].Stat(p)
+	for name, p := range rpc.svc.cfg.Pipelines {
+		stat, err := rpc.svc.Brokers[p.Broker()].Stat(p)
 		if err != nil {
 			return err
 		}
 
-		stat.Broker = p.Broker
+		stat.Name = name
+		stat.Broker = p.Broker()
 		l.Pipelines = append(l.Pipelines, stat)
 	}
 

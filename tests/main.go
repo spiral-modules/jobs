@@ -1,27 +1,20 @@
 package main
 
 import (
-	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
+	"github.com/sirupsen/logrus"
+	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/broker/local"
 	"github.com/spiral/roadrunner/service/rpc"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/broker/beanstalk"
-	"github.com/spiral/jobs/broker/local"
-	"github.com/spiral/jobs/broker/sqs"
-
-	// additional commands and debug handlers
 	_ "github.com/spiral/jobs/cmd"
+	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 )
 
 func main() {
 	rr.Container.Register(rpc.ID, &rpc.Service{})
 	rr.Container.Register(jobs.ID, &jobs.Service{
 		Brokers: map[string]jobs.Broker{
-			"local":     &local.Broker{},
-			"beanstalk": &beanstalk.Broker{},
-			"sqs":       &sqs.Broker{},
+			"local": &local.Broker{},
 		},
 	})
 

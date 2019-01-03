@@ -1,25 +1,23 @@
-package jobs
+package cpool
 
 import (
 	"errors"
 	"log"
+	"strings"
 	"sync"
 )
 
-// ConnErr indicates that given error is connection specific.
-func ConnErr(err error) error {
-	return connErr{err}
-}
+var pipeErrors = []string{"pipe", "EOF"}
 
-// ConnErr wraps regular error.
-type connErr struct {
-	// Underlying error
-	err error
+// PipeErr wraps regular error as pipe error and forces pool to re-init the connection.
+type PipeErr struct {
+	// Error is underlying error.
+	Err error
 }
 
 // Error return error code.
-func (e connErr) Error() string {
-	return e.err.Error()
+func (e PipeErr) Error() string {
+	return e.Err.Error()
 }
 
 // ConnPool manages set of connections with ability to
@@ -72,7 +70,7 @@ func (p *ConnPool) Exec(exec func(interface{}) error) (err error) {
 		err = exec(c)
 
 		// non connection issue
-		if _, ok := err.(connErr); !ok {
+		if _, ok := err.(PipeErr); !ok {
 			p.conn <- c
 			return err
 		}
@@ -113,4 +111,16 @@ func (p *ConnPool) Destroy() {
 
 	close(p.conn)
 	p.conn = nil
+}
+
+// IsPipeError indicates that error is related to dead socket.
+func IsPipeError(err error) bool {
+	for _, errStr := range pipeErrors {
+		// golang...
+		if strings.Contains(err.Error(), errStr) {
+			return true
+		}
+	}
+
+	return false
 }

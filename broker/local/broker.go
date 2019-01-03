@@ -1,131 +1,126 @@
 package local
 
 import (
+	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	"github.com/spiral/jobs"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // Broker run queue using local goroutines.
 type Broker struct {
-	mu       sync.Mutex
-	wg       sync.WaitGroup
-	queue    chan entry
-	stat     *jobs.Stat
-	execPool chan jobs.Handler
-	report   jobs.ErrorHandler
-}
-
-type entry struct {
-	id      string
-	attempt int
-	job     *jobs.Job
-}
-
-// Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
-// together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, execPool chan jobs.Handler, err jobs.ErrorHandler) error {
-	b.execPool = execPool
-	b.report = err
-	return nil
+	running int32
+	mu      sync.Mutex
+	stop    chan interface{}
+	queues  map[*jobs.Pipeline]*queue
 }
 
 // Init configures local job broker.
 func (b *Broker) Init() (bool, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.queue = make(chan entry)
-	b.stat = &jobs.Stat{Pipeline: ":memory:"}
-
 	return true, nil
 }
 
-// Serve local broker.
+// serve local broker.
 func (b *Broker) Serve() error {
+	// enable consuming?
+	atomic.StoreInt32(&b.running, 1)
+
+	// start consuming
 	b.mu.Lock()
-	b.queue = make(chan entry)
+	for _, q := range b.queues {
+		go q.serve()
+	}
+	b.stop = make(chan interface{})
 	b.mu.Unlock()
 
-	var h jobs.Handler
-	for e := range b.queue {
-		// wait for free h
-		h = <-b.execPool
+	<-b.stop
 
-		atomic.AddInt64(&b.stat.Active, 1)
-		go func(e entry, handler jobs.Handler) {
-			defer atomic.AddInt64(&b.stat.Active, ^int64(0))
-			e.attempt++
+	return nil
+}
 
-			err := handler(e.id, e.job)
-			b.execPool <- handler
+// stop local broker.
+func (b *Broker) Stop() {
+	if atomic.LoadInt32(&b.running) == 0 {
+		return
+	}
 
-			if err == nil {
-				atomic.AddInt64(&b.stat.Queue, ^int64(0))
-				return
-			}
+	// stop consuming after all jobs are complete
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-			if e.job.CanRetry(e.attempt) {
-				b.schedule(e.id, e.attempt, e.job, e.job.Options.RetryDuration())
-				return
-			}
+	for _, q := range b.queues {
+		q.stop()
+	}
 
-			b.report(e.id, e.job, err)
-			atomic.AddInt64(&b.stat.Queue, ^int64(0))
-		}(e, h)
+	close(b.stop)
+}
+
+// Listen configures broker with list of pipelines to listen and handler function.
+func (b *Broker) Register(pipes []*jobs.Pipeline) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.queues = make(map[*jobs.Pipeline]*queue)
+	for _, p := range pipes {
+		b.queues[p] = newQueue()
 	}
 
 	return nil
 }
 
-// Stop local broker.
-func (b *Broker) Stop() {
+// Consume enables or disabled pipeline consuming.
+func (b *Broker) Consume(pipes []*jobs.Pipeline, execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.queue != nil {
-		close(b.queue)
-		b.queue = nil
+	// WTF
+
+	for _, pipe := range pipes {
+		q, ok := b.queues[pipe]
+		if !ok {
+			return errors.New("invalid pipeline")
+		}
+
+		q.stop()
+
+		if err := q.configure(execPool, err); err != nil {
+			return err
+		}
+
+		if atomic.LoadInt32(&b.running) == 1 {
+			go q.serve()
+		}
 	}
+
+	return nil
 }
 
-// Push new job to queue
-func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
+// Push job into the worker.
+func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
+	if atomic.LoadInt32(&b.running) != 1 {
+		return "", errors.New("broker is not running")
+	}
+
+	b.mu.Lock()
+	q, ok := b.queues[pipe]
+	b.mu.Unlock()
+
+	if !ok {
+		return "", errors.New("invalid pipeline")
+	}
+
 	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
 	}
 
-	go b.schedule(id.String(), 0, j, j.Options.DelayDuration())
+	go q.push(id.String(), j, 0, j.Options.DelayDuration())
+
 	return id.String(), nil
 }
 
 // Stat must fetch statistics about given pipeline or return error.
 func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
-	return b.stat, nil
-}
-
-// addJob adds job to queue
-func (b *Broker) schedule(id string, attempt int, j *jobs.Job, delay time.Duration) {
-	if delay == 0 {
-		atomic.AddInt64(&b.stat.Queue, 1)
-		b.queue <- entry{id: id, job: j}
-		return
-	}
-
-	atomic.AddInt64(&b.stat.Delayed, 1)
-
-	time.Sleep(delay)
-
-	atomic.AddInt64(&b.stat.Delayed, ^int64(0))
-	atomic.AddInt64(&b.stat.Queue, 1)
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.queue != nil {
-		b.queue <- entry{id: id, attempt: attempt, job: j}
-	}
+	return nil, nil
 }

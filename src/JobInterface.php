@@ -15,5 +15,5 @@ interface JobInterface extends \Serializable
      *
      * @param string $id
      */
-    public function execute(string $id): void;
+    public function execute(string $id);
 }

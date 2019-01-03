@@ -1,8 +1,8 @@
 package jobs
 
 const (
-	// EventJobAdded thrown when new job has been added. JobEvent is passed as context.
-	EventJobAdded = iota + 1500
+	// EventPushComplete thrown when new job has been added. JobEvent is passed as context.
+	EventPushComplete = iota + 1500
 
 	// EventPushError caused when job can not be registered.
 	EventPushError
@@ -12,6 +12,9 @@ const (
 
 	// EventJobError thrown on all job related errors. See ErrorEvent as context.
 	EventJobError
+
+	// EventBrokerError defines broker specific error.
+	EventBrokerError
 )
 
 // JobEvent represent job event.
@@ -28,7 +31,7 @@ type ErrorEvent struct {
 	// ID is job id.
 	ID string
 
-	// Job is failed job.
+	// Job is failed job. Can be empty.
 	Job *Job
 
 	// Error - associated error, if any.
