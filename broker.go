@@ -11,7 +11,7 @@ type Broker interface {
 	Push(pipe *Pipeline, j *Job) (string, error)
 
 	// Stat must fetch statistics about given pipeline or return error.
-	Stat(p *Pipeline) (stat *Stat, err error)
+	Stat(pipe *Pipeline) (stat *Stat, err error)
 }
 
 // Stat contains information about pipeline.

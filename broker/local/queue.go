@@ -8,6 +8,7 @@ import (
 )
 
 type queue struct {
+	stat     *jobs.Stat
 	jobs     chan entry
 	mu       sync.Mutex
 	wg       sync.WaitGroup
@@ -24,11 +25,25 @@ type entry struct {
 }
 
 func newQueue() *queue {
-	return &queue{jobs: make(chan entry)}
+	return &queue{stat: &jobs.Stat{}, jobs: make(chan entry)}
 }
 
 func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
-	// todo: what about delay?
+	if delay == 0 {
+		atomic.AddInt64(&q.stat.Queue, 1)
+		q.jobs <- entry{id: id, job: j}
+		return
+	}
+
+	atomic.AddInt64(&q.stat.Delayed, 1)
+
+	time.Sleep(delay)
+
+	atomic.AddInt64(&q.stat.Delayed, ^int64(0))
+	atomic.AddInt64(&q.stat.Queue, 1)
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
 	q.jobs <- entry{id: id, job: j, attempt: attempt}
 }
@@ -77,13 +92,13 @@ func (q *queue) serve() {
 			return
 		case e := <-q.jobs:
 			q.wg.Add(1)
+			atomic.AddInt64(&q.stat.Active, 1)
 
 			// wait for free h
 			h = <-q.execPool
 
-			// atomic.AddInt64(&b.stat.Active, 1)
 			go func(e entry, handler jobs.Handler) {
-				// defer atomic.AddInt64(&b.stat.Active, ^int64(0))
+				defer atomic.AddInt64(&q.stat.Active, ^int64(0))
 				defer q.wg.Done()
 
 				e.attempt++
@@ -92,7 +107,7 @@ func (q *queue) serve() {
 				q.execPool <- handler
 
 				if err == nil {
-					// atomic.AddInt64(&b.stat.Queue, ^int64(0))
+					atomic.AddInt64(&q.stat.Queue, ^int64(0))
 					return
 				}
 
@@ -102,7 +117,7 @@ func (q *queue) serve() {
 				}
 
 				q.err(e.id, e.job, err)
-				// atomic.AddInt64(&b.stat.Queue, ^int64(0))
+				atomic.AddInt64(&q.stat.Queue, ^int64(0))
 			}(e, h)
 		}
 	}

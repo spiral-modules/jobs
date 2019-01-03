@@ -110,6 +110,11 @@ func (s *Service) Serve() error {
 
 // stop all pipelines and rr server.
 func (s *Service) Stop() {
+	// explicitly stop all consuming
+	for name, b := range s.Brokers {
+		b.Consume(s.cfg.ConsumedPipelines(name), nil, nil)
+	}
+
 	s.services.Stop()
 }
 

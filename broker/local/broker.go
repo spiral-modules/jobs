@@ -120,6 +120,14 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 }
 
 // Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
-	return nil, nil
+func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	b.mu.Lock()
+	q, ok := b.queues[pipe]
+	b.mu.Unlock()
+
+	if !ok {
+		return nil, errors.New("invalid pipeline")
+	}
+
+	return q.stat, nil
 }
