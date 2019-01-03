@@ -35,8 +35,37 @@ func (rpc *rpcServer) Reset(reset bool, r *string) error {
 	return rpc.svc.rr.Reset()
 }
 
-// todo: stop
-// todo: resume
+// Stop all job consuming.
+func (rpc *rpcServer) Stop(stop bool, r *string) (err error) {
+	if rpc.svc == nil || rpc.svc.rr == nil {
+		return errors.New("jobs server is not running")
+	}
+
+	for name, b := range rpc.svc.Brokers {
+		if err := b.Consume(rpc.svc.cfg.ConsumedPipelines(name), nil, nil); err != nil {
+			return err
+		}
+	}
+
+	*r = "OK"
+	return nil
+}
+
+// Resume all job consuming.
+func (rpc *rpcServer) Resume(resume bool, r *string) (err error) {
+	if rpc.svc == nil || rpc.svc.rr == nil {
+		return errors.New("jobs server is not running")
+	}
+
+	for name, b := range rpc.svc.Brokers {
+		if err := b.Consume(rpc.svc.cfg.ConsumedPipelines(name), rpc.svc.execPool, rpc.svc.error); err != nil {
+			return err
+		}
+	}
+
+	*r = "OK"
+	return nil
+}
 
 // Workers returns list of active workers and their stats.
 func (rpc *rpcServer) Workers(list bool, r *WorkerList) (err error) {
