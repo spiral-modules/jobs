@@ -10,7 +10,6 @@ import (
 type queue struct {
 	stat     *jobs.Stat
 	jobs     chan entry
-	mu       sync.Mutex
 	wg       sync.WaitGroup
 	active   int32
 	stopped  chan interface{}
@@ -42,16 +41,10 @@ func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
 	atomic.AddInt64(&q.stat.Delayed, ^int64(0))
 	atomic.AddInt64(&q.stat.Queue, 1)
 
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
 	q.jobs <- entry{id: id, job: j, attempt: attempt}
 }
 
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
 	q.execPool = execPool
 	q.err = err
 
@@ -77,9 +70,7 @@ func (q *queue) serve() {
 	}
 
 	// we are stopped now
-	q.mu.Lock()
 	q.stopped = make(chan interface{})
-	q.mu.Unlock()
 
 	atomic.StoreInt32(&q.active, 1)
 
