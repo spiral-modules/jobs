@@ -7,24 +7,25 @@ import (
 	"github.com/spiral/roadrunner/service"
 	"github.com/spiral/roadrunner/service/env"
 	"github.com/spiral/roadrunner/service/rpc"
-	"strings"
+	"sync"
 )
 
 // ID defines public service name.
 const ID = "jobs"
 
-// Service wraps roadrunner container and manage set of brokers within it.
+// Service wraps roadrunner container and manage set of parent within it.
 type Service struct {
-	// Associated brokers
-	Brokers map[string]Broker
-
-	cfg      *Config
-	env      env.Environment
-	log      *logrus.Logger
-	execPool chan Handler
-	lsns     []func(event int, ctx interface{})
-	rr       *roadrunner.Server
-	services service.Container
+	// Associated parent
+	Brokers   map[string]Broker
+	cfg       *Config
+	env       env.Environment
+	log       *logrus.Logger
+	execPool  chan Handler
+	lsns      []func(event int, ctx interface{})
+	rr        *roadrunner.Server
+	services  service.Container
+	mu        sync.Mutex
+	consuming map[*Pipeline]bool
 }
 
 // AddListener attaches server event watcher.
@@ -57,14 +58,17 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
 	s.services = service.NewContainer(l)
+
+	s.mu.Lock()
+	s.consuming = make(map[*Pipeline]bool)
+	for _, p := range s.Pipelines() {
+		s.consuming[p] = false
+	}
+	s.mu.Unlock()
+
 	for name, b := range s.Brokers {
 		// registering pipelines and handlers
-		if err := b.Register(s.cfg.BrokerPipelines(name)); err != nil {
-			return false, err
-		}
-
-		// configuring consuming groups (need ability to consume to external pools in a future)
-		if err := b.Consume(s.cfg.ConsumedPipelines(name), s.execPool, s.error); err != nil {
+		if err := b.Register(s.Pipelines().Filter(name, nil)); err != nil {
 			return false, err
 		}
 
@@ -101,8 +105,12 @@ func (s *Service) Serve() error {
 	}
 	defer s.rr.Stop()
 
-	if len(s.cfg.Consume) != 0 {
-		s.log.Debugf("[jobs] consuming `%s`", strings.Join(s.cfg.Consume, "`, `"))
+	for broker := range s.Brokers {
+		for _, p := range s.Pipelines().Filter(broker, s.cfg.Consume) {
+			if err := s.Consume(p, s.execPool, s.error); err != nil {
+				return err
+			}
+		}
 	}
 
 	return s.services.Serve()
@@ -111,8 +119,12 @@ func (s *Service) Serve() error {
 // stop all pipelines and rr server.
 func (s *Service) Stop() {
 	// explicitly stop all consuming
-	for name, b := range s.Brokers {
-		b.Consume(s.cfg.ConsumedPipelines(name), nil, nil)
+	for broker := range s.Brokers {
+		for _, p := range s.Pipelines().Filter(broker, nil) {
+			if err := s.Consume(p, nil, nil); err != nil {
+				s.throw(EventBrokerError, err)
+			}
+		}
 	}
 
 	s.services.Stop()
@@ -120,7 +132,7 @@ func (s *Service) Stop() {
 
 // Push job to associated broker and return job id.
 func (s *Service) Push(j *Job) (string, error) {
-	pipe, err := s.cfg.FindPipeline(j)
+	pipe, err := s.cfg.MapPipeline(j)
 	if err != nil {
 		return "", err
 	}
@@ -139,6 +151,62 @@ func (s *Service) Push(j *Job) (string, error) {
 	}
 
 	return id, err
+}
+
+// Pipelines return all service pipelines.
+func (s *Service) Pipelines() Pipelines {
+	return s.cfg.Pipelines
+}
+
+// Stat returns list of active workers and their stats.
+func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
+	b, ok := s.Brokers[pipe.Broker()]
+	if !ok {
+		return nil, fmt.Errorf("undefined broker `%s`", pipe.Broker())
+	}
+
+	stat, err = b.Stat(pipe)
+	if err != nil {
+		return nil, err
+	}
+
+	stat.Pipeline = pipe.Name()
+	stat.Broker = pipe.Broker()
+
+	return stat, err
+}
+
+// Consuming enables or disables pipeline consuming using given handlers.
+func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if execPool != nil {
+		if s.consuming[pipe] {
+			return nil
+		}
+
+		s.throw(EventPipelineConsume, pipe)
+		s.consuming[pipe] = true
+	} else {
+		if !s.consuming[pipe] {
+			return nil
+		}
+
+		s.throw(EventPipelineStop, pipe)
+		s.consuming[pipe] = false
+	}
+
+	broker, ok := s.Brokers[pipe.Broker()]
+	if !ok {
+		return fmt.Errorf("undefined broker `%s`", pipe.Broker())
+	}
+
+	if err := broker.Consume(pipe, execPool, errHandler); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // exec executed job using local RR server. Make sure that service is started.
@@ -171,7 +239,7 @@ func (s *Service) throw(event int, ctx interface{}) {
 	}
 
 	if event == roadrunner.EventServerFailure {
-		// underlying rr server is dead, stopping everything
+		// underlying rr server is dead, stopeverything
 		s.Stop()
 	}
 }

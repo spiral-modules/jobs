@@ -4,8 +4,9 @@ type Broker interface {
 	// Listen configures broker with list of pipelines to listen and handler function.
 	Register(pipes []*Pipeline) error
 
-	// Consume configures pipelines to be consumes. Set execPool to nil to disable consuming.
-	Consume(pipes []*Pipeline, execPool chan Handler, err ErrorHandler) error
+	// Consuming configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
+	// the service is started!
+	Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error
 
 	// Push job into the worker.
 	Push(pipe *Pipeline, j *Job) (string, error)
@@ -16,17 +17,14 @@ type Broker interface {
 
 // Stat contains information about pipeline.
 type Stat struct {
-	// Name is pipeline public name.
-	Name string
+	// Pipeline name.
+	Pipeline string
 
 	// Broken is name of associated broker.
 	Broker string
 
-	// Consume indicates that pipeline is consuming jobs.
-	Consume bool
-
-	// Pipeline name.
-	Pipeline string
+	// Consuming indicates that pipeline is consuming jobs.
+	Consuming bool
 
 	// Queue defines number of pending jobs.
 	Queue int64

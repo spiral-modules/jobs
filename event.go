@@ -15,6 +15,12 @@ const (
 
 	// EventBrokerError defines broker specific error.
 	EventBrokerError
+
+	// EventPipelineStop when pipeline consuming has been enabled.
+	EventPipelineConsume
+
+	// EventPipelineStop when pipeline consuming has been stopped.
+	EventPipelineStop
 )
 
 // JobEvent represent job event.
@@ -31,7 +37,7 @@ type ErrorEvent struct {
 	// ID is job id.
 	ID string
 
-	// Job is failed job. Can be empty.
+	// Job is failed job.
 	Job *Job
 
 	// Error - associated error, if any.

@@ -69,27 +69,25 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 	return nil
 }
 
-// Consume enables or disabled pipeline consuming.
-func (b *Broker) Consume(pipes []*jobs.Pipeline, execPool chan jobs.Handler, err jobs.ErrorHandler) error {
+// Consuming enables or disabled pipeline consuming.
+func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	for _, pipe := range pipes {
-		q, ok := b.queues[pipe]
-		if !ok {
-			return errors.New("invalid pipeline")
-		}
+	q, ok := b.queues[pipe]
+	if !ok {
+		return errors.New("invalid pipeline")
+	}
 
-		q.stop()
+	q.stop()
 
-		if err := q.configure(execPool, err); err != nil {
-			return err
-		}
+	if err := q.configure(execPool, errHandler); err != nil {
+		return err
+	}
 
-		if atomic.LoadInt32(&b.running) == 1 {
-			// resume consuming
-			go q.serve()
-		}
+	if atomic.LoadInt32(&b.running) == 1 {
+		// resume consuming
+		go q.serve()
 	}
 
 	return nil

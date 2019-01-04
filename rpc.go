@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"errors"
+	"fmt"
 	"github.com/spiral/roadrunner/util"
 )
 
@@ -35,14 +36,52 @@ func (r *rpcServer) Reset(reset bool, w *string) error {
 	return r.s.rr.Reset()
 }
 
-// Stop all job consuming.
-func (r *rpcServer) Stop(stop bool, w *string) (err error) {
+// Stop job consuming for a given pipeline.
+func (r *rpcServer) Stop(pipeline string, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
 		return errors.New("jobs server is not running")
 	}
 
-	for name, b := range r.s.Brokers {
-		if err := b.Consume(r.s.cfg.ConsumedPipelines(name), nil, nil); err != nil {
+	pipe := r.s.Pipelines().Get(pipeline)
+	if pipe == nil {
+		return fmt.Errorf("undefined pipeline `%s`", pipeline)
+	}
+
+	if err := r.s.Consume(pipe, nil, nil); err != nil {
+		return err
+	}
+
+	*w = "OK"
+	return nil
+}
+
+// Resume job consuming for a given pipeline.
+func (r *rpcServer) Resume(pipeline string, w *string) (err error) {
+	if r.s == nil || r.s.rr == nil {
+		return errors.New("jobs server is not running")
+	}
+
+	pipe := r.s.Pipelines().Get(pipeline)
+	if pipe == nil {
+		return fmt.Errorf("undefined pipeline `%s`", pipeline)
+	}
+
+	if err := r.s.Consume(pipe, r.s.execPool, r.s.error); err != nil {
+		return err
+	}
+
+	*w = "OK"
+	return nil
+}
+
+// Stop job consuming for a given pipeline.
+func (r *rpcServer) StopAll(stop bool, w *string) (err error) {
+	if r.s == nil || r.s.rr == nil {
+		return errors.New("jobs server is not running")
+	}
+
+	for _, pipe := range r.s.Pipelines() {
+		if err := r.s.Consume(pipe, nil, nil); err != nil {
 			return err
 		}
 	}
@@ -51,14 +90,14 @@ func (r *rpcServer) Stop(stop bool, w *string) (err error) {
 	return nil
 }
 
-// Resume all job consuming.
-func (r *rpcServer) Resume(resume bool, w *string) (err error) {
+// Resume job consuming for a given pipeline.
+func (r *rpcServer) ResumeAll(resume bool, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
 		return errors.New("jobs server is not running")
 	}
 
-	for name, b := range r.s.Brokers {
-		if err := b.Consume(r.s.cfg.ConsumedPipelines(name), r.s.execPool, r.s.error); err != nil {
+	for _, pipe := range r.s.Pipelines() {
+		if err := r.s.Consume(pipe, r.s.execPool, r.s.error); err != nil {
 			return err
 		}
 	}
@@ -84,19 +123,12 @@ func (r *rpcServer) Stat(list bool, l *PipelineList) (err error) {
 	}
 
 	*l = PipelineList{}
-	for name, p := range r.s.cfg.Pipelines {
-		b, ok := r.s.Brokers[p.Broker()]
-		if !ok {
-			continue
-		}
-
-		stat, err := b.Stat(p)
+	for _, p := range r.s.Pipelines() {
+		stat, err := r.s.Stat(p)
 		if err != nil {
 			return err
 		}
 
-		stat.Name = name
-		stat.Broker = p.Broker()
 		l.Pipelines = append(l.Pipelines, stat)
 	}
 

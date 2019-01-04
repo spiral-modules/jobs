@@ -44,7 +44,7 @@ func resumeHandler(cmd *cobra.Command, args []string) error {
 	util.Printf("<green>resuming job consumption</reset>: ")
 
 	var r string
-	if err := client.Call("jobs.Resume", true, &r); err != nil {
+	if err := client.Call("jobs.ResumeAll", true, &r); err != nil {
 		return err
 	}
 

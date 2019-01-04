@@ -44,7 +44,7 @@ func stopHandler(cmd *cobra.Command, args []string) error {
 	util.Printf("<green>stopping job consumption</reset>: ")
 
 	var r string
-	if err := client.Call("jobs.Stop", true, &r); err != nil {
+	if err := client.Call("jobs.StopAll", true, &r); err != nil {
 		return err
 	}
 

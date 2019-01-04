@@ -1,9 +1,75 @@
 package jobs
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
-// PipelineConfig defines pipeline config (
+// Pipelines is list of Pipeline.
+type Pipelines []*Pipeline
+
+// Valid validates given list of pipelines.
+func (ps Pipelines) Valid() error {
+	for _, p := range ps {
+		if p.Name() == "" {
+			return fmt.Errorf("found unnamed pipeline")
+		}
+
+		if p.Broker() == "" {
+			return fmt.Errorf("found the pipeline without defined broker")
+		}
+	}
+
+	return nil
+}
+
+// Filter return pipelines associated with specific broker and names (all when empty).
+func (ps Pipelines) Filter(broker string, only []string) Pipelines {
+	out := make(Pipelines, 0)
+
+	for _, p := range ps {
+		if p.Broker() != broker {
+			continue
+		}
+
+		if len(only) != 0 {
+			found := false
+			for _, n := range only {
+				if p.Name() == n {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				continue
+			}
+		}
+
+		out = append(out, p)
+	}
+
+	return out
+}
+
+// Get returns pipeline by it's name.
+func (ps Pipelines) Get(name string) *Pipeline {
+	for _, p := range ps {
+		if p.Name() == name {
+			return p
+		}
+	}
+
+	return nil
+}
+
+// PipelineConfig defines pipeline options.
 type Pipeline map[string]interface{}
+
+// Name returns pipeline name.
+func (c Pipeline) Name() string {
+	return c.String("name", "")
+}
 
 // Broker associated with the pipeline.
 func (c Pipeline) Broker() string {

@@ -12,16 +12,16 @@ type Config struct {
 	Workers *roadrunner.ServerConfig
 
 	// Pipelines defines mapping between PHP job pipeline and associated job broker.
-	Pipelines map[string]*Pipeline
+	Pipelines Pipelines
 
 	// Mapping defines how to map jobs to their target pipelines.
 	Mapping Mapper
 
-	// Consume specifies names of pipelines to be consumed on service start.
+	// Consuming specifies names of pipelines to be consumed on service start.
 	Consume []string
 
-	// brokers config for broken options.
-	brokers service.Config
+	// parent config for broken options.
+	parent service.Config
 }
 
 // Hydrate populates config values.
@@ -30,8 +30,7 @@ func (c *Config) Hydrate(cfg service.Config) error {
 		return err
 	}
 
-	c.brokers = cfg.Get("brokers")
-
+	c.parent = cfg
 	if c.Workers == nil {
 		c.Workers = &roadrunner.ServerConfig{}
 	}
@@ -40,11 +39,15 @@ func (c *Config) Hydrate(cfg service.Config) error {
 		return err
 	}
 
+	if err := c.Pipelines.Valid(); err != nil {
+		return err
+	}
+
 	return c.Workers.Pool.Valid()
 }
 
 // FindTarget locates the broker name and associated pipeline.
-func (c *Config) FindPipeline(j *Job) (*Pipeline, error) {
+func (c *Config) MapPipeline(j *Job) (*Pipeline, error) {
 	p := j.Options.Pipeline
 	if p == "" {
 		p = c.Mapping.find(j.Job)
@@ -54,49 +57,20 @@ func (c *Config) FindPipeline(j *Job) (*Pipeline, error) {
 		return nil, fmt.Errorf("unable to locate pipeline for `%s`", j.Job)
 	}
 
-	pipe, ok := c.Pipelines[p]
-	if !ok {
-		return nil, fmt.Errorf("undefined pipeline `%s`", p)
+	if p := c.Pipelines.Get(p); p != nil {
+		return p, nil
 	}
 
-	return pipe, nil
-}
-
-// BrokerPipelines returns all pipelines broker accept jobs into.
-func (c *Config) BrokerPipelines(broker string) []*Pipeline {
-	accept := make([]*Pipeline, 0)
-	for _, p := range c.Pipelines {
-		if p.Broker() == broker {
-			accept = append(accept, p)
-		}
-	}
-
-	return accept
-}
-
-// BrokerPipelines returns all pipelines broker consumes from.
-func (c *Config) ConsumedPipelines(broker string) []*Pipeline {
-	consume := make([]*Pipeline, 0)
-	for _, pipe := range c.Consume {
-		p, ok := c.Pipelines[pipe]
-		if !ok || p.Broker() != broker {
-			// undefined reference
-			continue
-		}
-
-		consume = append(consume, p)
-	}
-
-	return consume
+	return nil, fmt.Errorf("undefined pipeline `%s`", p)
 }
 
 // Get underlying broker config.
 func (c *Config) Get(service string) service.Config {
-	if c.brokers == nil {
+	if c.parent == nil {
 		return nil
 	}
 
-	return c.brokers.Get(service)
+	return c.parent.Get(service)
 }
 
 // Unmarshal is doing nothing.
