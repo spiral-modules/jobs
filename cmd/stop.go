@@ -41,13 +41,28 @@ func stopHandler(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	util.Printf("<green>stopping job consumption</reset>: ")
+	if len(args) == 0 {
+		util.Printf("<yellow>stop job consumption for all pipelines</reset>: ")
 
-	var r string
-	if err := client.Call("jobs.StopAll", true, &r); err != nil {
-		return err
+		var r string
+		if err := client.Call("jobs.StopAll", true, &r); err != nil {
+			return err
+		}
+
+		util.Printf("<green+hb>done</reset>\n")
+		return nil
 	}
 
-	util.Printf("<green+hb>done</reset>\n")
+	for _, pipe := range args {
+		util.Printf("<yellow>stop job consumption for</reset> <white+hb>%s</reset><yellow>: </reset>", pipe)
+
+		var r string
+		if err := client.Call("jobs.Stop", pipe, &r); err != nil {
+			return err
+		}
+
+		util.Printf("<green+hb>done</reset>\n")
+	}
+
 	return nil
 }

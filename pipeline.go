@@ -23,8 +23,8 @@ func (ps Pipelines) Valid() error {
 	return nil
 }
 
-// Filter return pipelines associated with specific broker and names (all when empty).
-func (ps Pipelines) Filter(broker string, only []string) Pipelines {
+// Filter return pipelines associated with specific broker.
+func (ps Pipelines) Broker(broker string) Pipelines {
 	out := make(Pipelines, 0)
 
 	for _, p := range ps {
@@ -32,21 +32,22 @@ func (ps Pipelines) Filter(broker string, only []string) Pipelines {
 			continue
 		}
 
-		if len(only) != 0 {
-			found := false
-			for _, n := range only {
-				if p.Name() == n {
-					found = true
-					break
-				}
-			}
+		out = append(out, p)
+	}
 
-			if !found {
-				continue
+	return out
+}
+
+// Names returns only pipelines with specified names.
+func (ps Pipelines) Names(only ...string) Pipelines {
+	out := make(Pipelines, 0)
+
+	for _, name := range only {
+		for _, p := range ps {
+			if p.Name() == name {
+				out = append(out, p)
 			}
 		}
-
-		out = append(out, p)
 	}
 
 	return out

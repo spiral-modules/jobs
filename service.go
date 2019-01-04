@@ -68,7 +68,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	for name, b := range s.Brokers {
 		// registering pipelines and handlers
-		if err := b.Register(s.Pipelines().Filter(name, nil)); err != nil {
+		if err := b.Register(s.Pipelines().Broker(name)); err != nil {
 			return false, err
 		}
 
@@ -106,7 +106,7 @@ func (s *Service) Serve() error {
 	defer s.rr.Stop()
 
 	for broker := range s.Brokers {
-		for _, p := range s.Pipelines().Filter(broker, s.cfg.Consume) {
+		for _, p := range s.Pipelines().Broker(broker).Names(s.cfg.Consume...) {
 			if err := s.Consume(p, s.execPool, s.error); err != nil {
 				return err
 			}
@@ -120,7 +120,7 @@ func (s *Service) Serve() error {
 func (s *Service) Stop() {
 	// explicitly stop all consuming
 	for broker := range s.Brokers {
-		for _, p := range s.Pipelines().Filter(broker, nil) {
+		for _, p := range s.Pipelines().Broker(broker) {
 			if err := s.Consume(p, nil, nil); err != nil {
 				s.throw(EventBrokerError, err)
 			}
@@ -239,7 +239,7 @@ func (s *Service) throw(event int, ctx interface{}) {
 	}
 
 	if event == roadrunner.EventServerFailure {
-		// underlying rr server is dead, stopeverything
+		// underlying rr server is dead, stop everything
 		s.Stop()
 	}
 }

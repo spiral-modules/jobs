@@ -32,20 +32,15 @@ jobs:
     - name:   default
       broker: local
 
+    - name:   secondary
+      broker: local
+
   # default destinations for jobs
   mapping:
-
-    green:
-      - "spiral.jobs.tests.sqs.*"
-
-    purple:
-      - "spiral.jobs.tests.beanstalk.*"
-
-    default:
-      - "spiral.jobs.tests.local.*"
+    green:   ["spiral.jobs.tests.sqs.*"]
+    purple:  ["spiral.jobs.tests.beanstalk.*"]
+    default: ["spiral.jobs.tests.local.*"]
+    secondary: ["spiral.jobs.tests.local.errorJob"]
 
   # list of pipelines to be consumed by the server, keep empty if you want to start consuming manually
-  consume:
-    - default
-    - purple
-    - green
+  consume: [default, purple, green]

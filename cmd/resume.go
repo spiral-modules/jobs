@@ -41,13 +41,28 @@ func resumeHandler(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	util.Printf("<green>resuming job consumption</reset>: ")
+	if len(args) == 0 {
+		util.Printf("<green>resume job consumption for all pipelines</reset>: ")
 
-	var r string
-	if err := client.Call("jobs.ResumeAll", true, &r); err != nil {
-		return err
+		var r string
+		if err := client.Call("jobs.ResumeAll", true, &r); err != nil {
+			return err
+		}
+
+		util.Printf("<green+hb>done</reset>\n")
+		return nil
 	}
 
-	util.Printf("<green+hb>done</reset>\n")
+	for _, pipe := range args {
+		util.Printf("<green>resume job consumption for</reset> <white+hb>%s</reset><green>: </reset>", pipe)
+
+		var r string
+		if err := client.Call("jobs.Resume", pipe, &r); err != nil {
+			return err
+		}
+
+		util.Printf("<green+hb>done</reset>\n")
+	}
+
 	return nil
 }
