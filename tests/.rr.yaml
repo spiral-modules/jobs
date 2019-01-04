@@ -7,7 +7,7 @@ jobs:
 
   # beanstalk configuration
   beanstalk:
-    address:  tcp://localhost:11300
+    address:  tcp://localhost:11301
     reserve:  1
 
   # amazon sqs configuration
@@ -25,22 +25,18 @@ jobs:
     #  options:
     #    MessageRetentionPeriod: 86400
 
-    #- name:   purple
-    ##  broker: beanstalk
-    #  tube:   default
+    - name:   purple
+      broker: beanstalk
+      tube:   default
 
     - name:   default
       broker: local
 
-    - name:   secondary
-      broker: local
-
   # default destinations for jobs
   mapping:
-    green:   ["spiral.jobs.tests.sqs.*"]
-    purple:  ["spiral.jobs.tests.beanstalk.*"]
-    default: ["spiral.jobs.tests.local.*"]
-    secondary: ["spiral.jobs.tests.local.errorJob"]
+    green:    ["spiral.jobs.tests.sqs.*"]
+    purple:   ["spiral.jobs.tests.beanstalk.*"]
+    default:  ["spiral.jobs.tests.local.*"]
 
   # list of pipelines to be consumed by the server, keep empty if you want to start consuming manually
   consume: [default, purple, green]

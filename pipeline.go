@@ -23,6 +23,17 @@ func (ps Pipelines) Valid() error {
 	return nil
 }
 
+// Reverse returns pipelines in reversed order.
+func (ps Pipelines) Reverse() Pipelines {
+	out := make(Pipelines, len(ps))
+
+	for i, p := range ps {
+		out[len(ps)-i-1] = p
+	}
+
+	return out
+}
+
 // Filter return pipelines associated with specific broker.
 func (ps Pipelines) Broker(broker string) Pipelines {
 	out := make(Pipelines, 0)

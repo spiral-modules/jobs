@@ -43,13 +43,13 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, execPool chan jobs.Handler, 
 	return nil
 }
 
-// Init configures local job broker.
+// Start configures local job broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
 	b.connPool = &cpool.ConnPool{
-		NumConn: cfg.Connections,
-		Open:    func() (c interface{}, e error) { return b.cfg.Conn() },
-		Close:   func(c interface{}) { c.(*beanstalk.Conn).Close() },
+		Size:  cfg.Connections,
+		New:   func() (c interface{}, e error) { return b.cfg.Conn() },
+		Close: func(c interface{}) { c.(*beanstalk.Conn).Close() },
 	}
 
 	return true, nil
@@ -154,17 +154,6 @@ func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	return
 }
 
-// registerTube new beanstalk pipeline
-func (b *Broker) registerTube(pipeline *jobs.Pipeline) error {
-	tube, err := NewTube(pipeline)
-	if err != nil {
-		return err
-	}
-
-	b.tubes[pipeline] = tube
-	return nil
-}
-
 // consume job from the server
 func (b *Broker) consume(c interface{}) error {
 	b.tubeSet.Conn = c.(*beanstalk.Conn)
@@ -209,30 +198,4 @@ func (b *Broker) consume(c interface{}) error {
 	}(<-b.execPool, b.tubeSet.Conn)
 
 	return nil
-}
-
-// jid converts job id into string.
-func jid(id uint64) string {
-	if id == 0 {
-		return ""
-	}
-	return strconv.FormatUint(id, 10)
-}
-
-// wrapError into conn error when detected. softErr would not wrap any of no connection errors.
-func pushErr(err error, hide bool) error {
-	if err == nil {
-		return nil
-	}
-
-	// yeaaah...
-	if cpool.IsPipeError(err) {
-		return cpool.PipeErr{Err: err}
-	}
-
-	if hide {
-		return nil
-	}
-
-	return err
 }

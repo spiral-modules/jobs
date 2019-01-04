@@ -1,6 +1,7 @@
 package local
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spiral/jobs"
 	"sync"
 	"sync/atomic"
@@ -11,8 +12,7 @@ type queue struct {
 	stat     *jobs.Stat
 	jobs     chan entry
 	wg       sync.WaitGroup
-	active   int32
-	stopped  chan interface{}
+	wait     chan interface{}
 	execPool chan jobs.Handler
 	err      jobs.ErrorHandler
 }
@@ -45,40 +45,29 @@ func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
 }
 
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
+	if q.wait != nil {
+		return errors.New("unable to configure active queue")
+	}
+
 	q.execPool = execPool
 	q.err = err
 
 	return nil
 }
 
-func (q *queue) stop() {
-	if atomic.LoadInt32(&q.active) == 0 {
-		// not stopped
-		return
-	}
-
-	atomic.StoreInt32(&q.active, 0)
-
-	close(q.stopped)
-	q.wg.Wait()
-}
-
 func (q *queue) serve() {
-	if atomic.LoadInt32(&q.active) == 1 || q.execPool == nil {
-		// already stopped or no need to run
+	if q.wait != nil || q.execPool == nil {
+		// already wait or no need to run
 		return
 	}
 
-	// we are stopped now
-	q.stopped = make(chan interface{})
-
-	atomic.StoreInt32(&q.active, 1)
+	// we are wait now
+	q.wait = make(chan interface{})
 
 	var h jobs.Handler
 	for {
 		select {
-		case <-q.stopped:
-			atomic.StoreInt32(&q.active, 0)
+		case <-q.wait:
 			q.wg.Wait()
 			return
 		case e := <-q.jobs:
@@ -112,4 +101,14 @@ func (q *queue) serve() {
 			}(e, h)
 		}
 	}
+}
+
+func (q *queue) stop() {
+	if q.wait == nil {
+		// not wait
+		return
+	}
+
+	close(q.wait)
+	q.wait = nil
 }

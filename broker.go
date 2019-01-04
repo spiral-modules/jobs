@@ -23,6 +23,9 @@ type Stat struct {
 	// Broken is name of associated broker.
 	Broker string
 
+	// InternalName defines internal broker specific pipeline name.
+	InternalName string
+
 	// Consuming indicates that pipeline is consuming jobs.
 	Consuming bool
 

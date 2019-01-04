@@ -43,7 +43,7 @@ func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err 
 	return nil
 }
 
-// Init configures local job broker.
+// Start configures local job broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
 	return true, nil

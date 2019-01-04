@@ -1,7 +1,6 @@
 package beanstalk
 
 import (
-	"errors"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
 	"strconv"
@@ -17,15 +16,6 @@ type Tube struct {
 
 	// Indicates that tube must be listened.
 	Listen bool
-}
-
-// NewTube creates new tube or returns an error
-func NewTube(p *jobs.Pipeline) (*Tube, error) {
-	if p.Options.String("tube", "") == "" {
-		return nil, errors.New("missing `tube` parameter on beanstalk pipeline")
-	}
-
-	return &Tube{Tube: &beanstalk.Tube{Name: p.Options.String("tube", "")}, Listen: p.Listen}, nil
 }
 
 // Stats fetches and formats tube stats.

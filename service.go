@@ -33,7 +33,7 @@ func (s *Service) AddListener(l func(event int, ctx interface{})) {
 	s.lsns = append(s.lsns, l)
 }
 
-// Init configures job service.
+// Start configures job service.
 func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env.Environment) (ok bool, err error) {
 	s.cfg = &Config{}
 	s.env = e
@@ -67,17 +67,19 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	s.mu.Unlock()
 
 	for name, b := range s.Brokers {
-		// registering pipelines and handlers
-		if err := b.Register(s.Pipelines().Broker(name)); err != nil {
-			return false, err
-		}
-
 		s.services.Register(name, b)
 	}
 
 	// init all broker configs
 	if err := s.services.Init(s.cfg); err != nil {
 		return false, err
+	}
+
+	for name, b := range s.Brokers {
+		// registering pipelines and handlers
+		if err := b.Register(s.Pipelines().Broker(name)); err != nil {
+			return false, err
+		}
 	}
 
 	return true, nil
@@ -105,11 +107,9 @@ func (s *Service) Serve() error {
 	}
 	defer s.rr.Stop()
 
-	for broker := range s.Brokers {
-		for _, p := range s.Pipelines().Broker(broker).Names(s.cfg.Consume...) {
-			if err := s.Consume(p, s.execPool, s.error); err != nil {
-				return err
-			}
+	for _, p := range s.Pipelines().Names(s.cfg.Consume...) {
+		if err := s.Consume(p, s.execPool, s.error); err != nil {
+			return err
 		}
 	}
 
@@ -119,11 +119,9 @@ func (s *Service) Serve() error {
 // stop all pipelines and rr server.
 func (s *Service) Stop() {
 	// explicitly stop all consuming
-	for broker := range s.Brokers {
-		for _, p := range s.Pipelines().Broker(broker) {
-			if err := s.Consume(p, nil, nil); err != nil {
-				s.throw(EventBrokerError, err)
-			}
+	for _, p := range s.Pipelines().Names(s.cfg.Consume...).Reverse() {
+		if err := s.Consume(p, nil, nil); err != nil {
+			s.throw(EventBrokerError, err)
 		}
 	}
 
