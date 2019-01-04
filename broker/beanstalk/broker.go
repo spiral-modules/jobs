@@ -41,6 +41,12 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 		b.tubes[p] = t
 	}
 
+	if len(b.tubes)+1 > b.connPool.Size {
+		// Since each of the tube is listening it's own connection is it possible to run out of connections
+		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
+		b.connPool.Size = len(b.tubes) + 1
+	}
+
 	return nil
 }
 
