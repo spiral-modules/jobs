@@ -58,6 +58,7 @@ func (b *Broker) Serve() (err error) {
 		b.mu.Unlock()
 		return err
 	}
+	defer b.connPool.Destroy()
 
 	for _, t := range b.tubes {
 		go t.serve()
@@ -86,8 +87,6 @@ func (b *Broker) Stop() {
 
 	close(b.wait)
 	b.wait = nil
-
-	b.connPool.Destroy()
 }
 
 // Consuming enables or disabled pipeline consuming.
@@ -116,12 +115,9 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 // Push job into the worker.
 func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
-	b.mu.Lock()
-	if b.wait == nil {
-		b.mu.Unlock()
-		return "", errors.New("broker is not running")
+	if err := b.isAlive(); err != nil {
+		return "", err
 	}
-	b.mu.Unlock()
 
 	t := b.Tube(pipe)
 	if t == nil {
@@ -138,6 +134,10 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 // Stat must fetch statistics about given pipeline or return error.
 func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	if err := b.isAlive(); err != nil {
+		return nil, err
+	}
+
 	t := b.Tube(pipe)
 	if t == nil {
 		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
@@ -157,4 +157,14 @@ func (b *Broker) Tube(pipe *jobs.Pipeline) *tube {
 	}
 
 	return t
+}
+
+func (b *Broker) isAlive() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.wait == nil {
+		return errors.New("broker is not running")
+	}
+
+	return nil
 }

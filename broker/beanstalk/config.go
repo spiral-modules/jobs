@@ -6,6 +6,7 @@ import (
 	"github.com/spiral/jobs/cpool"
 	"github.com/spiral/roadrunner/service"
 	"io"
+	"net"
 	"strings"
 	"syscall"
 	"time"
@@ -53,7 +54,12 @@ func (c *Config) newConn() (*beanstalk.Conn, error) {
 		syscall.Unlink(dsn[1])
 	}
 
-	return beanstalk.Dial(dsn[0], dsn[1])
+	conn, err := net.Dial(dsn[0], dsn[1])
+	if err != nil {
+		return nil, err
+	}
+
+	return beanstalk.NewConn(conn), nil
 }
 
 // ReserveDuration returns number of seconds to reserve the job.

@@ -89,13 +89,8 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 func (s *Service) Serve() error {
 	// ensure that workers aware of running within jobs
 	if s.env != nil {
-		values, err := s.env.GetEnv()
-		if err != nil {
+		if err := s.env.Copy(s.cfg.Workers); err != nil {
 			return err
-		}
-
-		for k, v := range values {
-			s.cfg.Workers.SetEnv(k, v)
 		}
 	}
 
