@@ -16,6 +16,7 @@ class Job extends AbstractJob
 
     public function do(string $id)
     {
+        sleep(5);
         file_put_contents(self::JOB_FILE, json_encode(
             $this->data + compact('id')
         ));

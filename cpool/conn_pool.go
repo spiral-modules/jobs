@@ -61,55 +61,14 @@ func (p *ConnPool) Start() error {
 	return nil
 }
 
-// Close all underlying connections. Non thread safe.
-func (p *ConnPool) Destroy() {
-	atomic.AddInt32(&p.inDestroy, 1)
+// Allocate free connection or return error. Blocked until connection is available or pool is dead.
+func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 
-	close(p.wait)
-	p.wg.Wait()
-	close(p.free)
-
-	p.muc.Lock()
-	defer p.muc.Unlock()
-	for _, c := range p.conn {
-		c.Close()
-	}
-
-	p.conn = nil
-}
-
-// Exec executes given function and provides ability to retry it in case of connection error.
-func (p *ConnPool) Exec(exec func(interface{}) error, tout time.Duration) (err error) {
-	p.wg.Add(1)
-	defer p.wg.Done()
-
-	for i := 0; i < p.Size; i++ {
-		c, err := p.allocateConn(tout)
-		if err != nil {
-			break
-		}
-
-		err = exec(c)
-
-		// connection issue, retry?
-		if _, ok := err.(ConnError); ok {
-			go p.replaceConn(c)
-			continue
-		}
-
-		p.free <- c
-		break
-	}
-
-	return err
-}
-
-// allocateConn free connection or return error. Blocked until connection is available or pool is dead.
-func (p *ConnPool) allocateConn(tout time.Duration) (io.Closer, error) {
 	select {
 	case <-p.wait:
 		return nil, fmt.Errorf("unable to allocate connection (pool closed)")
 	case c := <-p.free:
+		p.wg.Add(1)
 		return c.(io.Closer), nil
 	default:
 		timeout := time.NewTimer(tout)
@@ -121,8 +80,69 @@ func (p *ConnPool) allocateConn(tout time.Duration) (io.Closer, error) {
 			return nil, fmt.Errorf("unable to allocate connection (pool closed)")
 		case c := <-p.free:
 			timeout.Stop()
+			p.wg.Add(1)
 			return c.(io.Closer), nil
 		}
+	}
+}
+
+// Release the connection with or without context error. If error is instance of ConnError then
+// connection will be recreated.
+func (p *ConnPool) Release(conn interface{}, err error) {
+	p.wg.Done()
+
+	// connection issue, retry?
+	if _, ok := err.(ConnError); ok {
+		go p.replaceConn(conn)
+		return
+	}
+
+	p.free <- conn
+}
+
+// Close all underlying connections. Thread safe.
+func (p *ConnPool) Destroy() {
+	if atomic.LoadInt32(&p.inDestroy) == 1 {
+		return
+	}
+
+	atomic.AddInt32(&p.inDestroy, 1)
+
+	close(p.wait)
+	p.wg.Wait()
+
+	close(p.free)
+
+	p.muc.Lock()
+	defer p.muc.Unlock()
+	for _, c := range p.conn {
+		c.Close()
+	}
+
+	p.conn = nil
+}
+
+// close the connection and replace it with new one (if pool is still alive).
+func (p *ConnPool) replaceConn(conn interface{}) {
+	conn.(io.Closer).Close()
+
+	p.muc.Lock()
+	for i, c := range p.conn {
+		if conn == c {
+			p.conn = append(p.conn[:i], p.conn[i+1:]...)
+			break
+		}
+	}
+	p.muc.Unlock()
+
+	if !p.destroying() {
+		c, err := p.createConn()
+		if err != nil {
+			// need logic to handle stalled mode even better
+			return
+		}
+
+		p.free <- c
 	}
 }
 
@@ -142,37 +162,6 @@ func (p *ConnPool) createConn() (io.Closer, error) {
 	p.conn = append(p.conn, c)
 
 	return c, nil
-}
-
-// close the connection and replace it with new one (if pool is still alive).
-func (p *ConnPool) replaceConn(conn io.Closer) {
-	p.wg.Add(1)
-	defer p.wg.Done()
-
-	conn.Close()
-
-	p.muc.Lock()
-	for i, c := range p.conn {
-		if conn == c {
-			p.conn = append(p.conn[:i], p.conn[i+1:]...)
-			break
-		}
-	}
-	p.muc.Unlock()
-
-	if !p.destroying() {
-		c, err := p.New()
-		if err != nil {
-			// connection is dead and we can not replace it, conn pool is not in stalled mode
-
-			// todo: handle stalled (???)
-			p.Destroy()
-
-			return
-		}
-
-		p.free <- c
-	}
 }
 
 // destroying indicates that pool is being destroyed

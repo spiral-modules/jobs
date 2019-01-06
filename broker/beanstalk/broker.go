@@ -43,7 +43,6 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 			pipe,
 			b.connPool,              // available connections
 			b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
-			b.cfg.TouchDuration(),   // how often tue should notify that job is still alive
 			b.cfg.TimeoutDuration(), // how much time is given to allocate connection
 			b.throw,                 // event listener
 		)
@@ -175,6 +174,8 @@ func (b *Broker) stopError(err error) {
 	for _, t := range b.tubes {
 		t.stop()
 	}
+
+	b.connPool.Destroy()
 	b.wait <- err
 }
 
