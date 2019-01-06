@@ -23,6 +23,9 @@ type Config struct {
 	// Reserve timeout in seconds. Default 0.
 	Reserve int
 
+	// Touch specifies how ofter service must notify beanstalk that job is still alive. Default 30 seconds.
+	Touch int
+
 	// Timeout to allocate the connection. Default 5.
 	Timeout int
 }
@@ -31,6 +34,7 @@ type Config struct {
 func (c *Config) InitDefaults() error {
 	c.NumConn = 2
 	c.Timeout = 5
+	c.Touch = 30
 
 	return nil
 }
@@ -70,6 +74,11 @@ func (c *Config) newConn() (*beanstalk.Conn, error) {
 // ReserveDuration returns number of seconds to reserve the job.
 func (c *Config) ReserveDuration() time.Duration {
 	return time.Duration(c.Reserve) * time.Second
+}
+
+// ReserveDuration returns number of seconds to reserve the job.
+func (c *Config) TouchDuration() time.Duration {
+	return time.Duration(c.Touch) * time.Second
 }
 
 // TimeoutDuration returns number of seconds allowed to allocate the connection.

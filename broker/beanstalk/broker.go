@@ -38,19 +38,27 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 	defer b.mu.Unlock()
 
 	b.tubes = make(map[*jobs.Pipeline]*tube)
-	for _, p := range pipes {
-		t, err := newTube(p, b.connPool, b.cfg.ReserveDuration(), b.throw)
+	for _, pipe := range pipes {
+		t, err := newTube(
+			pipe,
+			b.connPool,              // available connections
+			b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
+			b.cfg.TouchDuration(),   // how often tue should notify that job is still alive
+			b.cfg.TimeoutDuration(), // how much time is given to allocate connection
+			b.throw,                 // event listener
+		)
+
 		if err != nil {
 			return err
 		}
 
-		b.tubes[p] = t
+		b.tubes[pipe] = t
 	}
 
-	if len(b.tubes)+1 > b.connPool.Size {
+	if len(b.tubes)+2 > b.connPool.Size {
 		// Since each of the tube is listening it's own connection is it possible to run out of connections
 		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
-		b.connPool.Size = len(b.tubes) + 1
+		b.connPool.Size = len(b.tubes) + 2
 	}
 
 	return nil
@@ -125,13 +133,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return t.put(
-		data,
-		0,
-		j.Options.DelayDuration(),
-		j.Options.TimeoutDuration(),
-		b.cfg.TimeoutDuration(),
-	)
+	return t.put(data, 0, j.Options.DelayDuration(), j.Options.TimeoutDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.
@@ -145,7 +147,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	return t.stat(b.cfg.TimeoutDuration())
+	return t.stat()
 }
 
 // Queue returns queue associated with the pipeline.
