@@ -6,7 +6,6 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
 	"github.com/spiral/jobs/cpool"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -20,10 +19,12 @@ type tube struct {
 	tube       *beanstalk.Tube
 	tubeSet    *beanstalk.TubeSet
 	connPool   *cpool.ConnPool
+	prefetch   int
 	reserve    time.Duration
 	cmdTimeout time.Duration
 	lsn        func(event int, ctx interface{})
 	wait       chan interface{}
+	fetched    chan interface{}
 	waitTouch  chan interface{}
 	wg         sync.WaitGroup
 	execPool   chan jobs.Handler
@@ -35,6 +36,7 @@ type tube struct {
 func newTube(
 	pipe *jobs.Pipeline,
 	connPool *cpool.ConnPool,
+	prefetch int,
 	reserve time.Duration,
 	cmdTimeout time.Duration,
 	listener func(event int, ctx interface{}),
@@ -48,6 +50,7 @@ func newTube(
 		tube:       &beanstalk.Tube{Name: pipe.String("tube", "")},
 		tubeSet:    beanstalk.NewTubeSet(nil, pipe.String("tube", "")),
 		connPool:   connPool,
+		prefetch:   prefetch,
 		reserve:    reserve,
 		cmdTimeout: cmdTimeout,
 		lsn:        listener,
@@ -68,11 +71,16 @@ func (t *tube) serve() {
 	t.waitTouch = make(chan interface{})
 	atomic.StoreInt32(&t.active, 1)
 
+	t.fetched = make(chan interface{}, t.prefetch)
+	for i := 0; i < t.prefetch; i++ {
+		t.fetched <- nil
+	}
+
 	for {
 		select {
 		case <-t.wait:
 			return
-		default:
+		case <-t.fetched:
 			conn, err := t.connPool.Allocate(t.cmdTimeout)
 			if err != nil {
 				// keep trying
@@ -85,6 +93,7 @@ func (t *tube) serve() {
 			if err != nil {
 				// do not report reserve errors such as timeouts, conn errors will be reported by the connPool
 				t.connPool.Release(conn, wrapErr(err))
+				t.fetched <- nil
 				continue
 			}
 
@@ -93,6 +102,7 @@ func (t *tube) serve() {
 			if err != nil {
 				t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
 				t.connPool.Release(conn, wrapErr(err))
+				t.fetched <- nil
 				continue
 			}
 
@@ -112,11 +122,7 @@ func (t *tube) stop() {
 	atomic.StoreInt32(&t.active, 0)
 
 	close(t.wait)
-	log.Println("waiting", t.wg)
-
 	t.wg.Wait()
-
-	log.Println("waiting done")
 	close(t.waitTouch)
 }
 
@@ -165,7 +171,7 @@ func (t *tube) stat() (stat *jobs.Stat, err error) {
 		stat.Queue = int64(v)
 	}
 
-	if v, err := strconv.Atoi(values["current-jobs-touch"]); err == nil {
+	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
 		stat.Active = int64(v)
 	}
 
@@ -179,6 +185,7 @@ func (t *tube) stat() (stat *jobs.Stat, err error) {
 // consume job
 func (t *tube) consume(conn *beanstalk.Conn, id uint64, j *jobs.Job) {
 	defer t.wg.Done()
+	defer func() { t.fetched <- nil }()
 
 	// connection leaks here (!!!)
 	h := <-t.execPool
@@ -195,11 +202,11 @@ func (t *tube) consume(conn *beanstalk.Conn, id uint64, j *jobs.Job) {
 		return
 	}
 
-	stat, err := conn.StatsJob(id)
-	if err != nil {
-		t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
+	stat, sErr := conn.StatsJob(id)
+	if sErr != nil {
+		t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: sErr})
 
-		t.connPool.Release(conn, wrapErr(err))
+		t.connPool.Release(conn, wrapErr(sErr))
 		return
 	}
 

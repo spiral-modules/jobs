@@ -20,6 +20,9 @@ type Config struct {
 	// Size defines number of open connections to beanstalk server. Default 5.
 	NumConn int
 
+	// Prefetch number of jobs allowed to be fetched by each pipe at the same time. Default 2.
+	Prefetch int
+
 	// Reserve timeout in seconds. Default 0.
 	Reserve int
 
@@ -29,7 +32,8 @@ type Config struct {
 
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
-	c.NumConn = 4
+	c.NumConn = 5
+	c.Prefetch = 2
 	c.Timeout = 5
 
 	return nil

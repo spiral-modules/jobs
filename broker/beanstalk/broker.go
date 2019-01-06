@@ -42,6 +42,7 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 		t, err := newTube(
 			pipe,
 			b.connPool,              // available connections
+			b.cfg.Prefetch,          // maximum number of jobs pipeline can hold in memory
 			b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
 			b.cfg.TimeoutDuration(), // how much time is given to allocate connection
 			b.throw,                 // event listener
@@ -54,10 +55,10 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 		b.tubes[pipe] = t
 	}
 
-	if len(b.tubes)+2 > b.connPool.Size {
+	if len(b.tubes)*b.cfg.Prefetch+2 > b.connPool.Size {
 		// Since each of the tube is listening it's own connection is it possible to run out of connections
 		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
-		b.connPool.Size = len(b.tubes) + 2
+		b.connPool.Size = len(b.tubes)*b.cfg.Prefetch + 2
 	}
 
 	return nil
