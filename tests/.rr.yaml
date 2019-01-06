@@ -7,8 +7,8 @@ jobs:
 
   # beanstalk configuration
   beanstalk:
-    address:  tcp://localhost:11301
-    reserve:  1
+    address: tcp://localhost:11300
+    reserve: 1
 
   # amazon sqs configuration
   amazon:

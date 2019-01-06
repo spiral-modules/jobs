@@ -42,7 +42,6 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 		t, err := newTube(
 			pipe,
 			b.connPool,              // available connections
-			b.cfg.Prefetch,          // maximum number of jobs pipeline can hold in memory
 			b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
 			b.cfg.TimeoutDuration(), // how much time is given to allocate connection
 			b.throw,                 // event listener
@@ -55,7 +54,7 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 		b.tubes[pipe] = t
 	}
 
-	if len(b.tubes)*b.cfg.Prefetch+2 > b.connPool.Size {
+	if b.connPool.Size < (len(b.tubes)*b.cfg.Prefetch + 2) {
 		// Since each of the tube is listening it's own connection is it possible to run out of connections
 		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
 		b.connPool.Size = len(b.tubes)*b.cfg.Prefetch + 2
@@ -75,7 +74,7 @@ func (b *Broker) Serve() (err error) {
 	defer b.connPool.Destroy()
 
 	for _, t := range b.tubes {
-		go t.serve()
+		go t.serve(b.cfg.Prefetch)
 	}
 
 	b.wait = make(chan error)
@@ -111,7 +110,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	if b.wait != nil && t.execPool != nil {
 		// resume wg
-		go t.serve()
+		go t.serve(b.cfg.Prefetch)
 	}
 
 	return nil

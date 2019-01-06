@@ -3,6 +3,7 @@ package cpool
 import (
 	"fmt"
 	"io"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -63,7 +64,6 @@ func (p *ConnPool) Start() error {
 
 // Allocate free connection or return error. Blocked until connection is available or pool is dead.
 func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
-
 	select {
 	case <-p.wait:
 		return nil, fmt.Errorf("unable to allocate connection (pool closed)")
@@ -74,7 +74,7 @@ func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 		timeout := time.NewTimer(tout)
 		select {
 		case <-timeout.C:
-			return nil, fmt.Errorf("allocate connection timeout (%s)", tout)
+			return nil, fmt.Errorf("connection allocate timeout (%s)", tout)
 		case <-p.wait:
 			timeout.Stop()
 			return nil, fmt.Errorf("unable to allocate connection (pool closed)")
@@ -138,6 +138,9 @@ func (p *ConnPool) replaceConn(conn interface{}) {
 	if !p.destroying() {
 		c, err := p.createConn()
 		if err != nil {
+			// todo: this scenario has not been tested!
+			log.Println(err)
+
 			// need logic to handle stalled mode even better
 			return
 		}
@@ -147,7 +150,7 @@ func (p *ConnPool) replaceConn(conn interface{}) {
 }
 
 // Creates new connection in the pool.
-func (p *ConnPool) createConn() (io.Closer, error) {
+func (p *ConnPool) createConn() (interface{}, error) {
 	p.wg.Add(1)
 	defer p.wg.Done()
 

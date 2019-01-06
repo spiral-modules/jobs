@@ -32,9 +32,9 @@ type Config struct {
 
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
-	c.NumConn = 5
-	c.Prefetch = 2
-	c.Timeout = 5
+	c.NumConn = 10
+	c.Prefetch = 4
+	c.Timeout = 10
 
 	return nil
 }
