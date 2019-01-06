@@ -12,10 +12,16 @@ import (
 // Broker run jobs using Broker service.
 type Broker struct {
 	cfg      *Config
+	lsns     []func(event int, ctx interface{})
 	mu       sync.Mutex
-	wait     chan interface{}
+	wait     chan error
 	connPool *cpool.ConnPool
 	tubes    map[*jobs.Pipeline]*tube
+}
+
+// AddListener attaches server event watcher.
+func (b *Broker) AddListener(l func(event int, ctx interface{})) {
+	b.lsns = append(b.lsns, l)
 }
 
 // Start configures local job broker.
@@ -33,7 +39,7 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 
 	b.tubes = make(map[*jobs.Pipeline]*tube)
 	for _, p := range pipes {
-		t, err := newTube(p, b.connPool)
+		t, err := newTube(p, b.connPool, b.cfg.ReserveDuration(), b.throw)
 		if err != nil {
 			return err
 		}
@@ -64,32 +70,22 @@ func (b *Broker) Serve() (err error) {
 		go t.serve()
 	}
 
-	b.wait = make(chan interface{})
+	b.wait = make(chan error)
 	b.mu.Unlock()
 
-	<-b.wait
-
-	return nil
+	select {
+	case err := <-b.wait:
+		return err
+		// todo: watch pool
+	}
 }
 
 // wait local broker.
 func (b *Broker) Stop() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return
-	}
-
-	for _, t := range b.tubes {
-		t.stop()
-	}
-
-	close(b.wait)
-	b.wait = nil
+	b.stopError(nil)
 }
 
-// Consuming enables or disabled pipeline consuming.
+// Consuming enables or disabled pipeline wg.
 func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -105,8 +101,8 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.wait != nil {
-		// resume consuming
+	if b.wait != nil && t.execPool != nil {
+		// resume wg
 		go t.serve()
 	}
 
@@ -115,7 +111,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 // Push job into the worker.
 func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
-	if err := b.isAlive(); err != nil {
+	if err := b.isServing(); err != nil {
 		return "", err
 	}
 
@@ -129,12 +125,18 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return t.put(data, 0, j.Options.DelayDuration(), j.Options.RetryDuration())
+	return t.put(
+		data,
+		0,
+		j.Options.DelayDuration(),
+		j.Options.TimeoutDuration(),
+		b.cfg.TimeoutDuration(),
+	)
 }
 
 // Stat must fetch statistics about given pipeline or return error.
 func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
-	if err := b.isAlive(); err != nil {
+	if err := b.isServing(); err != nil {
 		return nil, err
 	}
 
@@ -143,7 +145,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	return t.stat()
+	return t.stat(b.cfg.TimeoutDuration())
 }
 
 // Queue returns queue associated with the pipeline.
@@ -159,12 +161,36 @@ func (b *Broker) Tube(pipe *jobs.Pipeline) *tube {
 	return t
 }
 
-func (b *Broker) isAlive() error {
+// stop broker and send error
+func (b *Broker) stopError(err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return
+	}
+
+	for _, t := range b.tubes {
+		t.stop()
+	}
+	b.wait <- err
+}
+
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.wait == nil {
 		return errors.New("broker is not running")
 	}
 
 	return nil
+}
+
+// throw handles service, server and pool events.
+func (b *Broker) throw(event int, ctx interface{}) {
+	for _, l := range b.lsns {
+		l(event, ctx)
+	}
 }

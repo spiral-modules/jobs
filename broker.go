@@ -15,6 +15,12 @@ type Broker interface {
 	Stat(pipe *Pipeline) (stat *Stat, err error)
 }
 
+// EventProvider defines the ability to throw events for the broker.
+type EventProvider interface {
+	// AddListener attaches the even listener.
+	AddListener(l func(event int, ctx interface{}))
+}
+
 // Stat contains information about pipeline.
 type Stat struct {
 	// Pipeline name.

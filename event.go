@@ -10,17 +10,17 @@ const (
 	// EventJobComplete thrown when job execution is successfully completed. JobEvent is passed as context.
 	EventJobComplete
 
-	// EventJobError thrown on all job related errors. See ErrorEvent as context.
+	// EventJobError thrown on all job related errors. See JobError as context.
 	EventJobError
-
-	// EventBrokerError defines broker specific error.
-	EventBrokerError
 
 	// EventPipelineStop when pipeline consuming has been enabled.
 	EventPipelineConsume
 
 	// EventPipelineStop when pipeline consuming has been stopped.
 	EventPipelineStop
+
+	// EventPipelineError when pipeline specific error happen.
+	EventPipelineError
 )
 
 // JobEvent represent job event.
@@ -32,14 +32,33 @@ type JobEvent struct {
 	Job *Job
 }
 
-// ErrorEvent represents singular Job error event.
-type ErrorEvent struct {
+// JobError represents singular Job error event.
+type JobError struct {
 	// ID is job id.
 	ID string
 
 	// Job is failed job.
 	Job *Job
 
-	// Error - associated error, if any.
-	Error error
+	// Caused contains job specific error.
+	Caused error
+}
+
+// Caused returns error message.
+func (e *JobError) Error() string {
+	return e.Caused.Error()
+}
+
+// PipelineError defines pipeline specific errors.
+type PipelineError struct {
+	// Pipeline is associated pipeline.
+	Pipeline *Pipeline
+
+	// Caused send by broker.
+	Caused error
+}
+
+// Caused returns error message.
+func (e *PipelineError) Error() string {
+	return e.Caused.Error()
 }

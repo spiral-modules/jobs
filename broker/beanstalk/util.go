@@ -1,7 +1,6 @@
 package beanstalk
 
 import (
-	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs/cpool"
 	"strconv"
 )
@@ -18,10 +17,6 @@ func jid(id uint64) string {
 func wrapErr(err error, hide bool) error {
 	if err == nil {
 		return nil
-	}
-
-	if err, ok := err.(beanstalk.ConnError); ok {
-		return cpool.ConnError{Err: err}
 	}
 
 	if cpool.IsConnError(err) {

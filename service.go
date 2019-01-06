@@ -20,9 +20,9 @@ type Service struct {
 	cfg       *Config
 	env       env.Environment
 	log       *logrus.Logger
-	execPool  chan Handler
 	lsns      []func(event int, ctx interface{})
 	rr        *roadrunner.Server
+	execPool  chan Handler
 	services  service.Container
 	mu        sync.Mutex
 	consuming map[*Pipeline]bool
@@ -68,6 +68,9 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	for name, b := range s.Brokers {
 		s.services.Register(name, b)
+		if eb, ok := b.(EventProvider); ok {
+			eb.AddListener(s.throw)
+		}
 	}
 
 	// init all broker configs
@@ -116,7 +119,7 @@ func (s *Service) Stop() {
 	// explicitly stop all consuming
 	for _, p := range s.Pipelines().Names(s.cfg.Consume...).Reverse() {
 		if err := s.Consume(p, nil, nil); err != nil {
-			s.throw(EventBrokerError, err)
+			s.throw(EventPipelineError, &PipelineError{Pipeline: p, Caused: err})
 		}
 	}
 
@@ -138,7 +141,7 @@ func (s *Service) Push(j *Job) (string, error) {
 	id, err := broker.Push(pipe, j)
 
 	if err != nil {
-		s.throw(EventPushError, &ErrorEvent{Job: j, Error: err})
+		s.throw(EventPushError, &JobError{Job: j, Caused: err})
 	} else {
 		s.throw(EventPushComplete, &JobEvent{ID: id, Job: j})
 	}
@@ -222,7 +225,7 @@ func (s *Service) exec(id string, j *Job) error {
 
 // error must be invoked when job is declared as failed.
 func (s *Service) error(id string, j *Job, err error) {
-	s.throw(EventJobError, &ErrorEvent{ID: id, Job: j, Error: err})
+	s.throw(EventJobError, &JobError{ID: id, Job: j, Caused: err})
 }
 
 // throw handles service, server and pool events.

@@ -36,7 +36,7 @@ func (r *rpcServer) Reset(reset bool, w *string) error {
 	return r.s.rr.Reset()
 }
 
-// Stop job consuming for a given pipeline.
+// Destroy job consuming for a given pipeline.
 func (r *rpcServer) Stop(pipeline string, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
 		return errors.New("jobs server is not running")
@@ -74,7 +74,7 @@ func (r *rpcServer) Resume(pipeline string, w *string) (err error) {
 	return nil
 }
 
-// Stop job consuming for a given pipeline.
+// Destroy job consuming for a given pipeline.
 func (r *rpcServer) StopAll(stop bool, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
 		return errors.New("jobs server is not running")

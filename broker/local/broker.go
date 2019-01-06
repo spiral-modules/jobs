@@ -48,7 +48,7 @@ func (b *Broker) Serve() error {
 	return nil
 }
 
-// wait local broker.
+// Stop local broker (wait for all jobs to complete).
 func (b *Broker) Stop() {
 	if b.wait == nil {
 		return
@@ -59,11 +59,11 @@ func (b *Broker) Stop() {
 	defer b.mu.Unlock()
 
 	for _, q := range b.queues {
+		// wait for stop
 		q.stop()
 	}
 
 	close(b.wait)
-	b.wait = nil
 }
 
 // Consuming enables or disabled pipeline consuming.
@@ -82,7 +82,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.wait != nil {
+	if b.wait != nil && q.execPool != nil {
 		// resume consuming
 		go q.serve()
 	}

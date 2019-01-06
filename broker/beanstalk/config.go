@@ -17,16 +17,21 @@ type Config struct {
 	// Address of beanstalk server.
 	Address string
 
-	// Reserve timeout in seconds.
-	Reserve int
-
 	// Size defines number of open connections to beanstalk server. Default 5.
 	NumConn int
+
+	// Reserve timeout in seconds. Default 0.
+	Reserve int
+
+	// Timeout to allocate the connection. Default 5.
+	Timeout int
 }
 
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
-	c.NumConn = 5
+	c.NumConn = 2
+	c.Timeout = 5
+
 	return nil
 }
 
@@ -65,4 +70,9 @@ func (c *Config) newConn() (*beanstalk.Conn, error) {
 // ReserveDuration returns number of seconds to reserve the job.
 func (c *Config) ReserveDuration() time.Duration {
 	return time.Duration(c.Reserve) * time.Second
+}
+
+// TimeoutDuration returns number of seconds allowed to allocate the connection.
+func (c *Config) TimeoutDuration() time.Duration {
+	return time.Duration(c.Timeout) * time.Second
 }

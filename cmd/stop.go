@@ -29,7 +29,7 @@ import (
 func init() {
 	rr.CLI.AddCommand(&cobra.Command{
 		Use:   "jobs:stop",
-		Short: "Stop job consuming for Job service brokers",
+		Short: "Destroy job consuming for Job service brokers",
 		RunE:  stopHandler,
 	})
 }
@@ -57,7 +57,7 @@ func stopHandler(cmd *cobra.Command, args []string) error {
 		util.Printf("<yellow>stop job consumption for</reset> <white+hb>%s</reset><yellow>: </reset>", pipe)
 
 		var r string
-		if err := client.Call("jobs.Stop", pipe, &r); err != nil {
+		if err := client.Call("jobs.Destroy", pipe, &r); err != nil {
 			return err
 		}
 
