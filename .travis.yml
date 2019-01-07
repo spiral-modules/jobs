@@ -19,9 +19,9 @@ install:
 before_script:
   - cd tests
   - docker-compose up -d
-  - go build -o rr main.go
-  - ./rr serve -c .rr.yaml &
   - cd ..
+  - go build -o rr-jobs cmd/rr-jobs/main.go
+  - ./rr-jobs serve -c .rr.yaml &
 
 script:
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic

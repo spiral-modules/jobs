@@ -7,7 +7,7 @@ import (
 	"github.com/spiral/jobs/broker/local"
 	"github.com/spiral/roadrunner/service/rpc"
 
-	_ "github.com/spiral/jobs/cmd"
+	_ "github.com/spiral/jobs/cmd/rr-jobs/cmd"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 )
 
