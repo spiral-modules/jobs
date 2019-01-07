@@ -3,7 +3,6 @@ package cpool
 import (
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,6 +12,9 @@ import (
 type ConnPool struct {
 	// Size number of open connections.
 	Size int
+
+	// Reconnect defines the time to wait between reconnect attempts.
+	Reconnect time.Duration
 
 	// New creates new connection or returns error.
 	New func() (io.Closer, error)
@@ -31,7 +33,8 @@ type ConnPool struct {
 	wg  sync.WaitGroup
 
 	// free connections
-	free chan interface{}
+	free      chan interface{}
+	reconnect chan interface{}
 
 	// stop the pool
 	wait chan interface{}
@@ -39,9 +42,11 @@ type ConnPool struct {
 
 // Start creates given number of pending connections. Non thread safe.
 func (p *ConnPool) Start() error {
-	p.conn = make([]io.Closer, 0, p.Size)
-	p.free = make(chan interface{}, p.Size)
 	p.wait = make(chan interface{})
+	p.conn = make([]io.Closer, 0, p.Size)
+
+	p.free = make(chan interface{}, p.Size)
+	p.reconnect = make(chan interface{}, p.Size)
 
 	start := make(chan interface{}, p.Size)
 	for i := 0; i < p.Size; i++ {
@@ -64,6 +69,8 @@ func (p *ConnPool) Start() error {
 		}
 	}
 
+	go p.serve()
+
 	return nil
 }
 
@@ -77,7 +84,7 @@ func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 		return nil, fmt.Errorf("unable to allocate connection (pool closed)")
 	case c := <-p.free:
 		p.wg.Add(1)
-		return c.(io.Closer), nil
+		return c, nil
 	default:
 		timeout := time.NewTimer(tout)
 		select {
@@ -87,7 +94,7 @@ func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 		case c := <-p.free:
 			timeout.Stop()
 			p.wg.Add(1)
-			return c.(io.Closer), nil
+			return c, nil
 		case <-timeout.C:
 			return nil, fmt.Errorf("connection allocate timeout (%s)", tout)
 		}
@@ -101,7 +108,7 @@ func (p *ConnPool) Release(conn interface{}, err error) {
 
 	// connection issue, retry?
 	if _, ok := err.(ConnError); ok {
-		go p.replaceConn(conn)
+		p.replaceConn(conn)
 		return
 	}
 
@@ -131,10 +138,76 @@ func (p *ConnPool) Destroy() {
 	p.conn = nil
 }
 
-// close the connection and replace it with new one (if pool is still alive).
-func (p *ConnPool) replaceConn(conn interface{}) {
-	conn.(io.Closer).Close()
+// serve connections and reconnect dead sockets.
+func (p *ConnPool) serve() {
+	var (
+		reconnect = time.NewTicker(p.Reconnect)
+		deadConn  = 0
+	)
 
+	for {
+		select {
+		case <-p.wait:
+			reconnect.Stop()
+			return
+		case <-reconnect.C:
+			if deadConn == 0 {
+				// nothing to reconnect
+				continue
+			}
+
+			if !p.acquireLock() {
+				// pool is dead, chimichanga
+				return
+			}
+
+			conn, err := p.createConn()
+
+			if err != nil {
+				// unable to reconnect, still
+				p.wg.Done()
+				continue
+			}
+
+			p.free <- conn
+			deadConn--
+
+			// try to reconnect the rest of sockets
+			for i := 0; i < deadConn; i++ {
+				p.reconnect <- nil
+				deadConn--
+			}
+			p.wg.Done()
+
+		case conn := <-p.reconnect:
+			if closer, ok := conn.(io.Closer); ok {
+				closer.Close()
+			}
+
+			if !p.acquireLock() {
+				// pool is dead
+				return
+			}
+
+			// immediate reconnect attempt
+			conn, err := p.createConn()
+
+			if err != nil {
+				p.wg.Done()
+
+				// try later
+				deadConn++
+				continue
+			}
+
+			p.free <- conn
+			p.wg.Done()
+		}
+	}
+}
+
+// close the connection and reconnect it with new one (if pool is still alive).
+func (p *ConnPool) replaceConn(conn interface{}) {
 	p.muc.Lock()
 	for i, c := range p.conn {
 		if conn == c {
@@ -144,25 +217,11 @@ func (p *ConnPool) replaceConn(conn interface{}) {
 	}
 	p.muc.Unlock()
 
-	if !p.destroying() {
-		c, err := p.createConn()
-		if err != nil {
-			// todo: this scenario has not been tested!
-			log.Println(err)
-
-			// need logic to handle stalled mode even better
-			return
-		}
-
-		p.free <- c
-	}
+	p.reconnect <- conn
 }
 
 // Creates new connection in the pool.
 func (p *ConnPool) createConn() (interface{}, error) {
-	p.wg.Add(1)
-	defer p.wg.Done()
-
 	c, err := p.New()
 	if err != nil {
 		return nil, err
@@ -175,7 +234,15 @@ func (p *ConnPool) createConn() (interface{}, error) {
 	return c, nil
 }
 
-// destroying indicates that pool is being destroyed
-func (p *ConnPool) destroying() bool {
-	return atomic.LoadInt32(&p.inDestroy) != 0
+// indicate that we have reserved the operation (pool must wait until operation is complete)
+func (p *ConnPool) acquireLock() bool {
+	p.muw.Lock()
+	defer p.muw.Unlock()
+
+	if atomic.LoadInt32(&p.inDestroy) != 0 {
+		return false
+	}
+
+	p.wg.Add(1)
+	return true
 }

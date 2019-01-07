@@ -131,11 +131,11 @@ func elapsed(d time.Duration) string {
 		v = fmt.Sprintf("%.2fms", d.Seconds()*1000)
 	}
 
-	if d > time.Second {
+	if d > time.Second*30 {
 		return util.Sprintf("<red>{%v}</reset>", v)
 	}
 
-	if d > time.Millisecond*500 {
+	if d > time.Second*5 {
 		return util.Sprintf("<yellow>{%v}</reset>", v)
 	}
 

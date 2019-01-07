@@ -83,7 +83,8 @@ func (b *Broker) Serve() (err error) {
 	select {
 	case err := <-b.wait:
 		return err
-		// todo: watch pool
+		//case err := <-b.connPool.Notify:
+		//	log.Println(err)
 	}
 }
 

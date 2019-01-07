@@ -94,15 +94,15 @@ func (t *tube) serve(prefetch int) {
 			continue
 		}
 
-		go func(conn *beanstalk.Conn, h jobs.Handler, id uint64, job *jobs.Job) {
-			err := t.consume(conn, h, id, job)
+		go func() {
+			err := t.consume(conn, <-t.execPool, id, job)
+			t.connPool.Release(conn, wrapErr(err))
+			t.wg.Done()
 
 			if err != nil {
 				t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
 			}
-
-			t.connPool.Release(conn, wrapErr(err))
-		}(conn, <-t.execPool, id, job)
+		}()
 	}
 }
 
@@ -145,14 +145,12 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop 
 		}
 
 		// fetchPool and connPool will be refilled by consume method
-		return t.tubeSet.Conn, id, job, false
+		return conn.(*beanstalk.Conn), id, job, false
 	}
 }
 
 // consume job
 func (t *tube) consume(conn *beanstalk.Conn, h jobs.Handler, id uint64, j *jobs.Job) error {
-	defer t.wg.Done()
-
 	err := h(jid(id), j)
 	t.execPool <- h
 	t.fetchPool <- nil

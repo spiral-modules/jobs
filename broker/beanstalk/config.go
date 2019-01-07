@@ -47,8 +47,9 @@ func (c *Config) Hydrate(cfg service.Config) error {
 // ConnPool creates new connection pool for beanstalk.
 func (c *Config) ConnPool() *cpool.ConnPool {
 	return &cpool.ConnPool{
-		Size: c.NumConn,
-		New:  func() (i io.Closer, e error) { return c.newConn() },
+		Size:      c.NumConn,
+		Reconnect: c.TimeoutDuration(),
+		New:       func() (i io.Closer, e error) { return c.newConn() },
 	}
 }
 
