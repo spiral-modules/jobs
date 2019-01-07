@@ -256,7 +256,7 @@ func wrapErr(err error) error {
 	}
 
 	if cpool.IsConnError(err) {
-		return cpool.ConnError{Err: err}
+		return cpool.ConnError{Caused: err}
 	}
 
 	return err
