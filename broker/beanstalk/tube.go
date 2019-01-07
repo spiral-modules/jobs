@@ -131,9 +131,6 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop 
 			return nil, 0, nil, false
 		}
 
-		// got the job!
-		t.wg.Add(1)
-
 		job = &jobs.Job{}
 		err = json.Unmarshal(body, job)
 
@@ -143,6 +140,9 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop 
 			t.fetchPool <- nil
 			return nil, 0, nil, false
 		}
+
+		// got the job!
+		t.wg.Add(1)
 
 		// fetchPool and connPool will be refilled by consume method
 		return conn.(*beanstalk.Conn), id, job, false

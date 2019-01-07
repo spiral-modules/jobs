@@ -44,7 +44,6 @@ type ConnPool struct {
 func (p *ConnPool) Start() error {
 	p.wait = make(chan interface{})
 	p.conn = make([]io.Closer, 0, p.Size)
-
 	p.free = make(chan interface{}, p.Size)
 	p.reconnect = make(chan interface{}, p.Size)
 
