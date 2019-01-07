@@ -34,8 +34,8 @@ func Test_Config_Hydrate_Mapping(t *testing.T) {
 			}
 		},
 		"mapping": {
-			"some.*":       "default",
-			"some.other.*": "other"
+			"default": ["some.*"],
+			"other":   ["some.other.*"]
 		}
 	}`}
 	c := &Config{}
@@ -53,12 +53,13 @@ func Test_Config_Hydrate_Pipelines(t *testing.T) {
 				"numWorkers": 1
 			}
 		},
-		"pipelines": {
-			"some": {
+		"pipelines": [
+			{
+				"name":   "some",
 				"broker": "local",
 				"queue":  "default"
 			}
-		}
+		]
 	}`}
 	c := &Config{}
 
