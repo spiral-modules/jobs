@@ -26,9 +26,14 @@ type ConnPool struct {
 	// disable refilling
 	inDestroy int32
 
-	// waits for creation, destruction and execs
-	wg   sync.WaitGroup
+	// active allocations
+	muw sync.Mutex
+	wg  sync.WaitGroup
+
+	// free connections
 	free chan interface{}
+
+	// stop the pool
 	wait chan interface{}
 }
 
@@ -64,6 +69,9 @@ func (p *ConnPool) Start() error {
 
 // Allocate free connection or return error. Blocked until connection is available or pool is dead.
 func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
+	p.muw.Lock()
+	defer p.muw.Unlock()
+
 	select {
 	case <-p.wait:
 		return nil, fmt.Errorf("unable to allocate connection (pool closed)")
@@ -73,8 +81,6 @@ func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 	default:
 		timeout := time.NewTimer(tout)
 		select {
-		case <-timeout.C:
-			return nil, fmt.Errorf("connection allocate timeout (%s)", tout)
 		case <-p.wait:
 			timeout.Stop()
 			return nil, fmt.Errorf("unable to allocate connection (pool closed)")
@@ -82,6 +88,8 @@ func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 			timeout.Stop()
 			p.wg.Add(1)
 			return c.(io.Closer), nil
+		case <-timeout.C:
+			return nil, fmt.Errorf("connection allocate timeout (%s)", tout)
 		}
 	}
 }
@@ -109,8 +117,9 @@ func (p *ConnPool) Destroy() {
 	atomic.AddInt32(&p.inDestroy, 1)
 
 	close(p.wait)
+	p.muw.Lock()
 	p.wg.Wait()
-
+	p.muw.Unlock()
 	close(p.free)
 
 	p.muc.Lock()
@@ -160,9 +169,8 @@ func (p *ConnPool) createConn() (interface{}, error) {
 	}
 
 	p.muc.Lock()
-	defer p.muc.Unlock()
-
 	p.conn = append(p.conn, c)
+	p.muc.Unlock()
 
 	return c, nil
 }

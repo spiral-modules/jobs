@@ -23,11 +23,13 @@ type tube struct {
 	cmdTimeout time.Duration
 	lsn        func(event int, ctx interface{})
 	wait       chan interface{}
-	waitTouch  chan interface{}
-	wg         sync.WaitGroup
-	execPool   chan jobs.Handler
-	err        jobs.ErrorHandler
-	mur        sync.Mutex
+
+	// active operations
+	muw      sync.RWMutex
+	wg       sync.WaitGroup
+	execPool chan jobs.Handler
+	err      jobs.ErrorHandler
+	mur      sync.Mutex
 }
 
 // create new tube consumer and producer
@@ -57,14 +59,12 @@ func newTube(
 func (t *tube) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	t.execPool = execPool
 	t.err = err
-
 	return nil
 }
 
 // run consumers
 func (t *tube) serve(prefetch int) {
 	t.wait = make(chan interface{})
-	t.waitTouch = make(chan interface{})
 	atomic.StoreInt32(&t.active, 1)
 
 	fetchPool := make(chan interface{}, prefetch)
@@ -122,7 +122,6 @@ func (t *tube) stop() {
 
 	close(t.wait)
 	t.wg.Wait()
-	close(t.waitTouch)
 }
 
 // put data into pool or return error (no wait)
@@ -147,41 +146,7 @@ func (t *tube) put(data []byte, attempt int, delay, rrt time.Duration) (id strin
 	return jid(bid), err
 }
 
-// return tube stats
-func (t *tube) stat() (stat *jobs.Stat, err error) {
-	t.wg.Add(1)
-	defer t.wg.Done()
-
-	conn, err := t.connPool.Allocate(t.cmdTimeout)
-	if err != nil {
-		return nil, err
-	}
-
-	t.mut.Lock()
-	t.tube.Conn = conn.(*beanstalk.Conn)
-	values, err := t.tube.Stats()
-	t.mut.Unlock()
-
-	t.connPool.Release(conn, wrapErr(err))
-
-	stat = &jobs.Stat{InternalName: t.tube.Name}
-
-	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
-		stat.Queue = int64(v)
-	}
-
-	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
-		stat.Active = int64(v)
-	}
-
-	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
-		stat.Delayed = int64(v)
-	}
-
-	return stat, err
-}
-
-// consume job
+// consume job todo: refactor
 func (t *tube) consume(
 	conn *beanstalk.Conn,
 	fetchPool chan interface{},
@@ -233,6 +198,40 @@ func (t *tube) consume(
 	}
 
 	t.connPool.Release(conn, wrapErr(err))
+}
+
+// return tube stats
+func (t *tube) stat() (stat *jobs.Stat, err error) {
+	t.wg.Add(1)
+	defer t.wg.Done()
+
+	conn, err := t.connPool.Allocate(t.cmdTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	t.mut.Lock()
+	t.tube.Conn = conn.(*beanstalk.Conn)
+	values, err := t.tube.Stats()
+	t.mut.Unlock()
+
+	t.connPool.Release(conn, wrapErr(err))
+
+	stat = &jobs.Stat{InternalName: t.tube.Name}
+
+	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
+		stat.Queue = int64(v)
+	}
+
+	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
+		stat.Active = int64(v)
+	}
+
+	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
+		stat.Delayed = int64(v)
+	}
+
+	return stat, err
 }
 
 // throw handles service, server and pool events.

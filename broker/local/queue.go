@@ -8,11 +8,20 @@ import (
 )
 
 type queue struct {
-	active   int32
-	stat     *jobs.Stat
-	jobs     chan entry
-	wg       sync.WaitGroup
-	wait     chan interface{}
+	active int32
+	stat   *jobs.Stat
+
+	// job pipeline
+	jobs chan *entry
+
+	// active operations
+	muw sync.Mutex
+	wg  sync.WaitGroup
+
+	// stop channel
+	wait chan interface{}
+
+	// exec handlers
 	execPool chan jobs.Handler
 	err      jobs.ErrorHandler
 }
@@ -25,28 +34,10 @@ type entry struct {
 
 // create new queue
 func newQueue() *queue {
-	return &queue{stat: &jobs.Stat{}, jobs: make(chan entry)}
+	return &queue{stat: &jobs.Stat{}, jobs: make(chan *entry)}
 }
 
-// add job to the queue
-func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
-	if delay == 0 {
-		atomic.AddInt64(&q.stat.Queue, 1)
-		q.jobs <- entry{id: id, job: j}
-		return
-	}
-
-	atomic.AddInt64(&q.stat.Delayed, 1)
-
-	time.Sleep(delay)
-
-	atomic.AddInt64(&q.stat.Delayed, ^int64(0))
-	atomic.AddInt64(&q.stat.Queue, 1)
-
-	q.jobs <- entry{id: id, job: j, attempt: attempt}
-}
-
-// associate queue with new exec pool
+// associate queue with new consume pool
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	q.execPool = execPool
 	q.err = err
@@ -60,15 +51,28 @@ func (q *queue) serve() {
 	atomic.StoreInt32(&q.active, 1)
 
 	for {
-		select {
-		case <-q.wait:
+		e := q.allocateEntry()
+		if e == nil {
 			return
-		case e := <-q.jobs:
-			q.wg.Add(1)
-			atomic.AddInt64(&q.stat.Active, 1)
-
-			go q.exec(e, <-q.execPool)
 		}
+
+		go q.consume(e, <-q.execPool)
+	}
+}
+
+// allocate one job entry
+func (q *queue) allocateEntry() *entry {
+	q.muw.Lock()
+	defer q.muw.Unlock()
+
+	select {
+	case <-q.wait:
+		return nil
+	case e := <-q.jobs:
+		atomic.AddInt64(&q.stat.Active, 1)
+		q.wg.Add(1)
+
+		return e
 	}
 }
 
@@ -81,11 +85,31 @@ func (q *queue) stop() {
 	atomic.StoreInt32(&q.active, 0)
 
 	close(q.wait)
+	q.muw.Lock()
 	q.wg.Wait()
+	q.muw.Unlock()
 }
 
-// exec singe job
-func (q *queue) exec(e entry, handler jobs.Handler) {
+// add job to the queue
+func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
+	if delay == 0 {
+		atomic.AddInt64(&q.stat.Queue, 1)
+		q.jobs <- &entry{id: id, job: j}
+		return
+	}
+
+	atomic.AddInt64(&q.stat.Delayed, 1)
+
+	time.Sleep(delay)
+
+	atomic.AddInt64(&q.stat.Delayed, ^int64(0))
+	atomic.AddInt64(&q.stat.Queue, 1)
+
+	q.jobs <- &entry{id: id, job: j, attempt: attempt}
+}
+
+// consume singe job
+func (q *queue) consume(e *entry, handler jobs.Handler) {
 	defer atomic.AddInt64(&q.stat.Active, ^int64(0))
 	defer q.wg.Done()
 

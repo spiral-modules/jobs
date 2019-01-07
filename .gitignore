@@ -6,3 +6,4 @@ vendor/
 clover.xml
 .DS_Store
 tests/.rr-test.yml
+go.sum
