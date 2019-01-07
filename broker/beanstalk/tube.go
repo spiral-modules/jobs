@@ -28,8 +28,8 @@ type tube struct {
 	reserve    time.Duration
 	cmdTimeout time.Duration
 
-	// consuming events
-	listener func(event int, ctx interface{})
+	// tube events
+	lsn func(event int, ctx interface{})
 
 	// stop channel
 	wait chan interface{}
@@ -50,7 +50,7 @@ func newTube(
 	connPool *cpool.ConnPool,
 	reserve time.Duration,
 	cmdTimeout time.Duration,
-	listener func(event int, ctx interface{}),
+	lsn func(event int, ctx interface{}),
 ) (*tube, error) {
 	if pipe.String("tube", "") == "" {
 		return nil, errors.New("missing `tube` parameter on beanstalk pipeline")
@@ -63,7 +63,7 @@ func newTube(
 		connPool:   connPool,
 		reserve:    reserve,
 		cmdTimeout: cmdTimeout,
-		listener:   listener,
+		lsn:        lsn,
 	}, nil
 }
 
@@ -141,7 +141,7 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop 
 			return nil, 0, nil, false
 		}
 
-		// got the job!
+		// got the job, it will block stop() until wg is freed
 		t.wg.Add(1)
 
 		// fetchPool and connPool will be refilled by consume method
@@ -183,7 +183,7 @@ func (t *tube) stop() {
 
 	close(t.wait)
 	t.muw.Lock()
-	t.wg.Wait()
+	t.wg.Wait() // wait for all the jobs to complete
 	t.muw.Unlock()
 }
 
@@ -238,7 +238,7 @@ func (t *tube) stat() (stat *jobs.Stat, err error) {
 
 // throw handles service, server and pool events.
 func (t *tube) throw(event int, ctx interface{}) {
-	t.listener(event, ctx)
+	t.lsn(event, ctx)
 }
 
 // jid converts job id into string.
