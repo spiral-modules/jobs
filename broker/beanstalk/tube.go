@@ -13,23 +13,35 @@ import (
 )
 
 type tube struct {
-	active     int32
-	pipe       *jobs.Pipeline
-	mut        sync.Mutex
-	tube       *beanstalk.Tube
-	tubeSet    *beanstalk.TubeSet
-	connPool   *cpool.ConnPool
+	active int32
+	pipe   *jobs.Pipeline
+
+	// beanstalk drivers
+	mut     sync.Mutex
+	tube    *beanstalk.Tube
+	tubeSet *beanstalk.TubeSet
+
+	// socket pool
+	connPool *cpool.ConnPool
+
+	// durations
 	reserve    time.Duration
 	cmdTimeout time.Duration
-	lsn        func(event int, ctx interface{})
-	wait       chan interface{}
+
+	// consuming events
+	listener func(event int, ctx interface{})
+
+	// stop channel
+	wait chan interface{}
 
 	// active operations
-	muw      sync.RWMutex
-	wg       sync.WaitGroup
-	execPool chan jobs.Handler
-	err      jobs.ErrorHandler
-	mur      sync.Mutex
+	muw sync.RWMutex
+	wg  sync.WaitGroup
+
+	// exec handlers
+	fetchPool chan interface{}
+	execPool  chan jobs.Handler
+	err       jobs.ErrorHandler
 }
 
 // create new tube consumer and producer
@@ -51,7 +63,7 @@ func newTube(
 		connPool:   connPool,
 		reserve:    reserve,
 		cmdTimeout: cmdTimeout,
-		lsn:        listener,
+		listener:   listener,
 	}, nil
 }
 
@@ -65,51 +77,102 @@ func (t *tube) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) erro
 // run consumers
 func (t *tube) serve(prefetch int) {
 	t.wait = make(chan interface{})
+	t.fetchPool = make(chan interface{}, prefetch)
 	atomic.StoreInt32(&t.active, 1)
 
-	fetchPool := make(chan interface{}, prefetch)
 	for i := 0; i < prefetch; i++ {
-		fetchPool <- nil
+		t.fetchPool <- nil
 	}
 
-	var h jobs.Handler
 	for {
-		select {
-		case <-t.wait:
+		conn, id, job, stop := t.fetchJob()
+		if stop {
 			return
-		case <-fetchPool:
-			conn, err := t.connPool.Allocate(t.cmdTimeout)
-			if err != nil {
-				// keep trying
-				fetchPool <- nil
-				continue
-			}
+		}
 
-			t.tubeSet.Conn = conn.(*beanstalk.Conn)
+		if job == nil {
+			continue
+		}
 
-			id, body, err := t.tubeSet.Reserve(t.reserve)
-			if err != nil {
-				// do not report reserve errors such as timeouts, conn errors will be reported by the connPool
-				t.connPool.Release(conn, wrapErr(err))
-				fetchPool <- nil
-				continue
-			}
+		go func(conn *beanstalk.Conn, h jobs.Handler, id uint64, job *jobs.Job) {
+			err := t.consume(conn, h, id, job)
 
-			var j *jobs.Job
-			err = json.Unmarshal(body, &j)
 			if err != nil {
 				t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
-				t.connPool.Release(conn, wrapErr(err))
-				fetchPool <- nil
-				continue
 			}
 
-			t.wg.Add(1)
-
-			h = <-t.execPool
-			go t.consume(conn.(*beanstalk.Conn), fetchPool, h, id, j)
-		}
+			t.connPool.Release(conn, wrapErr(err))
+		}(conn, <-t.execPool, id, job)
 	}
+}
+
+// fetchJob and allocate connection. fetchPool must be refilled manually.
+func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop bool) {
+	t.muw.Lock()
+	defer t.muw.Unlock()
+
+	select {
+	case <-t.wait:
+		return nil, 0, nil, true
+	case <-t.fetchPool:
+		conn, err := t.connPool.Allocate(t.cmdTimeout)
+		if err != nil {
+			t.fetchPool <- nil
+			return nil, 0, nil, false
+		}
+
+		t.tubeSet.Conn = conn.(*beanstalk.Conn)
+
+		id, body, err := t.tubeSet.Reserve(t.reserve)
+		if err != nil {
+			// do not report reserve errors such as timeouts, conn errors will be reported by the connPool
+			t.connPool.Release(conn, wrapErr(err))
+			t.fetchPool <- nil
+			return nil, 0, nil, false
+		}
+
+		// got the job!
+		t.wg.Add(1)
+
+		job = &jobs.Job{}
+		err = json.Unmarshal(body, job)
+
+		if err != nil {
+			t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
+			t.connPool.Release(conn, wrapErr(err))
+			t.fetchPool <- nil
+			return nil, 0, nil, false
+		}
+
+		// fetchPool and connPool will be refilled by consume method
+		return t.tubeSet.Conn, id, job, false
+	}
+}
+
+// consume job
+func (t *tube) consume(conn *beanstalk.Conn, h jobs.Handler, id uint64, j *jobs.Job) error {
+	defer t.wg.Done()
+
+	err := h(jid(id), j)
+	t.execPool <- h
+	t.fetchPool <- nil
+
+	if err == nil {
+		return conn.Delete(id)
+	}
+
+	stat, statErr := conn.StatsJob(id)
+	if statErr != nil {
+		return statErr
+	}
+
+	reserves, _ := strconv.Atoi(stat["reserves"])
+	if j.Options.CanRetry(reserves) {
+		return conn.Release(id, 0, j.Options.RetryDuration())
+	}
+
+	t.err(jid(id), j, err)
+	return conn.Bury(id, 0)
 }
 
 // stop tube consuming
@@ -121,16 +184,14 @@ func (t *tube) stop() {
 	atomic.StoreInt32(&t.active, 0)
 
 	close(t.wait)
+	t.muw.Lock()
 	t.wg.Wait()
+	t.muw.Unlock()
 }
 
 // put data into pool or return error (no wait)
 func (t *tube) put(data []byte, attempt int, delay, rrt time.Duration) (id string, err error) {
-	t.wg.Add(1)
-	defer t.wg.Done()
-
 	var bid uint64
-
 	conn, err := t.connPool.Allocate(t.cmdTimeout)
 	if err != nil {
 		return "", err
@@ -146,65 +207,8 @@ func (t *tube) put(data []byte, attempt int, delay, rrt time.Duration) (id strin
 	return jid(bid), err
 }
 
-// consume job todo: refactor
-func (t *tube) consume(
-	conn *beanstalk.Conn,
-	fetchPool chan interface{},
-	h jobs.Handler,
-	id uint64,
-	j *jobs.Job,
-) {
-	defer t.wg.Done()
-	defer func() { fetchPool <- nil }()
-
-	// connection leaks here (!!!)
-	err := h(jid(id), j)
-	t.execPool <- h
-
-	if err == nil {
-		err = conn.Delete(id)
-		if err != nil {
-			t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
-		}
-
-		t.connPool.Release(conn, wrapErr(err))
-		return
-	}
-
-	stat, sErr := conn.StatsJob(id)
-	if sErr != nil {
-		t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: sErr})
-
-		t.connPool.Release(conn, wrapErr(sErr))
-		return
-	}
-
-	reserves, _ := strconv.Atoi(stat["reserves"])
-
-	if j.Options.CanRetry(reserves) {
-		err = conn.Release(id, 0, j.Options.RetryDuration())
-		if err != nil {
-			t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
-		}
-
-		t.connPool.Release(conn, wrapErr(err))
-		return
-	}
-
-	t.err(jid(id), j, err)
-	err = conn.Bury(id, 0)
-	if err != nil {
-		t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
-	}
-
-	t.connPool.Release(conn, wrapErr(err))
-}
-
 // return tube stats
 func (t *tube) stat() (stat *jobs.Stat, err error) {
-	t.wg.Add(1)
-	defer t.wg.Done()
-
 	conn, err := t.connPool.Allocate(t.cmdTimeout)
 	if err != nil {
 		return nil, err
@@ -236,7 +240,7 @@ func (t *tube) stat() (stat *jobs.Stat, err error) {
 
 // throw handles service, server and pool events.
 func (t *tube) throw(event int, ctx interface{}) {
-	t.lsn(event, ctx)
+	t.listener(event, ctx)
 }
 
 // jid converts job id into string.

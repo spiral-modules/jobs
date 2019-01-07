@@ -41,7 +41,6 @@ func newQueue() *queue {
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	q.execPool = execPool
 	q.err = err
-
 	return nil
 }
 
@@ -51,7 +50,7 @@ func (q *queue) serve() {
 	atomic.StoreInt32(&q.active, 1)
 
 	for {
-		e := q.allocateEntry()
+		e := q.fetchJob()
 		if e == nil {
 			return
 		}
@@ -61,7 +60,7 @@ func (q *queue) serve() {
 }
 
 // allocate one job entry
-func (q *queue) allocateEntry() *entry {
+func (q *queue) fetchJob() *entry {
 	q.muw.Lock()
 	defer q.muw.Unlock()
 
@@ -74,6 +73,30 @@ func (q *queue) allocateEntry() *entry {
 
 		return e
 	}
+}
+
+// consume singe job
+func (q *queue) consume(e *entry, h jobs.Handler) {
+	defer atomic.AddInt64(&q.stat.Active, ^int64(0))
+	defer q.wg.Done()
+
+	e.attempt++
+
+	err := h(e.id, e.job)
+	q.execPool <- h
+
+	if err == nil {
+		atomic.AddInt64(&q.stat.Queue, ^int64(0))
+		return
+	}
+
+	if e.job.Options.CanRetry(e.attempt) {
+		q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
+		return
+	}
+
+	q.err(e.id, e.job, err)
+	atomic.AddInt64(&q.stat.Queue, ^int64(0))
 }
 
 // stop the queue consuming
@@ -106,28 +129,4 @@ func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
 	atomic.AddInt64(&q.stat.Queue, 1)
 
 	q.jobs <- &entry{id: id, job: j, attempt: attempt}
-}
-
-// consume singe job
-func (q *queue) consume(e *entry, handler jobs.Handler) {
-	defer atomic.AddInt64(&q.stat.Active, ^int64(0))
-	defer q.wg.Done()
-
-	e.attempt++
-
-	err := handler(e.id, e.job)
-	q.execPool <- handler
-
-	if err == nil {
-		atomic.AddInt64(&q.stat.Queue, ^int64(0))
-		return
-	}
-
-	if e.job.Options.CanRetry(e.attempt) {
-		q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
-		return
-	}
-
-	q.err(e.id, e.job, err)
-	atomic.AddInt64(&q.stat.Queue, ^int64(0))
 }
