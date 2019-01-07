@@ -88,6 +88,15 @@ func (c Pipeline) Broker() string {
 	return c.String("broker", "")
 }
 
+// Has checks if value presented in pipeline.
+func (c Pipeline) Has(name string) bool {
+	if _, ok := c[name]; ok {
+		return true
+	}
+
+	return false
+}
+
 // Map must return nested map value or empty config.
 func (c Pipeline) Map(name string) Pipeline {
 	if value, ok := c[name]; ok {
