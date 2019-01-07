@@ -8,6 +8,7 @@ import (
 	"github.com/spiral/roadrunner/service/env"
 	"github.com/spiral/roadrunner/service/rpc"
 	"sync"
+	"time"
 )
 
 // ID defines public service name.
@@ -213,9 +214,10 @@ func (s *Service) exec(id string, j *Job) error {
 		return err
 	}
 
+	start := time.Now()
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j})
+		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j, start: start, elapsed: time.Since(start)})
 		return nil
 	}
 

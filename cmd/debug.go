@@ -21,11 +21,13 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spiral/jobs"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/cmd/util"
+	"time"
 )
 
 func init() {
@@ -61,8 +63,9 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventJobComplete:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
-			"job.<green+h>DONE</reset> <cyan>%s</reset> <white+hb>%s</reset>",
+			"job.<green+h>DONE</reset> <cyan>%s</reset> %s <white+hb>%s</reset>",
 			e.Job.Job,
+			elapsed(e.Elapsed()),
 			e.ID,
 		))
 
@@ -108,4 +111,33 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Error(),
 		))
 	}
+}
+
+// fits duration into 5 characters
+func elapsed(d time.Duration) string {
+	var v string
+	switch {
+	case d > 100*time.Second:
+		v = fmt.Sprintf("%.1fs", d.Seconds())
+	case d > 10*time.Second:
+		v = fmt.Sprintf("%.2fs", d.Seconds())
+	case d > time.Second:
+		v = fmt.Sprintf("%.3fs", d.Seconds())
+	case d > 100*time.Millisecond:
+		v = fmt.Sprintf("%.0fms", d.Seconds()*1000)
+	case d > 10*time.Millisecond:
+		v = fmt.Sprintf("%.1fms", d.Seconds()*1000)
+	default:
+		v = fmt.Sprintf("%.2fms", d.Seconds()*1000)
+	}
+
+	if d > time.Second {
+		return util.Sprintf("<red>{%v}</reset>", v)
+	}
+
+	if d > time.Millisecond*500 {
+		return util.Sprintf("<yellow>{%v}</reset>", v)
+	}
+
+	return util.Sprintf("<gray+hb>{%v}</reset>", v)
 }

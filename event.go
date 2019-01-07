@@ -1,5 +1,7 @@
 package jobs
 
+import "time"
+
 const (
 	// EventPushComplete thrown when new job has been added. JobEvent is passed as context.
 	EventPushComplete = iota + 1500
@@ -30,6 +32,15 @@ type JobEvent struct {
 
 	// Job is failed job.
 	Job *Job
+
+	// event timings
+	start   time.Time
+	elapsed time.Duration
+}
+
+// Elapsed returns duration of the invocation.
+func (e *JobEvent) Elapsed() time.Duration {
+	return e.elapsed
 }
 
 // JobError represents singular Job error event.
