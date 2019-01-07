@@ -1,4 +1,4 @@
-package sqs
+package ____sqs
 
 import (
 	"errors"
