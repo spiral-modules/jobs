@@ -15,7 +15,7 @@ const (
 	// EventJobError thrown on all job related errors. See JobError as context.
 	EventJobError
 
-	// EventPipelineStop when pipeline consuming has been enabled.
+	// EventPipelineConsume when pipeline consuming has been enabled.
 	EventPipelineConsume
 
 	// EventPipelineStop when pipeline consuming has been stopped.

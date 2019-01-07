@@ -6,7 +6,7 @@ import (
 	"github.com/spiral/roadrunner/service"
 )
 
-// Pipeline defines settings for job broker, workers and routing PipelineOptions.
+// Config defines settings for job broker, workers and job-pipeline mapping.
 type Config struct {
 	// Workers configures roadrunner server and worker busy.
 	Workers *roadrunner.ServerConfig
@@ -46,7 +46,7 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return c.Workers.Pool.Valid()
 }
 
-// FindTarget locates the broker name and associated pipeline.
+// MapPipeline locates the pipeline associated with the job.
 func (c *Config) MapPipeline(j *Job) (*Pipeline, error) {
 	p := j.Options.Pipeline
 	if p == "" {

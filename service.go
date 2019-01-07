@@ -29,12 +29,12 @@ type Service struct {
 	consuming map[*Pipeline]bool
 }
 
-// AddListener attaches server event watcher.
+// AddListener attaches event watcher.
 func (s *Service) AddListener(l func(event int, ctx interface{})) {
 	s.lsns = append(s.lsns, l)
 }
 
-// Start configures job service.
+// Init configures job service.
 func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env.Environment) (ok bool, err error) {
 	s.cfg = &Config{}
 	s.env = e
@@ -89,7 +89,7 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	return true, nil
 }
 
-// serve serves local rr server and creates broker association.
+// Serve serves local rr server and creates broker association.
 func (s *Service) Serve() error {
 	// ensure that workers aware of running within jobs
 	if s.env != nil {
@@ -115,7 +115,7 @@ func (s *Service) Serve() error {
 	return s.services.Serve()
 }
 
-// stop all pipelines and rr server.
+// Stop all pipelines and rr server.
 func (s *Service) Stop() {
 	// explicitly stop all consuming
 	for _, p := range s.Pipelines().Names(s.cfg.Consume...).Reverse() {
@@ -173,7 +173,7 @@ func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
 	return stat, err
 }
 
-// Consuming enables or disables pipeline consuming using given handlers.
+// Consume enables or disables pipeline consuming using given handlers.
 func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -108,7 +108,7 @@ func (p *ConnPool) Release(conn interface{}, err error) {
 	p.free <- conn
 }
 
-// Close all underlying connections. Thread safe.
+// Destroy pool and close all underlying connections. Thread safe.
 func (p *ConnPool) Destroy() {
 	if atomic.LoadInt32(&p.inDestroy) == 1 {
 		return

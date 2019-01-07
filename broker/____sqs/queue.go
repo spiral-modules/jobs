@@ -5,12 +5,12 @@ import (
 	"github.com/spiral/jobs"
 )
 
-// Queue defines single SQS queue.
+// queue defines single SQS queue.
 type Queue struct {
 	// Indicates that tube must be listened.
 	Listen bool
 
-	// Queue is queue name.
+	// queue is queue name.
 	Queue string
 
 	// URL is queue url.

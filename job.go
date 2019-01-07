@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-// Listen handles job execution.
+// Handler handles job execution.
 type Handler func(id string, j *Job) error
 
-// Listen handles job execution.
+// ErrorHandler handles job execution errors.
 type ErrorHandler func(id string, j *Job, err error)
 
 // Job carries information about single job.
@@ -71,7 +71,7 @@ func (o *Options) DelayDuration() time.Duration {
 	return time.Second * time.Duration(o.Delay)
 }
 
-// DelayDuration returns timeout duration in a form of time.Duration.
+// TimeoutDuration returns timeout duration in a form of time.Duration.
 func (o *Options) TimeoutDuration() time.Duration {
 	if o.Timeout == 0 {
 		return 30 * time.Minute

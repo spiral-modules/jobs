@@ -24,7 +24,7 @@ func (b *Broker) AddListener(l func(event int, ctx interface{})) {
 	b.lsns = append(b.lsns, l)
 }
 
-// Start configures local job broker.
+// Init configures broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
 	b.connPool = cfg.ConnPool()
@@ -32,7 +32,7 @@ func (b *Broker) Init(cfg *Config) (bool, error) {
 	return true, nil
 }
 
-// Listen configures broker with list of pipelines to listen and handler function.
+// Register broker specific pipelines.
 func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -63,7 +63,7 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 	return nil
 }
 
-// serve local broker.
+// Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
@@ -87,12 +87,13 @@ func (b *Broker) Serve() (err error) {
 	}
 }
 
-// wait local broker.
+// Stop all pipelines.
 func (b *Broker) Stop() {
 	b.stopError(nil)
 }
 
-// Consuming enables or disabled pipeline wg.
+// Consume configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
+// the service is started!
 func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -122,7 +123,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	t := b.Tube(pipe)
+	t := b.tube(pipe)
 	if t == nil {
 		return "", fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
@@ -141,7 +142,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, err
 	}
 
-	t := b.Tube(pipe)
+	t := b.tube(pipe)
 	if t == nil {
 		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
@@ -149,8 +150,8 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	return t.stat()
 }
 
-// Queue returns queue associated with the pipeline.
-func (b *Broker) Tube(pipe *jobs.Pipeline) *tube {
+// queue returns queue associated with the pipeline.
+func (b *Broker) tube(pipe *jobs.Pipeline) *tube {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

@@ -34,7 +34,7 @@ func (ps Pipelines) Reverse() Pipelines {
 	return out
 }
 
-// Filter return pipelines associated with specific broker.
+// Broker return pipelines associated with specific broker.
 func (ps Pipelines) Broker(broker string) Pipelines {
 	out := make(Pipelines, 0)
 
@@ -75,7 +75,7 @@ func (ps Pipelines) Get(name string) *Pipeline {
 	return nil
 }
 
-// PipelineConfig defines pipeline options.
+// Pipeline defines pipeline options.
 type Pipeline map[string]interface{}
 
 // Name returns pipeline name.
@@ -88,7 +88,7 @@ func (c Pipeline) Broker() string {
 	return c.String("broker", "")
 }
 
-// Bool must return nested map value or empty config.
+// Map must return nested map value or empty config.
 func (c Pipeline) Map(name string) Pipeline {
 	if value, ok := c[name]; ok {
 		if m, ok := value.(map[string]interface{}); ok {
@@ -121,7 +121,7 @@ func (c Pipeline) String(name string, d string) string {
 	return d
 }
 
-// Int must return option value as string or return default value.
+// Integer must return option value as string or return default value.
 func (c Pipeline) Integer(name string, d int) int {
 	if value, ok := c[name]; ok {
 		if str, ok := value.(int); ok {

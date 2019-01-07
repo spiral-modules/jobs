@@ -8,19 +8,19 @@ import (
 	"sync"
 )
 
-// Broker run Queue using local goroutines.
+// Broker run queue using local goroutines.
 type Broker struct {
 	mu     sync.Mutex
 	wait   chan interface{}
 	queues map[*jobs.Pipeline]*queue
 }
 
-// Start configures local job broker.
+// Init configures broker.
 func (b *Broker) Init() (bool, error) {
 	return true, nil
 }
 
-// Listen configures broker with list of pipelines to listen and handler function.
+// Register broker specific pipelines.
 func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -33,7 +33,7 @@ func (b *Broker) Register(pipes []*jobs.Pipeline) error {
 	return nil
 }
 
-// serve local broker.
+// Serve broker pipelines.
 func (b *Broker) Serve() error {
 	// start consuming
 	b.mu.Lock()
@@ -48,7 +48,7 @@ func (b *Broker) Serve() error {
 	return nil
 }
 
-// Stop local broker (wait for all jobs to complete).
+// Stop all pipelines.
 func (b *Broker) Stop() {
 	if b.wait == nil {
 		return
@@ -66,7 +66,8 @@ func (b *Broker) Stop() {
 	close(b.wait)
 }
 
-// Consuming enables or disabled pipeline consuming.
+// Consume configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
+// the service is started!
 func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -99,7 +100,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 	}
 	b.mu.Unlock()
 
-	q := b.Queue(pipe)
+	q := b.queue(pipe)
 	if q == nil {
 		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
@@ -116,7 +117,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 
 // Stat must fetch statistics about given pipeline or return error.
 func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
-	q := b.Queue(pipe)
+	q := b.queue(pipe)
 	if q == nil {
 		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
@@ -124,8 +125,8 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	return q.stat, nil
 }
 
-// Queue returns queue associated with the pipeline.
-func (b *Broker) Queue(pipe *jobs.Pipeline) *queue {
+// queue returns queue associated with the pipeline.
+func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

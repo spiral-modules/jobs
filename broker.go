@@ -1,10 +1,11 @@
 package jobs
 
+// Broker manages set of pipelines and provides ability to push jobs into them.
 type Broker interface {
-	// Listen configures broker with list of pipelines to listen and handler function.
+	// Register broker specific pipelines.
 	Register(pipes []*Pipeline) error
 
-	// Consuming configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
+	// Consume configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
 	// the service is started!
 	Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error
 
@@ -35,7 +36,7 @@ type Stat struct {
 	// Consuming indicates that pipeline is consuming jobs.
 	Consuming bool
 
-	// Queue defines number of pending jobs.
+	// queue defines number of pending jobs.
 	Queue int64
 
 	// Active defines number of jobs which are currently being processed.

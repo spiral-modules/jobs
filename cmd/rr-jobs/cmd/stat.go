@@ -96,10 +96,10 @@ func showStats(client *rpc.Client) {
 	StatTable(s.Pipelines).Render()
 }
 
-// WorkerTable renders table with information about rr server workers.
+// StatTable renders table with information about all active pipelines.
 func StatTable(pipelines []*jobs.Stat) *tablewriter.Table {
 	tw := tablewriter.NewWriter(os.Stdout)
-	tw.SetHeader([]string{"Broker", "Pipeline", "Queue", "Delayed", "Active"})
+	tw.SetHeader([]string{"Broker", "Pipeline", "queue", "Delayed", "Active"})
 
 	for _, p := range pipelines {
 		tw.Append([]string{
