@@ -1,4 +1,4 @@
-package cpool
+package beanstalk
 
 import (
 	"github.com/magiconair/properties/assert"
@@ -7,6 +7,6 @@ import (
 )
 
 func TestIsConnError(t *testing.T) {
-	ce := ConnError{Caused: errors.New("error")}
+	ce := connError{Caused: errors.New("error")}
 	assert.Equal(t, "error", ce.Error())
 }

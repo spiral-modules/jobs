@@ -25,7 +25,6 @@ before_script:
 
 script:
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic
-  - go test -v -race -cover ./cpool -coverprofile=cpool.txt -covermode=atomic
   - go test -v -race -cover ./broker/amqp -coverprofile=amqp.txt -covermode=atomic
   - go test -v -race -cover ./broker/local -coverprofile=local.txt -covermode=atomic
   - go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
@@ -34,7 +33,6 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -f jobs.txt
-  - bash <(curl -s https://codecov.io/bash) -f cpool.txt
   - bash <(curl -s https://codecov.io/bash) -f amqp.txt
   - bash <(curl -s https://codecov.io/bash) -f local.txt
   - bash <(curl -s https://codecov.io/bash) -f beanstalk.txt

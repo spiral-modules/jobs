@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/cpool"
 	"sync"
 )
 
@@ -15,7 +14,7 @@ type Broker struct {
 	lsns     []func(event int, ctx interface{})
 	mu       sync.Mutex
 	wait     chan error
-	connPool *cpool.ConnPool
+	connPool *connPool
 	tubes    map[*jobs.Pipeline]*tube
 }
 
@@ -58,10 +57,10 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 // Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
-	if b.connPool.Size < (len(b.tubes)*b.cfg.Prefetch + 2) {
+	if b.connPool.size < (len(b.tubes)*b.cfg.Prefetch + 2) {
 		// Since each of the tube is listening it's own connection is it possible to run out of connections
 		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
-		b.connPool.Size = len(b.tubes)*b.cfg.Prefetch + 2
+		b.connPool.size = len(b.tubes)*b.cfg.Prefetch + 2
 	}
 
 	if err = b.connPool.Start(); err != nil {

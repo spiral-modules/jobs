@@ -164,7 +164,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 // // createQueue creates sqs queue.
 func (b *Broker) ensureQueue(pipe *jobs.Pipeline) (*string, error) {
 	attr := make(map[string]*string)
-	for k, v := range pipe.Map("options") {
+	for k, v := range pipe.Map("declare") {
 		if vs, ok := v.(string); ok {
 			attr[k] = aws.String(vs)
 		}
@@ -174,7 +174,7 @@ func (b *Broker) ensureQueue(pipe *jobs.Pipeline) (*string, error) {
 		}
 	}
 
-	if len(attr) != 0 || pipe.Bool("create", false) {
+	if len(attr) != 0 {
 		res, err := b.sqs.CreateQueue(&sqs.CreateQueueInput{
 			QueueName:  aws.String(pipe.String("queue", "")),
 			Attributes: attr,

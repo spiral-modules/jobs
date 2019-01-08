@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"github.com/spiral/jobs"
+	"log"
 )
 
 // Broker represents AMQP broker.
@@ -18,6 +19,23 @@ func (b *Broker) AddListener(l func(event int, ctx interface{})) {
 // Start configures local job broker.
 func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
+
+	c, err := newConn(b.cfg.Addr, "test-exchange")
+	if err != nil {
+		return false, err
+	}
+
+	q, err := c.ch.QueueDeclare(
+		"default", // name
+		true,      // type
+		true,      // durable
+		false,     // auto-deleted
+		false,     // internal
+		nil,
+	)
+
+	log.Println(q)
+	log.Println(err)
 
 	return true, nil
 }

@@ -7,7 +7,7 @@ jobs:
 
   # beanstalk configuration
   beanstalk:
-    host:  tcp://localhost:11300
+    addr:  tcp://localhost:11300
     reserve:  1
     prefetch: 1
 
@@ -30,7 +30,7 @@ jobs:
     - name:   gamma
       broker: sqs
       queue:  default
-      options:
+      declare:
         MessageRetentionPeriod: 86400
 
   # default destinations for jobs

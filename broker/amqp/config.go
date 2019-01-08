@@ -2,16 +2,25 @@ package amqp
 
 import (
 	"github.com/spiral/roadrunner/service"
+	"time"
 )
 
 // Config defines sqs broker configuration.
 type Config struct {
-	// Host of AMQP server.
-	Host string
+	// Addr of AMQP server (example: amqp://guest:guest@localhost:5672/).
+	Addr string
+
+	// Size defines number of open connections to beanstalk server. Default 5.
+	NumConn int
+
+	// Timeout to allocate the conn. Default 5.
+	Timeout int
 }
 
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
+	c.NumConn = 2
+	c.Timeout = 5
 
 	return nil
 }
@@ -23,4 +32,9 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	}
 
 	return nil
+}
+
+// TimeoutDuration returns number of seconds allowed to allocate the conn.
+func (c *Config) TimeoutDuration() time.Duration {
+	return time.Duration(c.Timeout) * time.Second
 }

@@ -1,4 +1,4 @@
-package cpool
+package beanstalk
 
 import (
 	"fmt"
@@ -8,18 +8,12 @@ import (
 	"time"
 )
 
-// ConnPool manages set of connections with ability to retry operation using another connection in case of pipe error.
-type ConnPool struct {
-	// Size number of open connections.
-	Size int
-
-	// Reconnect defines the time to wait between reconnect attempts.
-	Reconnect time.Duration
-
-	// New creates new connection or returns error.
-	New func() (io.Closer, error)
-
-	// Notify chan interface{}
+// connPool manages set of connections with ability to retry operation using another connection in case of pipe error.
+type connPool struct {
+	// pool options
+	size      int
+	reconnect time.Duration
+	new       func() (io.Closer, error)
 
 	// active connections
 	muc   sync.Mutex
@@ -33,24 +27,24 @@ type ConnPool struct {
 	wg  sync.WaitGroup
 
 	// free connections
-	free      chan interface{}
-	reconnect chan interface{}
+	free chan interface{}
+	dead chan interface{}
 
 	// stop the pool
 	wait chan interface{}
 }
 
 // Start creates given number of pending connections. Non thread safe.
-func (p *ConnPool) Start() error {
+func (p *connPool) Start() error {
 	p.wait = make(chan interface{})
-	p.conns = make([]interface{}, 0, p.Size)
+	p.conns = make([]interface{}, 0, p.size)
 
-	p.free = make(chan interface{}, p.Size)
-	p.reconnect = make(chan interface{}, p.Size)
+	p.free = make(chan interface{}, p.size)
+	p.dead = make(chan interface{}, p.size)
 
 	// connect in parallel
-	start := make(chan interface{}, p.Size)
-	for i := 0; i < p.Size; i++ {
+	start := make(chan interface{}, p.size)
+	for i := 0; i < p.size; i++ {
 		go func() {
 			c, err := p.createConn()
 			if err != nil {
@@ -62,7 +56,7 @@ func (p *ConnPool) Start() error {
 		}()
 	}
 
-	for i := 0; i < p.Size; i++ {
+	for i := 0; i < p.size; i++ {
 		r := <-start
 		if err, ok := r.(error); ok {
 			p.Destroy()
@@ -76,7 +70,7 @@ func (p *ConnPool) Start() error {
 }
 
 // Allocate free connection or return error. Blocked until connection is available or pool is dead.
-func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
+func (p *connPool) Allocate(tout time.Duration) (interface{}, error) {
 	p.muw.Lock()
 	defer p.muw.Unlock()
 
@@ -103,12 +97,12 @@ func (p *ConnPool) Allocate(tout time.Duration) (interface{}, error) {
 	}
 }
 
-// Release the connection with or without context error. If error is instance of ConnError then
+// Release the connection with or without context error. If error is instance of connError then
 // connection will be recreated.
-func (p *ConnPool) Release(conn interface{}, err error) {
+func (p *connPool) Release(conn interface{}, err error) {
 	p.wg.Done()
 
-	if _, ok := err.(ConnError); ok {
+	if _, ok := err.(connError); ok {
 		// connection issue, retry?
 		p.replaceConn(conn)
 		return
@@ -118,7 +112,7 @@ func (p *ConnPool) Release(conn interface{}, err error) {
 }
 
 // Destroy pool and close all underlying connections. Thread safe.
-func (p *ConnPool) Destroy() {
+func (p *connPool) Destroy() {
 	if atomic.LoadInt32(&p.inDestroy) == 1 {
 		return
 	}
@@ -142,10 +136,10 @@ func (p *ConnPool) Destroy() {
 	p.conns = nil
 }
 
-// serve connections and reconnect dead sockets.
-func (p *ConnPool) serve() {
+// serve connections and dead dead sockets.
+func (p *connPool) serve() {
 	var (
-		retry    = time.NewTicker(p.Reconnect)
+		retry    = time.NewTicker(p.reconnect)
 		deadConn = 0
 	)
 
@@ -177,14 +171,14 @@ func (p *ConnPool) serve() {
 			p.free <- conn
 			deadConn--
 
-			// try to reconnect the rest of conns
+			// try to dead the rest of conns
 			for i := 0; i < deadConn; i++ {
-				p.reconnect <- nil
+				p.dead <- nil
 				deadConn--
 			}
 			p.wg.Done()
 
-		case conn := <-p.reconnect:
+		case conn := <-p.dead:
 			if closer, ok := conn.(io.Closer); ok {
 				closer.Close()
 			}
@@ -209,8 +203,8 @@ func (p *ConnPool) serve() {
 	}
 }
 
-// close the connection and reconnect it with new one (if pool is still alive).
-func (p *ConnPool) replaceConn(conn interface{}) {
+// close the connection and dead it with new one (if pool is still alive).
+func (p *connPool) replaceConn(conn interface{}) {
 	p.muc.Lock()
 	for i, c := range p.conns {
 		if conn == c {
@@ -220,12 +214,12 @@ func (p *ConnPool) replaceConn(conn interface{}) {
 	}
 	p.muc.Unlock()
 
-	p.reconnect <- conn
+	p.dead <- conn
 }
 
 // Creates new connection in the pool.
-func (p *ConnPool) createConn() (interface{}, error) {
-	c, err := p.New()
+func (p *connPool) createConn() (interface{}, error) {
+	c, err := p.new()
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +232,7 @@ func (p *ConnPool) createConn() (interface{}, error) {
 }
 
 // indicate that we have reserved the operation (pool must wait until operation is complete)
-func (p *ConnPool) acquireLock() bool {
+func (p *connPool) acquireLock() bool {
 	p.muw.Lock()
 	defer p.muw.Unlock()
 

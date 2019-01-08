@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/cpool"
 	"log"
 	"strconv"
 	"sync"
@@ -23,7 +22,7 @@ type tube struct {
 	tubeSet *beanstalk.TubeSet
 
 	// socket pool
-	connPool *cpool.ConnPool
+	connPool *connPool
 
 	// durations
 	reserve    time.Duration
@@ -48,7 +47,7 @@ type tube struct {
 // create new tube consumer and producer
 func newTube(
 	pipe *jobs.Pipeline,
-	connPool *cpool.ConnPool,
+	connPool *connPool,
 	reserve time.Duration,
 	cmdTimeout time.Duration,
 	lsn func(event int, ctx interface{}),
@@ -259,8 +258,8 @@ func wrapErr(err error) error {
 		return nil
 	}
 
-	if cpool.IsConnError(err) {
-		return cpool.ConnError{Caused: err}
+	if isConnError(err) {
+		return connError{Caused: err}
 	}
 
 	return err
