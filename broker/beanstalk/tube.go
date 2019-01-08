@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -21,8 +20,12 @@ type tube struct {
 	tube    *beanstalk.Tube
 	tubeSet *beanstalk.TubeSet
 
-	// socket pool
-	connPool *connPool
+	// only for put and stat operations
+	sharedConn *conn
+
+	// consume connection (lazy initialization)
+	consumeConn *conn
+	connector   connector
 
 	// durations
 	reserve    time.Duration
@@ -47,7 +50,8 @@ type tube struct {
 // create new tube consumer and producer
 func newTube(
 	pipe *jobs.Pipeline,
-	connPool *connPool,
+	sharedConn *conn,
+	connector connector,
 	reserve time.Duration,
 	cmdTimeout time.Duration,
 	lsn func(event int, ctx interface{}),
@@ -60,7 +64,8 @@ func newTube(
 		pipe:       pipe,
 		tube:       &beanstalk.Tube{Name: pipe.String("tube", "")},
 		tubeSet:    beanstalk.NewTubeSet(nil, pipe.String("tube", "")),
-		connPool:   connPool,
+		sharedConn: sharedConn,
+		connector:  connector,
 		reserve:    reserve,
 		cmdTimeout: cmdTimeout,
 		lsn:        lsn,
@@ -81,12 +86,21 @@ func (t *tube) serve(prefetch int) {
 	t.fetchPool = make(chan interface{}, prefetch)
 	atomic.StoreInt32(&t.active, 1)
 
+	consumeConn, err := t.connector.newConn()
+	defer consumeConn.Close()
+
+	if err != nil {
+		t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
+		return
+	}
+
 	for i := 0; i < prefetch; i++ {
 		t.fetchPool <- nil
 	}
 
 	for {
-		conn, id, job, eof := t.fetchJob()
+		id, job, eof := t.fetchJob(consumeConn)
+
 		if eof {
 			return
 		}
@@ -96,9 +110,8 @@ func (t *tube) serve(prefetch int) {
 		}
 
 		go func() {
-			err := t.consume(conn, <-t.execPool, id, job)
+			err := t.consume(consumeConn, <-t.execPool, id, job)
 			t.fetchPool <- nil
-			t.connPool.Release(conn, wrapErr(err))
 			t.wg.Done()
 
 			if err != nil {
@@ -109,28 +122,27 @@ func (t *tube) serve(prefetch int) {
 }
 
 // fetchJob and allocate connection. fetchPool must be refilled manually.
-func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, eof bool) {
+func (t *tube) fetchJob(consumeConn *conn) (id uint64, job *jobs.Job, eof bool) {
 	t.muw.Lock()
 	defer t.muw.Unlock()
 
 	select {
 	case <-t.wait:
-		return nil, 0, nil, true
+		return 0, nil, true
 	case <-t.fetchPool:
-		conn, err := t.connPool.Allocate(t.cmdTimeout)
+		conn, err := consumeConn.Acquire()
 		if err != nil {
 			t.fetchPool <- nil
-			return nil, 0, nil, false
+			return 0, nil, false
 		}
 
-		t.tubeSet.Conn = conn.(*beanstalk.Conn)
+		t.tubeSet.Conn = conn
 
 		id, body, err := t.tubeSet.Reserve(t.reserve)
 		if err != nil {
-			// do not report reserve errors such as timeouts, conn errors will be reported by the connPool
-			t.connPool.Release(conn, wrapErr(err))
+			consumeConn.Release(err)
 			t.fetchPool <- nil
-			return nil, 0, nil, false
+			return 0, nil, false
 		}
 
 		job = &jobs.Job{}
@@ -138,42 +150,47 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, eof b
 
 		if err != nil {
 			t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
-			t.connPool.Release(conn, wrapErr(err))
+			consumeConn.Release(err)
 			t.fetchPool <- nil
-			return nil, 0, nil, false
+			return 0, nil, false
 		}
 
 		// got the job, it will block eof() until wg is freed
 		t.wg.Add(1)
+		consumeConn.Release(err)
 
 		// fetchPool and connPool will be refilled by consume method
-		return conn.(*beanstalk.Conn), id, job, false
+		return id, job, false
 	}
 }
 
 // consume job
-func (t *tube) consume(conn *beanstalk.Conn, h jobs.Handler, id uint64, j *jobs.Job) error {
+func (t *tube) consume(consumeConn *conn, h jobs.Handler, id uint64, j *jobs.Job) error {
 	err := h(jid(id), j)
 	t.execPool <- h
 
+	conn, err := consumeConn.Acquire()
+	if err != nil {
+		return err
+	}
+
 	if err == nil {
-		return conn.Delete(id)
+		return consumeConn.Release(conn.Delete(id))
 	}
 
 	stat, statErr := conn.StatsJob(id)
 	if statErr != nil {
-		return statErr
+		return consumeConn.Release(statErr)
 	}
 
 	t.err(jid(id), j, err)
 
 	reserves, _ := strconv.Atoi(stat["reserves"])
 	if reserves != 0 && j.Options.CanRetry(reserves) {
-		log.Println("bean retry", reserves)
-		return conn.Release(id, 0, j.Options.RetryDuration())
+		return consumeConn.Release(conn.Release(id, 0, j.Options.RetryDuration()))
 	}
 
-	return conn.Bury(id, 0)
+	return consumeConn.Release(conn.Bury(id, 0))
 }
 
 // stop tube consuming
@@ -192,35 +209,36 @@ func (t *tube) stop() {
 
 // put data into pool or return error (no wait)
 func (t *tube) put(data []byte, attempt int, delay, rrt time.Duration) (id string, err error) {
-	var bid uint64
-	conn, err := t.connPool.Allocate(t.cmdTimeout)
+	conn, err := t.sharedConn.Acquire()
 	if err != nil {
 		return "", err
 	}
 
+	var bid uint64
+
 	t.mut.Lock()
-	t.tube.Conn = conn.(*beanstalk.Conn)
+	t.tube.Conn = conn
 	bid, err = t.tube.Put(data, 0, delay, rrt)
 	t.mut.Unlock()
 
-	t.connPool.Release(conn, wrapErr(err))
+	t.sharedConn.Release(err)
 
 	return jid(bid), err
 }
 
 // return tube stats
 func (t *tube) stat() (stat *jobs.Stat, err error) {
-	conn, err := t.connPool.Allocate(t.cmdTimeout)
+	conn, err := t.sharedConn.Acquire()
 	if err != nil {
 		return nil, err
 	}
 
 	t.mut.Lock()
-	t.tube.Conn = conn.(*beanstalk.Conn)
+	t.tube.Conn = conn
 	values, err := t.tube.Stats()
 	t.mut.Unlock()
 
-	t.connPool.Release(conn, wrapErr(err))
+	t.sharedConn.Release(err)
 
 	stat = &jobs.Stat{InternalName: t.tube.Name}
 
@@ -250,17 +268,4 @@ func jid(id uint64) string {
 		return ""
 	}
 	return strconv.FormatUint(id, 10)
-}
-
-// wrapError into conn error when detected. softErr would not wrap any of no connection errors.
-func wrapErr(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if isConnError(err) {
-		return connError{Caused: err}
-	}
-
-	return err
 }

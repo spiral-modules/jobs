@@ -10,12 +10,12 @@ import (
 
 // Broker run jobs using Broker service.
 type Broker struct {
-	cfg      *Config
-	lsns     []func(event int, ctx interface{})
-	mu       sync.Mutex
-	wait     chan error
-	connPool *connPool
-	tubes    map[*jobs.Pipeline]*tube
+	cfg        *Config
+	lsns       []func(event int, ctx interface{})
+	mu         sync.Mutex
+	wait       chan error
+	sharedConn *conn
+	tubes      map[*jobs.Pipeline]*tube
 }
 
 // AddListener attaches server event watcher.
@@ -26,8 +26,13 @@ func (b *Broker) AddListener(l func(event int, ctx interface{})) {
 // Init configures broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
-	b.connPool = cfg.ConnPool()
 	b.tubes = make(map[*jobs.Pipeline]*tube)
+
+	conn, err := b.cfg.newConn()
+	if err != nil {
+		return false, err
+	}
+	b.sharedConn = conn
 
 	return true, nil
 }
@@ -39,7 +44,8 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 
 	t, err := newTube(
 		pipe,
-		b.connPool,              // available connections
+		b.sharedConn,            // available connections
+		b.cfg,                   // connector
 		b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
 		b.cfg.TimeoutDuration(), // how much time is given to allocate connection
 		b.throw,                 // event lsn
@@ -57,18 +63,6 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 // Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
-	if b.connPool.size < (len(b.tubes)*b.cfg.Prefetch + 2) {
-		// Since each of the tube is listening it's own connection is it possible to run out of connections
-		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
-		b.connPool.size = len(b.tubes)*b.cfg.Prefetch + 2
-	}
-
-	if err = b.connPool.Start(); err != nil {
-		b.mu.Unlock()
-		return err
-	}
-	defer b.connPool.Destroy()
-
 	for _, t := range b.tubes {
 		if t.execPool != nil {
 			go t.serve(b.cfg.Prefetch)
@@ -170,8 +164,8 @@ func (b *Broker) stopError(err error) {
 		t.stop()
 	}
 
-	b.connPool.Destroy()
-	b.wait <- err
+	b.wait <- nil
+	b.sharedConn.Close()
 }
 
 // check if broker is serving

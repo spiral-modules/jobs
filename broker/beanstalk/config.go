@@ -2,10 +2,7 @@ package beanstalk
 
 import (
 	"errors"
-	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/roadrunner/service"
-	"io"
-	"net"
 	"strings"
 	"syscall"
 	"time"
@@ -15,9 +12,6 @@ import (
 type Config struct {
 	// Addr of beanstalk server.
 	Addr string
-
-	// size defines number of open connections to beanstalk server. Default 5.
-	NumConn int
 
 	// Prefetch number of jobs allowed to be fetched by each pipe at the same time. Default 1.
 	Prefetch int
@@ -31,7 +25,6 @@ type Config struct {
 
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
-	c.NumConn = 2
 	c.Prefetch = 1
 	c.Reserve = 1
 	c.Timeout = 10
@@ -44,17 +37,8 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return cfg.Unmarshal(c)
 }
 
-// connPool creates new connection pool for beanstalk.
-func (c *Config) ConnPool() *connPool {
-	return &connPool{
-		size:      c.NumConn,
-		reconnect: c.TimeoutDuration(),
-		new:       func() (i io.Closer, e error) { return c.newConn() },
-	}
-}
-
 // size creates new rpc socket Listener.
-func (c *Config) newConn() (*beanstalk.Conn, error) {
+func (c *Config) newConn() (*conn, error) {
 	dsn := strings.Split(c.Addr, "://")
 	if len(dsn) != 2 {
 		return nil, errors.New("invalid socket DSN (tcp://:6001, unix://rpc.sock)")
@@ -64,12 +48,7 @@ func (c *Config) newConn() (*beanstalk.Conn, error) {
 		syscall.Unlink(dsn[1])
 	}
 
-	conn, err := net.Dial(dsn[0], dsn[1])
-	if err != nil {
-		return nil, err
-	}
-
-	return beanstalk.NewConn(conn), nil
+	return newConn(dsn[0], dsn[1], c.TimeoutDuration())
 }
 
 // ReserveDuration returns number of seconds to reserve the job.
