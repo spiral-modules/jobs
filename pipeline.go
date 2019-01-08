@@ -102,6 +102,12 @@ func (c Pipeline) Map(name string) Pipeline {
 	out := make(map[string]interface{})
 
 	if value, ok := c[name]; ok {
+		if m, ok := value.(map[string]interface{}); ok {
+			for k, v := range m {
+				out[k] = v
+			}
+		}
+
 		if m, ok := value.(map[interface{}]interface{}); ok {
 			for k, v := range m {
 				if ks, ok := k.(string); ok {
