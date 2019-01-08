@@ -28,10 +28,13 @@ final class Options implements \JsonSerializable
 
     /**
      * @param int $delay
+     * @return self
      */
     public function setDelay(?int $delay)
     {
         $this->delay = $delay;
+
+        return $this;
     }
 
     /**
@@ -44,10 +47,13 @@ final class Options implements \JsonSerializable
 
     /**
      * @param string|null $pipeline
+     * @return self
      */
-    public function setPipeline(?string $pipeline)
+    public function setPipeline(?string $pipeline): self
     {
         $this->pipeline = $pipeline;
+
+        return this;
     }
 
     /**
@@ -65,4 +71,6 @@ final class Options implements \JsonSerializable
     {
         return ['delay' => $this->delay, 'pipeline' => $this->pipeline];
     }
+
+    // todo: static constructor
 }

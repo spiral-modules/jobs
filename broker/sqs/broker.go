@@ -117,7 +117,21 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	// todo: check delay duration and retry duration
+	if j.Options.Delay > 900 {
+		return "", fmt.Errorf(
+			"unable to push into `%s`, got delay %v (maximum 900)",
+			pipe.Name(),
+			j.Options.Delay,
+		)
+	}
+
+	if j.Options.RetryDelay > 900 {
+		return "", fmt.Errorf(
+			"unable to push into `%s`, got retry delay %v (maximum 900)",
+			pipe.Name(),
+			j.Options.RetryDelay,
+		)
+	}
 
 	t := b.queue(pipe)
 	if t == nil {
