@@ -1,4 +1,4 @@
-package ampq
+package amqp
 
 import (
 	"encoding/json"

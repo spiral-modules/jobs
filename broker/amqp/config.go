@@ -1,4 +1,4 @@
-package ampq
+package amqp
 
 import (
 	"github.com/spiral/roadrunner/service"
@@ -6,6 +6,8 @@ import (
 
 // Config defines sqs broker configuration.
 type Config struct {
+	// Host of AMQP server.
+	Host string
 }
 
 // InitDefaults sets missing values to their default values.

@@ -7,7 +7,7 @@ jobs:
 
   # beanstalk configuration
   beanstalk:
-    address:  tcp://localhost:11300
+    host:  tcp://localhost:11300
     reserve:  1
     prefetch: 1
 

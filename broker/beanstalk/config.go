@@ -14,8 +14,8 @@ import (
 
 // Config defines beanstalk broker configuration.
 type Config struct {
-	// Address of beanstalk server.
-	Address string
+	// Host of beanstalk server.
+	Host string
 
 	// Size defines number of open connections to beanstalk server. Default 5.
 	NumConn int
@@ -56,7 +56,7 @@ func (c *Config) ConnPool() *cpool.ConnPool {
 
 // Size creates new rpc socket Listener.
 func (c *Config) newConn() (*beanstalk.Conn, error) {
-	dsn := strings.Split(c.Address, "://")
+	dsn := strings.Split(c.Host, "://")
 	if len(dsn) != 2 {
 		return nil, errors.New("invalid socket DSN (tcp://:6001, unix://rpc.sock)")
 	}
