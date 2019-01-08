@@ -7,7 +7,7 @@
 - supports in memory queue, Beanstalk, AWS SQS
 - can work as standalone application or as part of RoadRunner server
 - multiple pipelines per application
-- durable (prefect control, graceful exit, reconnects)
+- durable (prefetch control, graceful exit, reconnects)
 - plug-and-play PHP library (framework agnostic)
 - combines job and process manager
 - delayed jobs
