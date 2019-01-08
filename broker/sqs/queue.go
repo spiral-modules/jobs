@@ -209,40 +209,38 @@ func (q *queue) send(data []byte, delay, retry time.Duration) (string, error) {
 
 // return queue stats
 func (q *queue) stat() (stat *jobs.Stat, err error) {
+	r, err := q.sqs.GetQueueAttributes(&sqs.GetQueueAttributesInput{
+		QueueUrl: q.url,
+		AttributeNames: []*string{
+			aws.String("ApproximateNumberOfMessages"),
+			aws.String("ApproximateNumberOfMessagesDelayed"),
+			aws.String("ApproximateNumberOfMessagesNotVisible"),
+		},
+	})
 
-	// r, err := b.sqs.GetQueueAttributes(&sqs.GetQueueAttributesInput{
-	// 	QueueUrl: b.queue[p].URL,
-	// 	AttributeNames: []*string{
-	// 		aws.String("ApproximateNumberOfMessages"),
-	// 		aws.String("ApproximateNumberOfMessagesDelayed"),
-	// 		aws.String("ApproximateNumberOfMessagesNotVisible"),
-	// 	},
-	// })
-	//
-	// stat = &jobs.Stat{Pipeline: b.queue[p].Queue}
-	//
-	// for a, v := range r.Attributes {
-	// 	if a == "ApproximateNumberOfMessages" {
-	// 		if v, err := strconv.Atoi(*v); err == nil {
-	// 			stat.Queue = int64(v)
-	// 		}
-	// 	}
-	//
-	// 	if a == "ApproximateNumberOfMessagesNotVisible" {
-	// 		if v, err := strconv.Atoi(*v); err == nil {
-	// 			stat.Active = int64(v)
-	// 		}
-	// 	}
-	//
-	// 	if a == "ApproximateNumberOfMessagesDelayed" {
-	// 		if v, err := strconv.Atoi(*v); err == nil {
-	// 			stat.Delayed = int64(v)
-	// 		}
-	// 	}
-	// }
-	//
-	// return stat, nil
-	return nil, nil
+	stat = &jobs.Stat{InternalName: q.pipe.String("queue", "")}
+
+	for a, v := range r.Attributes {
+		if a == "ApproximateNumberOfMessages" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Queue = int64(v)
+			}
+		}
+
+		if a == "ApproximateNumberOfMessagesNotVisible" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Active = int64(v)
+			}
+		}
+
+		if a == "ApproximateNumberOfMessagesDelayed" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Delayed = int64(v)
+			}
+		}
+	}
+
+	return stat, nil
 }
 
 // throw handles service, server and pool events.
