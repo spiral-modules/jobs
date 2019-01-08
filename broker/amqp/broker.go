@@ -29,6 +29,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 
 // Serve broker pipelines.
 func (b *Broker) Serve() error {
+
 	return nil
 }
 
