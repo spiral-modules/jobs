@@ -10,7 +10,7 @@
 - plug-and-play PHP library (framework agnostic)
 - combines job and process manager
 - delayed jobs
-- job level timeouts and retries
+- job level timeouts and retries, retry delays
 - PHP and Golang consumers and producers
 - pipelines stop/resume
 - graceful exit
