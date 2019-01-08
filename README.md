@@ -5,6 +5,7 @@
 
 ## Features
 - supports in memory queue, Beanstalk, AWS SQS
+- can work as standalone application or as part of RoadRunner server
 - multiple pipelines per application
 - plug-and-play PHP library (framework agnostic)
 - combines job and process manager
