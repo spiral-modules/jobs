@@ -34,7 +34,7 @@ type entry struct {
 
 // create new queue
 func newQueue() *queue {
-	return &queue{stat: &jobs.Stat{}, jobs: make(chan *entry)}
+	return &queue{stat: &jobs.Stat{InternalName: ":memory:"}, jobs: make(chan *entry)}
 }
 
 // associate queue with new consume pool

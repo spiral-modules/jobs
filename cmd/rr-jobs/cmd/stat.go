@@ -99,12 +99,13 @@ func showStats(client *rpc.Client) {
 // StatTable renders table with information about all active pipelines.
 func StatTable(pipelines []*jobs.Stat) *tablewriter.Table {
 	tw := tablewriter.NewWriter(os.Stdout)
-	tw.SetHeader([]string{"Broker", "Pipeline", "queue", "Delayed", "Active"})
+	tw.SetHeader([]string{"Pipeline", "Broker", "Name", "Queue", "Delayed", "Active"})
 
 	for _, p := range pipelines {
 		tw.Append([]string{
-			util.Sprintf("<white+hb>%s</reset>", p.Broker),
 			util.Sprintf("<cyan>%s</reset>", p.Pipeline),
+			util.Sprintf("<white+hb>%s</reset>", p.Broker),
+			util.Sprintf("<gray+hb>%s</reset>", p.InternalName),
 			util.Sprintf("<magenta>%s</reset>", humanize.Comma(p.Queue)),
 			util.Sprintf("<yellow>%s</reset>", humanize.Comma(p.Delayed)),
 			util.Sprintf("<green>%s</reset>", humanize.Comma(p.Active)),
