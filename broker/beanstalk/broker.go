@@ -46,7 +46,6 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 		pipe,
 		b.sharedConn,            // available connections
 		b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
-		b.cfg.TimeoutDuration(), // how much time is given to allocate connection
 		b.throw,                 // event lsn
 	)
 

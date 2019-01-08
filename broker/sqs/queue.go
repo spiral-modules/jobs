@@ -98,6 +98,7 @@ func (q *queue) fetchMessage() (msg *sqs.Message, job *jobs.Job, eof bool) {
 	q.muw.Lock()
 	defer q.muw.Unlock()
 
+	var consumeErr error
 	select {
 	case <-q.wait:
 		return nil, nil, true
@@ -110,10 +111,16 @@ func (q *queue) fetchMessage() (msg *sqs.Message, job *jobs.Job, eof bool) {
 		})
 
 		if err != nil {
-			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			if consumeErr != nil {
+				q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+				consumeErr = err
+			}
+
 			q.fetchPool <- nil
 			return nil, nil, false
 		}
+
+		consumeErr = nil
 
 		if len(result.Messages) == 0 {
 			q.fetchPool <- nil

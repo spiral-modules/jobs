@@ -24,8 +24,7 @@ type tube struct {
 	sharedConn *conn
 
 	// durations
-	reserve    time.Duration
-	cmdTimeout time.Duration
+	reserve time.Duration
 
 	// tube events
 	lsn func(event int, ctx interface{})
@@ -48,7 +47,6 @@ func newTube(
 	pipe *jobs.Pipeline,
 	sharedConn *conn,
 	reserve time.Duration,
-	cmdTimeout time.Duration,
 	lsn func(event int, ctx interface{}),
 ) (*tube, error) {
 	if pipe.String("tube", "") == "" {
@@ -61,7 +59,6 @@ func newTube(
 		tubeSet:    beanstalk.NewTubeSet(nil, pipe.String("tube", "")),
 		sharedConn: sharedConn,
 		reserve:    reserve,
-		cmdTimeout: cmdTimeout,
 		lsn:        lsn,
 	}, nil
 }
