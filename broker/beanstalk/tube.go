@@ -23,10 +23,6 @@ type tube struct {
 	// only for put and stat operations
 	sharedConn *conn
 
-	// consume connection (lazy initialization)
-	consumeConn *conn
-	connector   connector
-
 	// durations
 	reserve    time.Duration
 	cmdTimeout time.Duration
@@ -51,7 +47,6 @@ type tube struct {
 func newTube(
 	pipe *jobs.Pipeline,
 	sharedConn *conn,
-	connector connector,
 	reserve time.Duration,
 	cmdTimeout time.Duration,
 	lsn func(event int, ctx interface{}),
@@ -65,7 +60,6 @@ func newTube(
 		tube:       &beanstalk.Tube{Name: pipe.String("tube", "")},
 		tubeSet:    beanstalk.NewTubeSet(nil, pipe.String("tube", "")),
 		sharedConn: sharedConn,
-		connector:  connector,
 		reserve:    reserve,
 		cmdTimeout: cmdTimeout,
 		lsn:        lsn,
@@ -81,12 +75,12 @@ func (t *tube) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) erro
 }
 
 // run consumers
-func (t *tube) serve(prefetch int) {
+func (t *tube) serve(connector connector, prefetch int) {
 	t.wait = make(chan interface{})
 	t.fetchPool = make(chan interface{}, prefetch)
 	atomic.StoreInt32(&t.active, 1)
 
-	consumeConn, err := t.connector.newConn()
+	consumeConn, err := connector.newConn()
 	defer consumeConn.Close()
 
 	if err != nil {

@@ -45,7 +45,6 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	t, err := newTube(
 		pipe,
 		b.sharedConn,            // available connections
-		b.cfg,                   // connector
 		b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
 		b.cfg.TimeoutDuration(), // how much time is given to allocate connection
 		b.throw,                 // event lsn
@@ -65,7 +64,7 @@ func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 	for _, t := range b.tubes {
 		if t.execPool != nil {
-			go t.serve(b.cfg.Prefetch)
+			go t.serve(b.cfg, b.cfg.Prefetch)
 		}
 	}
 
@@ -99,7 +98,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	if b.wait != nil && t.execPool != nil {
 		// resume wg
-		go t.serve(b.cfg.Prefetch)
+		go t.serve(b.cfg, b.cfg.Prefetch)
 	}
 
 	return nil
