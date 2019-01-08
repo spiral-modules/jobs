@@ -112,9 +112,7 @@ func (t *tube) serve(connector connector, prefetch int) {
 		}()
 	}
 
-	log.Println("done serving")
 	t.wg.Wait()
-	log.Println("wait for complete")
 }
 
 // fetch jobs
@@ -126,7 +124,6 @@ func (t *tube) jobs(cn *conn, prefetch int) chan entry {
 			t.muw.Lock()
 			select {
 			case <-t.wait:
-				log.Println("got wait on jobs")
 				t.muw.Unlock()
 				return
 			default:
