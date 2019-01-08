@@ -9,21 +9,39 @@ const (
 	// EventPushError caused when job can not be registered.
 	EventPushError
 
+	// EventReceived thrown when new job received.
+	EventReceived
+
 	// EventJobComplete thrown when job execution is successfully completed. JobEvent is passed as context.
 	EventJobComplete
 
 	// EventJobError thrown on all job related errors. See JobError as context.
 	EventJobError
 
-	// EventPipelineConsume when pipeline consuming has been enabled.
+	// EventPipelineConsume when pipeline consuming has been requested.
 	EventPipelineConsume
 
-	// EventPipelineStop when pipeline consuming has been stopped.
+	// EventPipelineConsuming when pipeline consuming has started.
+	EventPipelineConsuming
+
+	// EventPipelineStop when pipeline consuming has begun stopping.
 	EventPipelineStop
+
+	// EventPipelineStop when pipeline consuming has been stopped.
+	EventPipelineStopped
 
 	// EventPipelineError when pipeline specific error happen.
 	EventPipelineError
 )
+
+// JobEvent represent job event.
+type ReceiveEvent struct {
+	// ID is job id.
+	ID string
+
+	// Job is failed job.
+	Job *Job
+}
 
 // JobEvent represent job event.
 type JobEvent struct {
@@ -53,6 +71,15 @@ type JobError struct {
 
 	// Caused contains job specific error.
 	Caused error
+
+	// event timings
+	start   time.Time
+	elapsed time.Duration
+}
+
+// Elapsed returns duration of the invocation.
+func (e *JobError) Elapsed() time.Duration {
+	return e.elapsed
 }
 
 // Caused returns error message.

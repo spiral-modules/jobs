@@ -55,7 +55,15 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventPushComplete:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
-			"job.<magenta+h>PUSH</reset> <cyan>%s</reset> <white+hb>%s</reset>",
+			"job.<magenta+h>PUSH</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
+			e.Job.Job,
+			e.ID,
+		))
+
+	case jobs.EventReceived:
+		e := ctx.(*jobs.ReceiveEvent)
+		s.logger.Info(util.Sprintf(
+			"job.<cyan+h>RECV</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
 			e.Job.Job,
 			e.ID,
 		))
@@ -63,25 +71,26 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventJobComplete:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
-			"job.<green+h>DONE</reset> <cyan>%s</reset> %s <white+hb>%s</reset>",
+			"job.<green+h>DONE</reset> <white+hb>%s</reset> <gray+hb>%s</reset> %s",
 			e.Job.Job,
-			elapsed(e.Elapsed()),
 			e.ID,
+			elapsed(e.Elapsed()),
 		))
 
 	case jobs.EventJobError:
 		e := ctx.(*jobs.JobError)
 		s.logger.Error(util.Sprintf(
-			"job.<red>ERRO</reset> <cyan>%s</reset> <white+hb>%s</reset> <yellow>%s</reset>",
+			"job.<red+hb>ERRO</reset> <red+>%s</reset> <gray+hb>%s</reset> %s <yellow>%s</reset>",
 			e.Job.Job,
 			e.ID,
+			elapsed(e.Elapsed()),
 			e.Error(),
 		))
 
 	case jobs.EventPushError:
 		e := ctx.(*jobs.JobError)
 		s.logger.Error(util.Sprintf(
-			"job.<red>ERRO</reset> <cyan>%s</reset> <red+hb>%s</reset>",
+			"job.<red>ERRO</reset> <red>%s</reset> <red+hb>%s</reset>",
 			e.Job.Job,
 			e.Error(),
 		))
@@ -89,7 +98,15 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventPipelineConsume:
 		e := ctx.(*jobs.Pipeline)
 		s.logger.Info(util.Sprintf(
-			"[%s]: resuming {<green+hb>%s</reset>}",
+			"[%s]: resuming {<yellow+hb>%s</reset>}",
+			e.Broker(),
+			e.Name(),
+		))
+
+	case jobs.EventPipelineConsuming:
+		e := ctx.(*jobs.Pipeline)
+		s.logger.Info(util.Sprintf(
+			"[%s]: resumed {<green+hb>%s</reset>}",
 			e.Broker(),
 			e.Name(),
 		))
@@ -98,6 +115,14 @@ func (s *debugger) listener(event int, ctx interface{}) {
 		e := ctx.(*jobs.Pipeline)
 		s.logger.Info(util.Sprintf(
 			"[%s]: stopping {<yellow+hb>%s</reset>}",
+			e.Broker(),
+			e.Name(),
+		))
+
+	case jobs.EventPipelineStopped:
+		e := ctx.(*jobs.Pipeline)
+		s.logger.Debugf(util.Sprintf(
+			"[%s]: stopped {<magenta+hb>%s</reset>}",
 			e.Broker(),
 			e.Name(),
 		))

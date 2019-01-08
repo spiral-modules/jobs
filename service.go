@@ -205,11 +205,19 @@ func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler Erro
 		return err
 	}
 
+	if execPool != nil {
+		s.throw(EventPipelineConsuming, pipe)
+	} else {
+		s.throw(EventPipelineStopped, pipe)
+	}
+
 	return nil
 }
 
 // exec executed job using local RR server. Make sure that service is started.
 func (s *Service) exec(id string, j *Job) error {
+	s.throw(EventReceived, &ReceiveEvent{ID: id, Job: j})
+
 	ctx, err := j.Context(id)
 	if err != nil {
 		s.error(id, j, err)
@@ -219,17 +227,31 @@ func (s *Service) exec(id string, j *Job) error {
 	start := time.Now()
 	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
 	if err == nil {
-		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j, start: start, elapsed: time.Since(start)})
+		s.throw(EventJobComplete, &JobEvent{
+			ID:      id,
+			Job:     j,
+			start:   start,
+			elapsed: time.Since(start),
+		})
+
 		return nil
 	}
 
 	// broker can handle retry or register job as errored
+	s.throw(EventJobError, &JobError{
+		ID:      id,
+		Job:     j,
+		Caused:  err,
+		start:   start,
+		elapsed: time.Since(start),
+	})
+
 	return err
 }
 
-// error must be invoked when job is declared as failed.
+// register died job, can be used to move to fallback queue or log
 func (s *Service) error(id string, j *Job, err error) {
-	s.throw(EventJobError, &JobError{ID: id, Job: j, Caused: err})
+	// nothing now
 }
 
 // throw handles service, server and pool events.
