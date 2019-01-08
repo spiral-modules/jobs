@@ -28,6 +28,7 @@ script:
   - go test -v -race -cover ./cpool -coverprofile=cpool.txt -covermode=atomic
   - go test -v -race -cover ./broker/local -coverprofile=local.txt -covermode=atomic
   - go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
+  - go test -v -race -cover ./broker/sqs -coverprofile=sqs.txt -covermode=atomic
   - vendor/bin/phpunit --coverage-clover=coverage.xml
 
 after_success:
@@ -35,6 +36,7 @@ after_success:
   - bash <(curl -s https://codecov.io/bash) -f cpool.txt
   - bash <(curl -s https://codecov.io/bash) -f local.txt
   - bash <(curl -s https://codecov.io/bash) -f beanstalk.txt
+  - bash <(curl -s https://codecov.io/bash) -f sqs.txt
   - bash <(curl -s https://codecov.io/bash) -f coverage.xml
 
 jobs:
