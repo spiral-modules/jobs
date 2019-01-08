@@ -80,9 +80,11 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	}
 
 	for name, b := range s.Brokers {
-		// registering pipelines and handlers
-		if err := b.Register(s.Pipelines().Broker(name)); err != nil {
-			return false, err
+		for _, pipe := range s.Pipelines().Broker(name) {
+			// registering pipelines and handlers
+			if err := b.Register(pipe); err != nil {
+				return false, err
+			}
 		}
 	}
 

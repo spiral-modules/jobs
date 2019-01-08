@@ -1,4 +1,4 @@
-package ____sqs
+package sqs
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/roadrunner/service"
+	"time"
 )
 
 // Config defines sqs broker configuration.
@@ -22,6 +23,41 @@ type Config struct {
 
 	// Endpoint can be used to re-define SQS endpoint to custom location. Only for local development.
 	Endpoint string
+
+	// Prefetch number of jobs allowed to be fetched by each pipe at the same time. Default 2.
+	Prefetch int
+
+	// Reserve timeout in seconds. Default 1.
+	Reserve int
+}
+
+// InitDefaults sets missing values to their default values.
+func (c *Config) InitDefaults() error {
+	c.Reserve = 1
+	c.Prefetch = 4
+
+	return nil
+}
+
+// Hydrate config values.
+func (c *Config) Hydrate(cfg service.Config) error {
+	if err := cfg.Unmarshal(c); err != nil {
+		return err
+	}
+
+	if c.Region == "" {
+		return errors.New("SQS region is missing")
+	}
+
+	if c.Key == "" {
+		return errors.New("SQS key is missing")
+	}
+
+	if c.Secret == "" {
+		return errors.New("SQS secret is missing")
+	}
+
+	return nil
 }
 
 // Session returns new AWS session.
@@ -46,23 +82,7 @@ func (c *Config) SQS() (*sqs.SQS, error) {
 	return sqs.New(sess, &aws.Config{Endpoint: aws.String(c.Endpoint)}), nil
 }
 
-// Hydrate config values.
-func (c *Config) Hydrate(cfg service.Config) error {
-	if err := cfg.Unmarshal(c); err != nil {
-		return err
-	}
-
-	if c.Region == "" {
-		return errors.New("SQS region is missing")
-	}
-
-	if c.Key == "" {
-		return errors.New("SQS key is missing")
-	}
-
-	if c.Secret == "" {
-		return errors.New("SQS secret is missing")
-	}
-
-	return nil
+// ReserveDuration returns number of seconds to reserve the job.
+func (c *Config) ReserveDuration() time.Duration {
+	return time.Duration(c.Reserve) * time.Second
 }

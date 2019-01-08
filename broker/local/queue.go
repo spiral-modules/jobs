@@ -41,6 +41,7 @@ func newQueue() *queue {
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	q.execPool = execPool
 	q.err = err
+
 	return nil
 }
 
@@ -90,12 +91,13 @@ func (q *queue) consume(e *entry, h jobs.Handler) {
 		return
 	}
 
+	q.err(e.id, e.job, err)
+
 	if e.job.Options.CanRetry(e.attempt) {
-		q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
+		go q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
 		return
 	}
 
-	q.err(e.id, e.job, err)
 	atomic.AddInt64(&q.stat.Queue, ^int64(0))
 }
 
@@ -117,7 +119,7 @@ func (q *queue) stop() {
 func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
 	if delay == 0 {
 		atomic.AddInt64(&q.stat.Queue, 1)
-		q.jobs <- &entry{id: id, job: j}
+		q.jobs <- &entry{id: id, job: j, attempt: attempt}
 		return
 	}
 

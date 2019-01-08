@@ -1,7 +1,7 @@
 module github.com/spiral/jobs
 
 require (
-	github.com/aws/aws-sdk-go v1.16.14 // indirect
+	github.com/aws/aws-sdk-go v1.16.14
 	github.com/beanstalkd/go-beanstalk v0.0.0-20180822062812-53ecdaa3bcfb
 	github.com/buger/goterm v0.0.0-20181115115552-c206103e1f37
 	github.com/dustin/go-humanize v1.0.0

@@ -99,13 +99,19 @@ func (c Pipeline) Has(name string) bool {
 
 // Map must return nested map value or empty config.
 func (c Pipeline) Map(name string) Pipeline {
+	out := make(map[string]interface{})
+
 	if value, ok := c[name]; ok {
-		if m, ok := value.(map[string]interface{}); ok {
-			return Pipeline(m)
+		if m, ok := value.(map[interface{}]interface{}); ok {
+			for k, v := range m {
+				if ks, ok := k.(string); ok {
+					out[ks] = v
+				}
+			}
 		}
 	}
 
-	return Pipeline{}
+	return Pipeline(out)
 }
 
 // Bool must return option value as string or return default value.

@@ -23,7 +23,7 @@ type Config struct {
 	// Prefetch number of jobs allowed to be fetched by each pipe at the same time. Default 2.
 	Prefetch int
 
-	// Reserve timeout in seconds. Default 0.
+	// Reserve timeout in seconds. Default 1.
 	Reserve int
 
 	// Timeout to allocate the connection. Default 5.
@@ -34,6 +34,7 @@ type Config struct {
 func (c *Config) InitDefaults() error {
 	c.NumConn = 6
 	c.Prefetch = 4
+	c.Reserve = 1
 	c.Timeout = 10
 
 	return nil

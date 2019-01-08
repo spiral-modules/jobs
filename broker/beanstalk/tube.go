@@ -6,6 +6,7 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
 	"github.com/spiral/jobs/cpool"
+	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -71,6 +72,7 @@ func newTube(
 func (t *tube) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	t.execPool = execPool
 	t.err = err
+
 	return nil
 }
 
@@ -85,8 +87,8 @@ func (t *tube) serve(prefetch int) {
 	}
 
 	for {
-		conn, id, job, stop := t.fetchJob()
-		if stop {
+		conn, id, job, eof := t.fetchJob()
+		if eof {
 			return
 		}
 
@@ -96,6 +98,7 @@ func (t *tube) serve(prefetch int) {
 
 		go func() {
 			err := t.consume(conn, <-t.execPool, id, job)
+			t.fetchPool <- nil
 			t.connPool.Release(conn, wrapErr(err))
 			t.wg.Done()
 
@@ -107,7 +110,7 @@ func (t *tube) serve(prefetch int) {
 }
 
 // fetchJob and allocate connection. fetchPool must be refilled manually.
-func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop bool) {
+func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, eof bool) {
 	t.muw.Lock()
 	defer t.muw.Unlock()
 
@@ -141,7 +144,7 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop 
 			return nil, 0, nil, false
 		}
 
-		// got the job, it will block stop() until wg is freed
+		// got the job, it will block eof() until wg is freed
 		t.wg.Add(1)
 
 		// fetchPool and connPool will be refilled by consume method
@@ -153,7 +156,6 @@ func (t *tube) fetchJob() (conn *beanstalk.Conn, id uint64, job *jobs.Job, stop 
 func (t *tube) consume(conn *beanstalk.Conn, h jobs.Handler, id uint64, j *jobs.Job) error {
 	err := h(jid(id), j)
 	t.execPool <- h
-	t.fetchPool <- nil
 
 	if err == nil {
 		return conn.Delete(id)
@@ -164,12 +166,14 @@ func (t *tube) consume(conn *beanstalk.Conn, h jobs.Handler, id uint64, j *jobs.
 		return statErr
 	}
 
+	t.err(jid(id), j, err)
+
 	reserves, _ := strconv.Atoi(stat["reserves"])
-	if j.Options.CanRetry(reserves) {
+	if reserves != 0 && j.Options.CanRetry(reserves) {
+		log.Println("bean retry", reserves)
 		return conn.Release(id, 0, j.Options.RetryDuration())
 	}
 
-	t.err(jid(id), j, err)
 	return conn.Bury(id, 0)
 }
 

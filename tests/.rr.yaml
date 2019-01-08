@@ -11,7 +11,7 @@ jobs:
     reserve:  1
 
   # amazon sqs configuration
-  amazon:
+  sqs:
     region:   us-west-1
     key:      api-key
     secret:   api-secret
@@ -19,11 +19,11 @@ jobs:
 
   # list of broker pipelines associated with endpoints
   pipelines:
-    #- name:   green
-    #  broker: amazon
-    ##  queue:  default
-    #  options:
-    #    MessageRetentionPeriod: 86400
+    - name:   green
+      broker: sqs
+      queue:  default
+      options:
+        MessageRetentionPeriod: 86400
 
     - name:   purple
       broker: beanstalk

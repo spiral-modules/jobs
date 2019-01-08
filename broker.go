@@ -2,8 +2,8 @@ package jobs
 
 // Broker manages set of pipelines and provides ability to push jobs into them.
 type Broker interface {
-	// Register broker specific pipelines.
-	Register(pipes []*Pipeline) error
+	// Register broker pipeline.
+	Register(pipe *Pipeline) error
 
 	// Consume configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
 	// the service is started!

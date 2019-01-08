@@ -17,18 +17,17 @@ type Broker struct {
 
 // Init configures broker.
 func (b *Broker) Init() (bool, error) {
+	b.queues = make(map[*jobs.Pipeline]*queue)
+
 	return true, nil
 }
 
-// Register broker specific pipelines.
-func (b *Broker) Register(pipes []*jobs.Pipeline) error {
+// Register broker pipeline.
+func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.queues = make(map[*jobs.Pipeline]*queue)
-	for _, p := range pipes {
-		b.queues[p] = newQueue()
-	}
+	b.queues[pipe] = newQueue()
 
 	return nil
 }
@@ -38,7 +37,9 @@ func (b *Broker) Serve() error {
 	// start consuming
 	b.mu.Lock()
 	for _, q := range b.queues {
-		go q.serve()
+		if q.execPool != nil {
+			go q.serve()
+		}
 	}
 	b.wait = make(chan interface{})
 	b.mu.Unlock()

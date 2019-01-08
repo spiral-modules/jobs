@@ -1,22 +1,23 @@
-package beanstalk
+package sqs
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/cpool"
+	"strconv"
 	"sync"
 )
 
-// Broker run jobs using Broker service.
 type Broker struct {
-	cfg      *Config
-	lsns     []func(event int, ctx interface{})
-	mu       sync.Mutex
-	wait     chan error
-	connPool *cpool.ConnPool
-	tubes    map[*jobs.Pipeline]*tube
+	cfg    *Config
+	sqs    *sqs.SQS
+	lsns   []func(event int, ctx interface{})
+	mu     sync.Mutex
+	wait   chan error
+	queues map[*jobs.Pipeline]*queue
 }
 
 // AddListener attaches server event watcher.
@@ -24,11 +25,15 @@ func (b *Broker) AddListener(l func(event int, ctx interface{})) {
 	b.lsns = append(b.lsns, l)
 }
 
-// Init configures broker.
-func (b *Broker) Init(cfg *Config) (bool, error) {
+// Start configures local job broker.
+func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
-	b.connPool = cfg.ConnPool()
-	b.tubes = make(map[*jobs.Pipeline]*tube)
+	b.sqs, err = b.cfg.SQS()
+	if err != nil {
+		return false, err
+	}
+
+	b.queues = make(map[*jobs.Pipeline]*queue)
 
 	return true, nil
 }
@@ -38,19 +43,28 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	t, err := newTube(
+	if pipe.String("queue", "") == "" {
+		return errors.New("missing `queue` parameter on sqs pipeline")
+	}
+
+	url, err := b.ensureQueue(pipe)
+	if err != nil {
+		return err
+	}
+
+	q, err := newQueue(
 		pipe,
-		b.connPool,              // available connections
-		b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
-		b.cfg.TimeoutDuration(), // how much time is given to allocate connection
-		b.throw,                 // event lsn
+		b.sqs,
+		url,
+		b.cfg.ReserveDuration(),
+		b.throw,
 	)
 
 	if err != nil {
 		return err
 	}
 
-	b.tubes[pipe] = t
+	b.queues[pipe] = q
 
 	return nil
 }
@@ -58,24 +72,9 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 // Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
-	if b.connPool.Size < (len(b.tubes)*b.cfg.Prefetch + 2) {
-		// Since each of the tube is listening it's own connection is it possible to run out of connections
-		// for pushing jobs in. Low number of connection won't break the server but would affect the performance.
-		b.connPool.Size = len(b.tubes)*b.cfg.Prefetch + 2
+	for _, q := range b.queues {
+		go q.serve(b.cfg.Prefetch)
 	}
-
-	if err = b.connPool.Start(); err != nil {
-		b.mu.Unlock()
-		return err
-	}
-	defer b.connPool.Destroy()
-
-	for _, t := range b.tubes {
-		if t.execPool != nil {
-			go t.serve(b.cfg.Prefetch)
-		}
-	}
-
 	b.wait = make(chan error)
 	b.mu.Unlock()
 
@@ -93,20 +92,20 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	t, ok := b.tubes[pipe]
+	q, ok := b.queues[pipe]
 	if !ok {
 		return errors.New("invalid pipeline")
 	}
 
-	t.stop()
+	q.stop()
 
-	if err := t.configure(execPool, errHandler); err != nil {
+	if err := q.configure(execPool, errHandler); err != nil {
 		return err
 	}
 
-	if b.wait != nil && t.execPool != nil {
+	if b.wait != nil && q.execPool != nil {
 		// resume wg
-		go t.serve(b.cfg.Prefetch)
+		go q.serve(b.cfg.Prefetch)
 	}
 
 	return nil
@@ -118,9 +117,11 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	t := b.tube(pipe)
+	// todo: check delay duration and retry duration
+
+	t := b.queue(pipe)
 	if t == nil {
-		return "", fmt.Errorf("undefined tube `%s`", pipe.Name())
+		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
 	data, err := json.Marshal(j)
@@ -128,7 +129,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return t.put(data, 0, j.Options.DelayDuration(), j.Options.TimeoutDuration())
+	return t.send(data, j.Options.DelayDuration(), j.Options.RetryDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.
@@ -137,25 +138,59 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, err
 	}
 
-	t := b.tube(pipe)
+	t := b.queue(pipe)
 	if t == nil {
-		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
+		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
 	return t.stat()
 }
 
+// // createQueue creates sqs queue.
+func (b *Broker) ensureQueue(pipe *jobs.Pipeline) (*string, error) {
+	attr := make(map[string]*string)
+	for k, v := range pipe.Map("options") {
+		if vs, ok := v.(string); ok {
+			attr[k] = aws.String(vs)
+		}
+
+		if vi, ok := v.(int); ok {
+			attr[k] = aws.String(strconv.Itoa(vi))
+		}
+	}
+
+	if len(attr) != 0 || pipe.Bool("create", false) {
+		res, err := b.sqs.CreateQueue(&sqs.CreateQueueInput{
+			QueueName:  aws.String(pipe.String("queue", "")),
+			Attributes: attr,
+		})
+
+		return res.QueueUrl, err
+	}
+
+	// no need to create (get existed)
+	url, err := b.sqs.GetQueueUrl(&sqs.GetQueueUrlInput{
+		QueueName: aws.String(pipe.String("queue", "")),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return url.QueueUrl, nil
+}
+
 // queue returns queue associated with the pipeline.
-func (b *Broker) tube(pipe *jobs.Pipeline) *tube {
+func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	t, ok := b.tubes[pipe]
+	q, ok := b.queues[pipe]
 	if !ok {
 		return nil
 	}
 
-	return t
+	return q
 }
 
 // stop broker and send error
@@ -167,11 +202,10 @@ func (b *Broker) stopError(err error) {
 		return
 	}
 
-	for _, t := range b.tubes {
-		t.stop()
+	for _, q := range b.queues {
+		q.stop()
 	}
 
-	b.connPool.Destroy()
 	b.wait <- err
 }
 
