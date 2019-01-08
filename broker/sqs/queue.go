@@ -144,6 +144,7 @@ func (q *queue) consume(h jobs.Handler, msg *sqs.Message, j *jobs.Job) (err erro
 	})
 
 	if err != nil {
+		q.execPool <- h
 		return err
 	}
 

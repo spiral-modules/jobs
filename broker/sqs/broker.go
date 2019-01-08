@@ -11,6 +11,7 @@ import (
 	"sync"
 )
 
+// Broker represents SQS broker.
 type Broker struct {
 	cfg    *Config
 	sqs    *sqs.SQS
