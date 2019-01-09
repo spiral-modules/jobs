@@ -7,7 +7,8 @@ jobs:
 
   # rabbitmq and similar servers
   amqp:
-    addr: amqp://guest:guest@localhost:5672/
+    addr:     amqp://guest:guest@localhost:5672/
+    exchange: default
 
   # beanstalk configuration
   beanstalk:
@@ -23,8 +24,7 @@ jobs:
   # job destinations and options
   dispatch:
     spiral-jobs-tests-local-*:
-      pipeline:    local
-      maxAttempts: 10
+      pipeline: local
 
     spiral-jobs-tests-beanstalk-*:
       pipeline: beanstalk
@@ -36,6 +36,13 @@ jobs:
   pipelines:
     local:
       broker: local
+
+    amqp:
+      broker: amqp
+      queue:  default
+      declare:
+        type:    direct
+        durable: true
 
     beanstalk:
       broker: beanstalk
