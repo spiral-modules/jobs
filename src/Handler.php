@@ -8,8 +8,6 @@
 
 namespace Spiral\Jobs;
 
-use Doctrine\Common\Inflector\Inflector;
-use Spiral\Core\FactoryInterface;
 use Spiral\RoadRunner\Worker;
 
 /***
@@ -37,37 +35,25 @@ class Handler
 
     /**
      * @codeCoverageIgnore
+     * @param callable|null $finalize
      */
-    public function handleJobs()
+    public function serve(callable $finalize = null)
     {
         while ($body = $this->worker->receive($context)) {
             try {
                 $context = json_decode($context, true);
 
-                $job = $this->makeJob($context['job']);
-
-                $job->unserialize($body);
+                $job = $this->factory->make($context['job'], $body);
                 $job->execute($context['id']);
 
                 $this->worker->send("ok");
             } catch (\Throwable $e) {
                 $this->worker->error((string)$e);
+            } finally {
+                if ($finalize !== null) {
+                    call_user_func($finalize);
+                }
             }
         }
-    }
-
-    /**
-     * @codeCoverageIgnore
-     * @param string $job
-     * @return JobInterface
-     */
-    private function makeJob(string $job): JobInterface
-    {
-        $names = explode('.', $job);
-        $names = array_map(function (string $value) {
-            return Inflector::classify($value);
-        }, $names);
-
-        return $this->factory->make(join('\\', $names));
     }
 }
