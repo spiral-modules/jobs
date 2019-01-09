@@ -10,6 +10,9 @@ type Config struct {
 	// Addr of AMQP server (example: amqp://guest:guest@localhost:5672/).
 	Addr string
 
+	// Exchange exchange to be used.
+	Exchange string
+
 	// Size defines number of open connections to beanstalk server. Default 5.
 	NumConn int
 

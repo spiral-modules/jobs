@@ -29,6 +29,11 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return cfg.Unmarshal(c)
 }
 
+// TimeoutDuration returns number of seconds allowed to allocate the connection.
+func (c *Config) TimeoutDuration() time.Duration {
+	return time.Duration(c.Timeout) * time.Second
+}
+
 // size creates new rpc socket Listener.
 func (c *Config) newConn() (*conn, error) {
 	dsn := strings.Split(c.Addr, "://")
@@ -41,9 +46,4 @@ func (c *Config) newConn() (*conn, error) {
 	}
 
 	return newConn(dsn[0], dsn[1], c.TimeoutDuration())
-}
-
-// TimeoutDuration returns number of seconds allowed to allocate the connection.
-func (c *Config) TimeoutDuration() time.Duration {
-	return time.Duration(c.Timeout) * time.Second
 }
