@@ -71,7 +71,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	case jobs.EventJobComplete:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
-			"job.<green+h>DONE</reset> <white+hb>%s</reset> <gray+hb>%s</reset> %s",
+			"job.<green+h>DONE</reset> <green>%s</reset> <gray+hb>%s</reset> %s",
 			e.Job.Job,
 			e.ID,
 			elapsed(e.Elapsed()),

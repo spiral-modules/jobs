@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -94,30 +93,37 @@ func (t *tube) serve(connector connector, prefetch int) {
 		return
 	}
 
-	for e := range t.jobs(conn, prefetch) {
-		t.wg.Add(1)
-		h := <-t.execPool
-		go func() {
-			defer t.wg.Done()
+	// NO PREFETCH (!)
 
-			err := t.consume(conn, <-t.execPool, e)
-			t.execPool <- h
-			log.Println("done")
-			if err != nil {
-				t.throw(jobs.EventPipelineError, &jobs.PipelineError{
-					Pipeline: t.pipe,
-					Caused:   err,
-				})
+	recv := t.jobs(conn)
+	for {
+		select {
+		case e, ok := <-recv:
+			if !ok {
+				return
 			}
-		}()
-	}
 
-	t.wg.Wait()
+			h := <-t.execPool
+			go func() {
+				defer t.wg.Done()
+
+				err := t.consume(conn, <-t.execPool, e)
+				t.execPool <- h
+
+				if err != nil {
+					t.throw(jobs.EventPipelineError, &jobs.PipelineError{
+						Pipeline: t.pipe,
+						Caused:   err,
+					})
+				}
+			}()
+		}
+	}
 }
 
 // fetch jobs
-func (t *tube) jobs(cn *conn, prefetch int) chan entry {
-	entries := make(chan entry, prefetch)
+func (t *tube) jobs(cn *conn) chan entry {
+	entries := make(chan entry)
 
 	go func() {
 		for {
@@ -125,6 +131,7 @@ func (t *tube) jobs(cn *conn, prefetch int) chan entry {
 			select {
 			case <-t.wait:
 				t.muw.Unlock()
+				close(entries)
 				return
 			default:
 				conn, err := cn.Acquire()
@@ -168,9 +175,9 @@ func (t *tube) jobs(cn *conn, prefetch int) chan entry {
 
 				// got the j, it will block eof() until wg is freed
 				cn.Release(err)
-				t.muw.Unlock() // must drain
-
+				t.wg.Add(1)
 				entries <- entry{id: id, job: j}
+				t.muw.Unlock() // must drain
 			}
 		}
 	}()
