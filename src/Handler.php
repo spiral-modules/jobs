@@ -51,7 +51,7 @@ class Handler
                 $this->worker->error((string)$e);
             } finally {
                 if ($finalize !== null) {
-                    call_user_func($finalize);
+                    call_user_func($finalize, $e ?? null);
                 }
             }
         }
