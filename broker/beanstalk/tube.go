@@ -52,12 +52,7 @@ func (e *entry) ID() string {
 }
 
 // create new tube consumer and producer
-func newTube(
-	pipe *jobs.Pipeline,
-	sharedConn *conn,
-	reserve time.Duration,
-	lsn func(event int, ctx interface{}),
-) (*tube, error) {
+func newTube(pipe *jobs.Pipeline, sharedConn *conn, lsn func(event int, ctx interface{})) (*tube, error) {
 	if pipe.String("tube", "") == "" {
 		return nil, errors.New("missing `tube` parameter on beanstalk pipeline")
 	}
@@ -67,7 +62,7 @@ func newTube(
 		tube:       &beanstalk.Tube{Name: pipe.String("tube", "")},
 		tubeSet:    beanstalk.NewTubeSet(nil, pipe.String("tube", "")),
 		sharedConn: sharedConn,
-		reserve:    reserve,
+		reserve:    pipe.Duration("reserve", time.Second),
 		lsn:        lsn,
 	}, nil
 }
@@ -81,7 +76,7 @@ func (t *tube) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) erro
 }
 
 // run consumers
-func (t *tube) serve(connector connector, prefetch int) {
+func (t *tube) serve(connector connector) {
 	t.wait = make(chan interface{})
 	atomic.StoreInt32(&t.active, 1)
 
@@ -92,8 +87,6 @@ func (t *tube) serve(connector connector, prefetch int) {
 		t.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
 		return
 	}
-
-	// NO PREFETCH (!)
 
 	recv := t.jobs(conn)
 	for {

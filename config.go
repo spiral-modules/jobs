@@ -11,21 +11,22 @@ type Config struct {
 	// Workers configures roadrunner server and worker busy.
 	Workers *roadrunner.ServerConfig
 
-	// Pipelines defines mapping between PHP job pipeline and associated job broker.
-	Pipelines Pipelines
+	// Dispatch defines where and how to clarify jobs.
+	Dispatch Dispatcher
 
-	// Mapping defines how to map jobs to their target pipelines.
-	Mapping Mapper
+	// Pipelines defines mapping between PHP job pipeline and associated job broker.
+	Pipelines map[string]*Pipeline
 
 	// Consuming specifies names of pipelines to be consumed on service start.
 	Consume []string
 
 	// parent config for broken options.
-	parent service.Config
+	parent    service.Config
+	pipelines Pipelines
 }
 
 // Hydrate populates config values.
-func (c *Config) Hydrate(cfg service.Config) error {
+func (c *Config) Hydrate(cfg service.Config) (err error) {
 	if err := cfg.Unmarshal(&c); err != nil {
 		return err
 	}
@@ -39,29 +40,32 @@ func (c *Config) Hydrate(cfg service.Config) error {
 		return err
 	}
 
-	if err := c.Pipelines.Valid(); err != nil {
+	c.pipelines, err = initPipelines(c.Pipelines)
+	if err != nil {
 		return err
 	}
 
 	return c.Workers.Pool.Valid()
 }
 
-// MapPipeline locates the pipeline associated with the job.
-func (c *Config) MapPipeline(j *Job) (*Pipeline, error) {
-	p := j.Options.Pipeline
-	if p == "" {
-		p = c.Mapping.find(j.Job)
+// FindPipeline locates the pipeline associated with the job.
+func (c *Config) FindPipeline(job *Job) (*Pipeline, *Options, error) {
+	opt := c.Dispatch.clarify(job)
+
+	pipe := job.Options.Pipeline
+	if pipe == "" && opt != nil {
+		pipe = opt.Pipeline
 	}
 
-	if p == "" {
-		return nil, fmt.Errorf("unable to locate pipeline for `%s`", j.Job)
+	if pipe == "" {
+		return nil, nil, fmt.Errorf("unable to locate pipeline for `%s`", job.Job)
 	}
 
-	if p := c.Pipelines.Get(p); p != nil {
-		return p, nil
+	if p := c.pipelines.Get(pipe); p != nil {
+		return p, opt, nil
 	}
 
-	return nil, fmt.Errorf("undefined pipeline `%s`", p)
+	return nil, nil, fmt.Errorf("undefined pipeline `%s`", pipe)
 }
 
 // Get underlying broker config.

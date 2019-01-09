@@ -20,7 +20,7 @@ type Job struct {
 	Payload string `json:"payload"`
 
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
-	Options Options `json:"options,omitempty"`
+	Options *Options `json:"options,omitempty"`
 }
 
 // Body packs job payload into binary payload.
@@ -54,6 +54,29 @@ type Options struct {
 
 	// Reserve defines for how broker should wait until treating job are failed. Defaults to 30 min.
 	Timeout int `json:"timeout,omitempty"`
+}
+
+// Merge merges job options.
+func (o *Options) Merge(from *Options) {
+	if o.Pipeline == "" {
+		o.Pipeline = from.Pipeline
+	}
+
+	if o.MaxAttempts == 0 {
+		o.MaxAttempts = from.MaxAttempts
+	}
+
+	if o.Timeout == 0 {
+		o.Timeout = from.Timeout
+	}
+
+	if o.RetryDelay == 0 {
+		o.RetryDelay = from.RetryDelay
+	}
+
+	if o.Delay == 0 {
+		o.Delay = from.Delay
+	}
 }
 
 // CanRetry must return true if broker is allowed to re-run the job.

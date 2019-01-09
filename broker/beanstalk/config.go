@@ -13,20 +13,12 @@ type Config struct {
 	// Addr of beanstalk server.
 	Addr string
 
-	// Prefetch number of jobs allowed to be fetched by each pipe at the same time. Default 1.
-	Prefetch int
-
-	// Reserve timeout in seconds. Default 1.
-	Reserve int
-
 	// Timeout to allocate the connection. Default 5.
 	Timeout int
 }
 
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
-	c.Prefetch = 1
-	c.Reserve = 1
 	c.Timeout = 10
 
 	return nil
@@ -49,11 +41,6 @@ func (c *Config) newConn() (*conn, error) {
 	}
 
 	return newConn(dsn[0], dsn[1], c.TimeoutDuration())
-}
-
-// ReserveDuration returns number of seconds to reserve the job.
-func (c *Config) ReserveDuration() time.Duration {
-	return time.Duration(c.Reserve) * time.Second
 }
 
 // TimeoutDuration returns number of seconds allowed to allocate the connection.

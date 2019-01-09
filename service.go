@@ -130,10 +130,14 @@ func (s *Service) Stop() {
 }
 
 // Push job to associated broker and return job id.
-func (s *Service) Push(j *Job) (string, error) {
-	pipe, err := s.cfg.MapPipeline(j)
+func (s *Service) Push(job *Job) (string, error) {
+	pipe, opt, err := s.cfg.FindPipeline(job)
 	if err != nil {
 		return "", err
+	}
+
+	if opt != nil {
+		job.Options.Merge(opt)
 	}
 
 	broker, ok := s.Brokers[pipe.Broker()]
@@ -141,12 +145,12 @@ func (s *Service) Push(j *Job) (string, error) {
 		return "", fmt.Errorf("undefined broker `%s`", pipe.Broker())
 	}
 
-	id, err := broker.Push(pipe, j)
+	id, err := broker.Push(pipe, job)
 
 	if err != nil {
-		s.throw(EventPushError, &JobError{Job: j, Caused: err})
+		s.throw(EventPushError, &JobError{Job: job, Caused: err})
 	} else {
-		s.throw(EventPushComplete, &JobEvent{ID: id, Job: j})
+		s.throw(EventPushComplete, &JobEvent{ID: id, Job: job})
 	}
 
 	return id, err
@@ -154,7 +158,7 @@ func (s *Service) Push(j *Job) (string, error) {
 
 // Pipelines return all service pipelines.
 func (s *Service) Pipelines() Pipelines {
-	return s.cfg.Pipelines
+	return s.cfg.pipelines
 }
 
 // Stat returns list of active workers and their stats.

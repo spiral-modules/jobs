@@ -42,12 +42,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	t, err := newTube(
-		pipe,
-		b.sharedConn,            // available connections
-		b.cfg.ReserveDuration(), // for how long tube should be wait for job to come
-		b.throw,                 // event lsn
-	)
+	t, err := newTube(pipe, b.sharedConn, b.throw)
 
 	if err != nil {
 		return err
@@ -63,7 +58,7 @@ func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 	for _, t := range b.tubes {
 		if t.execPool != nil {
-			go t.serve(b.cfg, b.cfg.Prefetch)
+			go t.serve(b.cfg)
 		}
 	}
 
@@ -78,7 +73,7 @@ func (b *Broker) Stop() {
 	b.stopError(nil)
 }
 
-// Consume configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
+// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
 // the service is started!
 func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
 	b.mu.Lock()
@@ -97,7 +92,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	if b.wait != nil && t.execPool != nil {
 		// resume wg
-		go t.serve(b.cfg, b.cfg.Prefetch)
+		go t.serve(b.cfg)
 	}
 
 	return nil

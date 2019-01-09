@@ -5,7 +5,7 @@ type Broker interface {
 	// Register broker pipeline.
 	Register(pipe *Pipeline) error
 
-	// Consume configures pipeline to be consumed. Set execPool to nil to disable consuming. Method can be called before
+	// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
 	// the service is started!
 	Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error
 

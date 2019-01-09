@@ -12,7 +12,6 @@ jobs:
   # beanstalk configuration
   beanstalk:
     addr:    tcp://localhost:11301
-    reserve: 1
 
   # amazon sqs configuration
   sqs:
@@ -21,30 +20,32 @@ jobs:
     region:   us-west-1
     endpoint: http://localhost:9324
 
+  # job destinations and options
+  dispatch:
+    spiral-jobs-tests-local-*:
+      pipeline:    local
+      maxAttempts: 10
+
+    spiral-jobs-tests-beanstalk-*:
+      pipeline: beanstalk
+
+    spiral-jobs-tests-sqs-*:
+      pipeline: sqs
+
   # list of broker pipelines associated with endpoints
   pipelines:
-    - name:   local
+    local:
       broker: local
 
-   # - name:   amqp
-   #   broker: amqp
-
-    - name:   beanstalk
+    beanstalk:
       broker: beanstalk
       tube:   default
 
-    - name:   sqs
+    sqs:
       broker: sqs
       queue:  default
       declare:
         MessageRetentionPeriod: 86400
-
-  # default destinations for jobs
-  mapping:
-    local:     ["spiral.jobs.tests.local.*"]
-    amqp:      ["spiral.jobs.tests.amqp.*"]
-    beanstalk: ["spiral.jobs.tests.beanstalk.*"]
-    sqs:       ["spiral.jobs.tests.sqs.*"]
 
   # list of pipelines to be consumed by the server, keep empty if you want to start consuming manually
   consume: [local, amqp, beanstalk, sqs]
