@@ -63,14 +63,14 @@ func (c *channel) queueBind(queue, routingKey, exchange string) error {
 	)
 }
 
-func (c *channel) publish(id, routingKey string, job *jobs.Job) error {
+func (c *channel) publish(id string, body []byte, attempt int, opts *jobs.Options) error {
 	// todo: watch for publishPool delivery
 
 	err := c.ch.Publish(
-		"",        // exchange
-		"default", // routing key
-		false,     // mandatory
-		false,     // immediate
+		"",         // exchange (DEFAULT?)
+		routingKey, // routing key
+		false,      // mandatory
+		false,      // immediate
 		amqp.Publishing{
 			ContentType:  "text/plain",
 			Body:         []byte(time.Now().String()),

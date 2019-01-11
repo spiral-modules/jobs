@@ -52,7 +52,7 @@ func (cp *chanPool) Close() error {
 
 		go func(ch *channel) {
 			defer wg.Done()
-			cp.closeChannel(ch)
+			cp.release(ch)
 		}(ch)
 	}
 
@@ -153,8 +153,8 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 	return cp.channels[name], nil
 }
 
-// closeChannel gracefully closes and removes channel allocation.
-func (cp *chanPool) closeChannel(c *channel) {
+// release gracefully closes and removes channel allocation.
+func (cp *chanPool) release(c *channel, err error) {
 	c.close()
 
 	cp.mu.Lock()

@@ -37,7 +37,17 @@ func (q *queue) stop() {
 }
 
 func (q *queue) publish(id string, body []byte, attempt int, opts *jobs.Options) error {
-	return nil
+	ch, err := q.publishChan()
+	if err != nil {
+		return err
+	}
+
+	// todo: map options
+	if err := ch.publish(id, body, attempt, opts); err != nil {
+		q.publishPool.release(ch, err)
+	}
+
+	return err
 }
 
 func (q *queue) inspect() (*amqp.Queue, error) {
