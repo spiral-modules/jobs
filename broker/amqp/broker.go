@@ -11,13 +11,13 @@ import (
 
 // Broker represents AMQP broker.
 type Broker struct {
-	cfg     *Config
-	lsns    []func(event int, ctx interface{})
-	publish *chanPool
-	consume *chanPool
-	mu      sync.Mutex
-	wait    chan error
-	queues  map[*jobs.Pipeline]*queue
+	cfg         *Config
+	lsns        []func(event int, ctx interface{})
+	publishPool *chanPool
+	consumePool *chanPool
+	mu          sync.Mutex
+	wait        chan error
+	queues      map[*jobs.Pipeline]*queue
 }
 
 // AddListener attaches server event watcher.
@@ -25,7 +25,7 @@ func (b *Broker) AddListener(l func(event int, ctx interface{})) {
 	b.lsns = append(b.lsns, l)
 }
 
-// Start configures local job broker.
+// Init configures AMQP job broker (always 2 connections).
 func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
 	b.queues = make(map[*jobs.Pipeline]*queue)
@@ -34,13 +34,13 @@ func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	b.publish = conn
+	b.publishPool = conn
 
 	conn, err = newConn(b.cfg.Addr, time.Second)
 	if err != nil {
 		return false, err
 	}
-	b.consume = conn
+	b.consumePool = conn
 
 	return true, nil
 }
@@ -50,16 +50,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if pipe.String("queue", "") == "" {
-		return errors.New("missing `queue` parameter on sqs pipeline")
-	}
-
-	err := b.ensureQueue(pipe)
-	if err != nil {
-		return err
-	}
-
-	q, err := newQueue(pipe, b.publish, b.consume)
+	q, err := newQueue(pipe, b.publishPool, b.consumePool, b.throw)
 	if err != nil {
 		return err
 	}
@@ -83,7 +74,18 @@ func (b *Broker) Serve() error {
 
 // Stop all pipelines.
 func (b *Broker) Stop() {
-	b.gracefulStop(nil)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return
+	}
+
+	for _, q := range b.queues {
+		q.stop()
+	}
+
+	b.wait <- nil
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -157,10 +159,6 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	}, nil
 }
 
-func (b *Broker) ensureQueue(pipe *jobs.Pipeline) error {
-	return nil
-}
-
 // queue returns queue associated with the pipeline.
 func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	b.mu.Lock()
@@ -172,22 +170,6 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	}
 
 	return q
-}
-
-// stop broker and send error
-func (b *Broker) gracefulStop(err error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return
-	}
-
-	for _, q := range b.queues {
-		q.stop()
-	}
-
-	b.wait <- err
 }
 
 // check if broker is serving

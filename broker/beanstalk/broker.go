@@ -70,7 +70,19 @@ func (b *Broker) Serve() (err error) {
 
 // Stop all pipelines.
 func (b *Broker) Stop() {
-	b.gracefulStop(nil)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return
+	}
+
+	for _, t := range b.tubes {
+		t.stop()
+	}
+
+	b.wait <- nil
+	b.sharedConn.Close()
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -142,23 +154,6 @@ func (b *Broker) tube(pipe *jobs.Pipeline) *tube {
 	}
 
 	return t
-}
-
-// stop broker and send error
-func (b *Broker) gracefulStop(err error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return
-	}
-
-	for _, t := range b.tubes {
-		t.stop()
-	}
-
-	b.wait <- nil
-	b.sharedConn.Close()
 }
 
 // check if broker is serving

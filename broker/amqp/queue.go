@@ -7,16 +7,20 @@ import (
 )
 
 type queue struct {
+	name        string
+	publishPool *chanPool
+	consumePool *chanPool
+
 	// exec handlers
 	execPool chan jobs.Handler
 	err      jobs.ErrorHandler
 }
 
-func newQueue(pipe *jobs.Pipeline, publish, consume *chanPool) (*queue, error) {
+func newQueue(pipe *jobs.Pipeline, publish, consume *chanPool, lsn func(event int, ctx interface{})) (*queue, error) {
 	return nil, nil
 }
 
-// associate queue with new consume pool
+// associate queue with new consumePool pool
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	q.execPool = execPool
 	q.err = err
@@ -53,4 +57,12 @@ func (q *queue) consume(delivery *amqp.Delivery) {
 	// retry
 	// delivery.Ack(multiple)
 	// delivery.Reject()
+}
+
+func (q *queue) publishChan() (*channel, error) {
+	return q.publishPool.channel(q.name)
+}
+
+func (q *queue) consumeChan() (*channel, error) {
+	return q.consumePool.channel(q.name)
 }

@@ -18,8 +18,7 @@ type queue struct {
 	url    *string
 
 	// durations
-	reserve    time.Duration
-	cmdTimeout time.Duration
+	reserve time.Duration
 
 	// tube events
 	lsn func(event int, ctx interface{})
@@ -37,18 +36,12 @@ type queue struct {
 	err       jobs.ErrorHandler
 }
 
-func newQueue(
-	pipe *jobs.Pipeline,
-	sqs *sqs.SQS,
-	url *string,
-	reserve time.Duration,
-	lsn func(event int, ctx interface{}),
-) (*queue, error) {
+func newQueue(pipe *jobs.Pipeline, sqs *sqs.SQS, url *string, lsn func(event int, ctx interface{})) (*queue, error) {
 	return &queue{
 		pipe:    pipe,
 		sqs:     sqs,
 		url:     url,
-		reserve: reserve,
+		reserve: pipe.Duration("reserve", time.Second),
 		lsn:     lsn,
 	}, nil
 }

@@ -53,13 +53,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 		return err
 	}
 
-	q, err := newQueue(
-		pipe,
-		b.sqs,
-		url,
-		b.cfg.ReserveDuration(),
-		b.throw,
-	)
+	q, err := newQueue(pipe, b.sqs, url, b.throw)
 
 	if err != nil {
 		return err
@@ -84,7 +78,18 @@ func (b *Broker) Serve() (err error) {
 
 // Stop all pipelines.
 func (b *Broker) Stop() {
-	b.gracefulStop(nil)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return
+	}
+
+	for _, q := range b.queues {
+		q.stop()
+	}
+
+	b.wait <- nil
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -205,22 +210,6 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	}
 
 	return q
-}
-
-// stop broker and send error
-func (b *Broker) gracefulStop(err error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return
-	}
-
-	for _, q := range b.queues {
-		q.stop()
-	}
-
-	b.wait <- err
 }
 
 // check if broker is serving

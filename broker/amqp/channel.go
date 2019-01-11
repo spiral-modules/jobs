@@ -64,7 +64,7 @@ func (c *channel) queueBind(queue, routingKey, exchange string) error {
 }
 
 func (c *channel) publish(id, routingKey string, job *jobs.Job) error {
-	// todo: watch for publish delivery
+	// todo: watch for publishPool delivery
 
 	err := c.ch.Publish(
 		"",        // exchange
@@ -85,14 +85,14 @@ func (c *channel) publish(id, routingKey string, job *jobs.Job) error {
 	confirm := <-c.confirm
 
 	if !confirm.Ack {
-		return 0, fmt.Errorf("unable to publish message into queue `%s`", queue)
+		return 0, fmt.Errorf("unable to publishPool message into queue `%s`", queue)
 	}
 
 	return confirm.DeliveryTag, nil
 }
 
 func (c *channel) publishDelay(queue string) (uint64, error) {
-	// todo: watch for publish delivery
+	// todo: watch for publishPool delivery
 
 	err := c.ch.Publish(
 		"",        // exchange
@@ -113,7 +113,7 @@ func (c *channel) publishDelay(queue string) (uint64, error) {
 	confirm := <-c.confirm
 
 	if !confirm.Ack {
-		return 0, fmt.Errorf("unable to publish message into queue `%s`", queue)
+		return 0, fmt.Errorf("unable to publishPool message into queue `%s`", queue)
 	}
 
 	return confirm.DeliveryTag, nil

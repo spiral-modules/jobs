@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/roadrunner/service"
-	"time"
 )
 
 // Config defines sqs broker configuration.
@@ -23,16 +22,6 @@ type Config struct {
 
 	// Endpoint can be used to re-define SQS endpoint to custom location. Only for local development.
 	Endpoint string
-
-	// Reserve timeout in seconds. Default 1.
-	Reserve int
-}
-
-// InitDefaults sets missing values to their default values.
-func (c *Config) InitDefaults() error {
-	c.Reserve = 1
-
-	return nil
 }
 
 // Hydrate config values.
@@ -76,9 +65,4 @@ func (c *Config) SQS() (*sqs.SQS, error) {
 	}
 
 	return sqs.New(sess, &aws.Config{Endpoint: aws.String(c.Endpoint)}), nil
-}
-
-// ReserveDuration returns number of seconds to reserve the job.
-func (c *Config) ReserveDuration() time.Duration {
-	return time.Duration(c.Reserve) * time.Second
 }
