@@ -18,25 +18,22 @@ type connector interface {
 // sharedConn protects allocation for one connection between
 // threads and provides reconnecting capabilities.
 type conn struct {
-	network, addr string
-	tout          time.Duration
-	conn          *beanstalk.Conn
-	free          chan interface{}
-	dead          chan interface{}
-	stop          chan interface{}
-	lock          *sync.Cond
+	tout time.Duration
+	conn *beanstalk.Conn
+	free chan interface{}
+	dead chan interface{}
+	stop chan interface{}
+	lock *sync.Cond
 }
 
 // creates new beanstalk connection and reconnect watcher.
 func newConn(network, addr string, tout time.Duration) (cn *conn, err error) {
 	cn = &conn{
-		network: network,
-		addr:    addr,
-		tout:    tout,
-		free:    make(chan interface{}, 1),
-		dead:    make(chan interface{}, 1),
-		stop:    make(chan interface{}),
-		lock:    sync.NewCond(&sync.Mutex{}),
+		tout: tout,
+		free: make(chan interface{}, 1),
+		dead: make(chan interface{}, 1),
+		stop: make(chan interface{}),
+		lock: sync.NewCond(&sync.Mutex{}),
 	}
 
 	cn.conn, err = beanstalk.Dial(network, addr)
@@ -44,45 +41,12 @@ func newConn(network, addr string, tout time.Duration) (cn *conn, err error) {
 		return nil, err
 	}
 
-	go func() {
-		cn.free <- nil
-		for {
-			select {
-			case <-cn.dead:
-				// try to reconnect
-				if conn, err := beanstalk.Dial(network, addr); err == nil {
-					cn.conn = conn
-					cn.free <- nil
-					continue
-				}
-
-				// retry later
-				time.Sleep(cn.tout)
-				cn.dead <- nil
-
-			case <-cn.stop:
-				cn.lock.L.Lock()
-				select {
-				case <-cn.dead:
-				case <-cn.free:
-				}
-
-				// stop underlying connection
-				cn.conn.Close()
-
-				cn.free = nil
-				cn.lock.Signal()
-				cn.lock.L.Unlock()
-
-				return
-			}
-		}
-	}()
+	go cn.watch(network, addr)
 
 	return cn, nil
 }
 
-// Close the connection and reconnect watcher.
+// close the connection and reconnect watcher.
 func (cn *conn) Close() error {
 	cn.lock.L.Lock()
 	close(cn.stop)
@@ -127,6 +91,42 @@ func (cn *conn) Release(err error) error {
 	}
 
 	return err
+}
+
+// watch and reconnect if dead
+func (cn *conn) watch(network, addr string) {
+	cn.free <- nil
+	for {
+		select {
+		case <-cn.dead:
+			// try to reconnect
+			if conn, err := beanstalk.Dial(network, addr); err == nil {
+				cn.conn = conn
+				cn.free <- nil
+				continue
+			}
+
+			// retry later
+			cn.dead <- nil
+			time.Sleep(cn.tout)
+
+		case <-cn.stop:
+			cn.lock.L.Lock()
+			select {
+			case <-cn.dead:
+			case <-cn.free:
+			}
+
+			// stop underlying connection
+			cn.conn.Close()
+
+			cn.free = nil
+			cn.lock.Signal()
+			cn.lock.L.Unlock()
+
+			return
+		}
+	}
 }
 
 // isConnError indicates that error is related to dead socket.

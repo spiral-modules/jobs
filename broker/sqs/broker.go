@@ -74,7 +74,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 	for _, q := range b.queues {
-		go q.serve(b.cfg.Prefetch)
+		go q.serve()
 	}
 	b.wait = make(chan error)
 	b.mu.Unlock()
@@ -84,7 +84,7 @@ func (b *Broker) Serve() (err error) {
 
 // Stop all pipelines.
 func (b *Broker) Stop() {
-	b.stopError(nil)
+	b.gracefulStop(nil)
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -105,8 +105,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 	}
 
 	if b.wait != nil && q.execPool != nil {
-		// resume wg
-		go q.serve(b.cfg.Prefetch)
+		go q.serve()
 	}
 
 	return nil
@@ -134,8 +133,8 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		)
 	}
 
-	t := b.queue(pipe)
-	if t == nil {
+	q := b.queue(pipe)
+	if q == nil {
 		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
@@ -144,7 +143,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return t.send(data, j.Options.DelayDuration(), j.Options.RetryDuration())
+	return q.send(data, j.Options.DelayDuration(), j.Options.RetryDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.
@@ -153,12 +152,12 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, err
 	}
 
-	t := b.queue(pipe)
-	if t == nil {
+	q := b.queue(pipe)
+	if q == nil {
 		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	return t.stat()
+	return q.stat()
 }
 
 // // createQueue creates sqs queue.
@@ -209,7 +208,7 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 }
 
 // stop broker and send error
-func (b *Broker) stopError(err error) {
+func (b *Broker) gracefulStop(err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

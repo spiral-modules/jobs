@@ -24,9 +24,6 @@ type Config struct {
 	// Endpoint can be used to re-define SQS endpoint to custom location. Only for local development.
 	Endpoint string
 
-	// Prefetch number of jobs allowed to be fetched by each pipe at the same time. Default 2.
-	Prefetch int
-
 	// Reserve timeout in seconds. Default 1.
 	Reserve int
 }
@@ -34,7 +31,6 @@ type Config struct {
 // InitDefaults sets missing values to their default values.
 func (c *Config) InitDefaults() error {
 	c.Reserve = 1
-	c.Prefetch = 4
 
 	return nil
 }

@@ -70,7 +70,7 @@ func (b *Broker) Serve() (err error) {
 
 // Stop all pipelines.
 func (b *Broker) Stop() {
-	b.stopError(nil)
+	b.gracefulStop(nil)
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -145,7 +145,7 @@ func (b *Broker) tube(pipe *jobs.Pipeline) *tube {
 }
 
 // stop broker and send error
-func (b *Broker) stopError(err error) {
+func (b *Broker) gracefulStop(err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

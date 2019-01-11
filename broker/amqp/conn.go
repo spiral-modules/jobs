@@ -1,161 +1,167 @@
 package amqp
 
 import (
+	"errors"
 	"github.com/streadway/amqp"
-	"log"
 	"sync"
 	"time"
 )
 
-// Conn manages underling TCP connection and provides
-// support for named channel association.
-type Conn struct {
-	addr, exchange string
-	tout           time.Duration
-	conn           *amqp.Connection
-	mu             sync.Mutex
-	channels       map[string]chanAlloc
-	connErr        chan *amqp.Error
-
-	// lock stuff?
+type chanPool struct {
+	tout     time.Duration
+	mu       sync.Mutex
+	conn     *amqp.Connection
+	channels map[string]*channel
+	wait     chan interface{}
+	restored chan interface{}
 }
 
-type chanAlloc struct {
-	ch    *amqp.Channel
-	close chan error
-}
-
-func NewConn(addr string, exchange string, tout time.Duration) (*Conn, error) {
+// newConn creates new watched connection
+func newConn(addr string, tout time.Duration) (*chanPool, error) {
 	conn, err := amqp.Dial(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	// ch, err := conn.Channel()
-	// if err != nil {
-	// 	conn.Close()
-	// 	return nil, err
-	// }
-
-	// // todo: hardcoded
-	// err = ch.ExchangeDeclare(
-	// 	exchange, // name
-	// 	"direct", // type
-	// 	true,     // durable
-	// 	false,    // auto-deleted
-	// 	false,    // internal
-	// 	false,    // noWait
-	// 	nil,      // arguments
-	// )
-	// 	if err != nil {
-	// 		ch.Close()
-	// 		conn.Close()
-	// 		return nil, err
-	// 	}
-
-	cn := &Conn{
-		addr:     addr,
-		exchange: exchange,
+	cp := &chanPool{
 		tout:     tout,
 		conn:     conn,
-		connErr:  conn.NotifyClose(make(chan *amqp.Error)),
+		channels: make(map[string]*channel),
+		wait:     make(chan interface{}),
 	}
 
-	go func() {
-		for {
-			select {
-			case err := <-cn.connErr:
-				log.Println(err)
-				// todo: reconnect
+	go cp.watch(addr, conn.NotifyClose(make(chan *amqp.Error)))
 
-				// todo: working on reconnect
-				// todo: broadcast reconnect
-
-				// todo: must lock
-			}
-		}
-	}()
-
-	return cn, err
+	return cp, nil
 }
 
-// Channel allocates new named connection channel.
-func (c *Conn) Channel(name string) (*amqp.Channel, chan error, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// Close gracefully closes all underlying channels and connection.
+func (cp *chanPool) Close() error {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
 
-	// todo: check if connection has been stopped
-
-	if ca, ok := c.channels[name]; ok {
-		return ca.ch, ca.close, nil
+	close(cp.wait)
+	if cp.channels == nil {
+		return errors.New("connection is dead")
 	}
 
-	var (
-		ca  = chanAlloc{}
-		err error
-	)
+	// close all channels and consumers
+	var wg sync.WaitGroup
+	for _, ch := range cp.channels {
+		wg.Add(1)
 
-	ca.ch, err = c.conn.Channel()
+		go func(ch *channel) {
+			defer wg.Done()
+			cp.closeChannel(ch)
+		}(ch)
+	}
+
+	wg.Wait()
+	return cp.conn.Close()
+}
+
+// watch manages connection state and reconnects if needed
+func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
+	for {
+		select {
+		case <-cp.wait:
+			// connection has been closed
+			return
+		case err := <-errors:
+			cp.mu.Lock()
+			cp.restored = make(chan interface{})
+
+			// broadcast error to all consumers to let them for the tryReconnect
+			for _, ch := range cp.channels {
+				ch.signal <- err
+			}
+
+			// disable channel allocation while server is dead
+			cp.conn = nil
+			cp.channels = nil
+			cp.mu.Unlock()
+
+			// reconnect loop
+			for {
+				select {
+				case <-cp.wait:
+					// restored is not possible
+					close(cp.restored)
+					return
+
+				case <-time.NewTimer(cp.tout).C:
+					// todo: need better dial method
+					conn, err := amqp.Dial(addr)
+
+					if err != nil {
+						// still failing
+						continue
+					}
+
+					cp.mu.Lock()
+
+					cp.conn = conn
+					cp.channels = make(map[string]*channel)
+
+					// return to normal watch state
+					errors = conn.NotifyClose(make(chan *amqp.Error))
+					cp.mu.Unlock()
+
+					// ready to move on and let all subscribers know that conn is restored
+					close(cp.restored)
+					cp.restored = nil
+
+					break
+				}
+			}
+		}
+	}
+}
+
+// reconnected waits till connection is connected again or eventually closed.
+// must only be invoked after connection error has been delivered to channel.signal.
+func (cp *chanPool) reconnect() chan interface{} {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+
+	return cp.restored
+}
+
+// channel allocates new channel on amqp connection
+func (cp *chanPool) channel(name string) (*channel, error) {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+
+	if cp.channels == nil {
+		return nil, errors.New("connection is dead")
+	}
+
+	if ch, ok := cp.channels[name]; ok {
+		return ch, nil
+	}
+
+	// we must create new channel
+	ch, err := cp.conn.Channel()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	ca.close = make(chan error)
-	c.channels[name] = ca
+	// we expect that every allocated channel would have listener on signal
+	// this is not true only in case of pure producing channels
+	cp.channels[name] = newChannel(ch)
 
-	return ca.ch, ca.close, nil
+	return cp.channels[name], nil
 }
 
-// Close the channel and underlying connection.
-func (c *Conn) Close() error {
-	// todo:
+// closeChannel gracefully closes and removes channel allocation.
+func (cp *chanPool) closeChannel(c *channel) {
+	c.close()
 
-	// if err := c.ch.Close(); err != nil {
-	// c.conn.Close()
-	// return err
-	// }
-
-	return c.conn.Close()
-}
-
-func m1(conn *Conn) {
-	q := conn.Consume()
-	for {
-		select {
-		case m := q:
-			// err
-		case <-conn.failed:
-			select {
-			case <-conn.restored:
-				q = conn.Consume()
-
-			case <-conn.dead:
-				return
-			case <-wait:
-
-			}
+	cp.mu.Lock()
+	for name, ch := range cp.channels {
+		if ch == c {
+			delete(cp.channels, name)
 		}
 	}
-}
-
-func m2(conn *Conn) {
-	q := conn.Consume()
-	for {
-		select {
-		case m := q:
-			// err
-		case <-conn.failed:
-
-			select {
-			case <-conn.restored:
-				q = conn.Consume()
-
-			case <-conn.dead:
-				return
-			case <-wait:
-
-			}
-
-		}
-	}
+	cp.mu.Unlock()
 }

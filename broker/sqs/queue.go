@@ -62,9 +62,12 @@ func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) err
 }
 
 // serve consumers
-func (q *queue) serve(prefetch int) {
+func (q *queue) serve() {
+	prefetch := q.pipe.Integer("prefetch", 1)
+
 	q.wait = make(chan interface{})
 	q.fetchPool = make(chan interface{}, prefetch)
+
 	atomic.StoreInt32(&q.active, 1)
 
 	for i := 0; i < prefetch; i++ {
