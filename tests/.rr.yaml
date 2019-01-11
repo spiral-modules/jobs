@@ -18,6 +18,18 @@ jobs:
       secret:   api-secret
       endpoint: http://localhost:9324
 
+    amqp:
+      url: amqp://login:password@localhost:5672/
+      exchanges:
+        - name: testExchange
+          type: direct
+          durable: false
+          autoDelete: false
+          internal: false
+          noWait: false
+          arguments:
+            test: test
+
   # list of broker pipelines associated with endpoints
   pipelines:
     - listen: true
@@ -40,3 +52,22 @@ jobs:
       broker: local
       handle:
         - "spiral.jobs.tests.local.*"
+
+    - listen: true
+      broker: amqp
+      options:
+        create: true
+        queue: test
+        durable: false
+        autoDelete: false
+        exclusive: false
+        noWait: false
+        arguments:
+          test: test
+        binds:
+          - key: ""
+            exchange: "testExchange"
+          - key: "logs.*"
+            exchange: "testExchange"
+      handle:
+        - "spiral.jobs.tests.amqp.*"
