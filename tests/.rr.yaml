@@ -3,7 +3,7 @@ jobs:
   workers:
     command: "php handler.php"
     pool:
-      numWorkers: 4
+      numWorkers: 8
 
   # rabbitmq and similar servers
   amqp:
@@ -35,7 +35,6 @@ jobs:
     amqp:
       broker:   amqp
       queue:    default
-      prefetch: 5
 
     beanstalk:
       broker: beanstalk

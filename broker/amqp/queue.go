@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
-	"log"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,20 +16,19 @@ type queue struct {
 	pipe   *jobs.Pipeline
 
 	exchange, name string
+	consumer       string
 	publishPool    *chanPool
 	consumePool    *chanPool
 
 	// tube events
 	lsn func(event int, ctx interface{})
 
-	// stop channel
-	wait chan interface{}
-
 	// active operations
 	muw sync.RWMutex
 	wg  sync.WaitGroup
 
 	// exec handlers
+	running  int32
 	execPool chan jobs.Handler
 	err      jobs.ErrorHandler
 }
@@ -47,6 +46,7 @@ func newQueue(pipe *jobs.Pipeline, publish, consume *chanPool, lsn func(event in
 	return &queue{
 		exchange:    pipe.String("exchange", "amqp.direct"),
 		name:        pipe.String("queue", ""),
+		consumer:    pipe.String("consumer", fmt.Sprintf("rr-jobs:%s-%v", pipe.Name(), os.Getpid())),
 		pipe:        pipe,
 		publishPool: publish,
 		consumePool: consume,
@@ -63,56 +63,46 @@ func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) err
 }
 
 func (q *queue) serve() {
-	c, err := q.consumePool.channel(q.name)
-	if err != nil {
-		q.consumePool.release(c, err)
-		q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-		return
-	}
-
-	if err := c.ch.Qos(q.pipe.Integer("prefetch", 1), 0, false); err != nil {
-		q.consumePool.release(c, err)
-		q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-		return
-	}
-
-	q.wait = make(chan interface{})
 	atomic.StoreInt32(&q.active, 1)
 
-	// begin consuming in safe mode!
+	breakDelivery := false
 	for {
 		reconnect := q.consumePool.reconnect()
 		if reconnect != nil {
 			select {
 			case <-reconnect:
 				// wait for connection restoration
-			case <-q.wait:
-				// or till manual stop
-				return
 			}
 		}
 
-		// todo: consumer name, todo: what if connection is dead?
-		delivery, err := c.ch.Consume(
-			"default",        // queue
-			"super-consumer", // consumer
-			false,            // auto-ack
-			false,            // exclusive
-			false,            // no-local
-			false,            // no-wait
-			nil,              // args
-		)
+		c, err := q.consumePool.channel(q.name)
+		if err != nil {
+			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			return
+		}
 
-		// unable to start consuming
+		if err := c.ch.Qos(q.pipe.Integer("prefetch", 1), 0, false); err != nil {
+			q.consumePool.release(c, err)
+			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			return
+		}
+
+		delivery, err := c.ch.Consume(q.name, q.consumer, false, false, false, false, nil)
 		if err != nil {
 			q.consumePool.release(c, err)
 			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-			continue
+			return
 		}
 
+		breakDelivery = false
 		for {
 			select {
 			case d := <-delivery:
+				if d.Body == nil {
+					breakDelivery = true
+					break
+				}
+
 				q.wg.Add(1)
 
 				go func(d amqp.Delivery) {
@@ -120,25 +110,27 @@ func (q *queue) serve() {
 					q.wg.Done()
 
 					if err != nil {
-						// todo: can this affect consume channel?
 						q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 					}
 				}(d)
 
 			case err := <-c.signal:
-				// todo: test it
-				log.Println(err)
-
 				q.consumePool.release(c, err)
 				if err == nil {
-					return
+					breakDelivery = true
+				} else {
+					q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 				}
+			}
 
+			if breakDelivery {
 				break
 			}
 		}
 
-		log.Println("broken")
+		if breakDelivery {
+			return
+		}
 	}
 }
 
@@ -150,7 +142,10 @@ func (q *queue) consume(h jobs.Handler, d amqp.Delivery) error {
 		return d.Nack(false, true)
 	}
 
+	atomic.AddInt32(&q.running, 1)
 	err = h(id, j)
+	atomic.AddInt32(&q.running, ^int32(0))
+
 	q.execPool <- h
 
 	if err == nil {
@@ -183,15 +178,16 @@ func (q *queue) stop() {
 	atomic.StoreInt32(&q.active, 0)
 
 	c, err := q.consumePool.channel(q.name)
-	if err != nil {
-		// release channel and stop consuming
-		q.consumePool.release(c, nil)
+	if err == nil {
+		err = c.ch.Cancel(q.consumer, true)
 	}
 
-	close(q.wait)
 	q.muw.Lock()
 	q.wg.Wait() // wait for all the jobs to complete
 	q.muw.Unlock()
+
+	// we can release channel now
+	q.consumePool.release(c, err)
 }
 
 // publish message to queue or to delayed queue.

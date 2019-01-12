@@ -6,6 +6,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/spiral/jobs"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -155,7 +156,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	return &jobs.Stat{
 		InternalName: queue.Name,
 		Queue:        int64(queue.Messages),
-		Active:       int64(queue.Consumers),
+		Active:       int64(atomic.LoadInt32(&q.running)),
 	}, nil
 }
 

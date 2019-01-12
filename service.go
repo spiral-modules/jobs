@@ -119,13 +119,18 @@ func (s *Service) Serve() error {
 
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
-	// explicitly stop all consuming
+	wg := sync.WaitGroup{}
 	for _, p := range s.Pipelines().Names(s.cfg.Consume...).Reverse() {
-		if err := s.Consume(p, nil, nil); err != nil {
-			s.throw(EventPipelineError, &PipelineError{Pipeline: p, Caused: err})
-		}
+		wg.Add(1)
+		go func(p *Pipeline) {
+			defer wg.Done()
+			if err := s.Consume(p, nil, nil); err != nil {
+				s.throw(EventPipelineError, &PipelineError{Pipeline: p, Caused: err})
+			}
+		}(p)
 	}
 
+	wg.Wait()
 	s.services.Stop()
 }
 
@@ -173,6 +178,10 @@ func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
 		return nil, err
 	}
 
+	if stat == nil {
+		return nil, fmt.Errorf("can't read %s", pipe.Name())
+	}
+
 	stat.Pipeline = pipe.Name()
 	stat.Broker = pipe.Broker()
 
@@ -182,10 +191,10 @@ func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
 // Consume enables or disables pipeline consuming using given handlers.
 func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if execPool != nil {
 		if s.consuming[pipe] {
+			s.mu.Unlock()
 			return nil
 		}
 
@@ -193,6 +202,7 @@ func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler Erro
 		s.consuming[pipe] = true
 	} else {
 		if !s.consuming[pipe] {
+			s.mu.Unlock()
 			return nil
 		}
 
@@ -202,8 +212,10 @@ func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler Erro
 
 	broker, ok := s.Brokers[pipe.Broker()]
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("undefined broker `%s`", pipe.Broker())
 	}
+	s.mu.Unlock()
 
 	if err := broker.Consume(pipe, execPool, errHandler); err != nil {
 		return err

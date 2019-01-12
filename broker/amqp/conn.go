@@ -3,7 +3,6 @@ package amqp
 import (
 	"errors"
 	"github.com/streadway/amqp"
-	"log"
 	"sync"
 	"time"
 )
@@ -69,7 +68,6 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			// connection has been closed
 			return
 		case err := <-errors:
-			log.Println(err)
 			cp.mu.Lock()
 			cp.restored = make(chan interface{})
 
@@ -101,19 +99,16 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					}
 
 					cp.mu.Lock()
-
 					cp.conn = conn
 					cp.channels = make(map[string]*channel)
 
 					// return to normal watch state
 					errors = conn.NotifyClose(make(chan *amqp.Error))
-					cp.mu.Unlock()
 
-					// todo: work reconnects out
-					// ready to move on and let all subscribers know that conn is restored
-					close(cp.restored)
+					if cp.restored != nil {
+						close(cp.restored)
+					}
 
-					cp.mu.Lock()
 					cp.restored = nil
 					cp.mu.Unlock()
 
