@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"errors"
 	"fmt"
 	"github.com/spiral/roadrunner/util"
 )
@@ -29,7 +28,7 @@ func (r *rpcServer) Push(j *Job, id *string) (err error) {
 // Reset resets underlying RR worker pool and restarts all of it's workers.
 func (r *rpcServer) Reset(reset bool, w *string) error {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	*w = "OK"
@@ -39,7 +38,7 @@ func (r *rpcServer) Reset(reset bool, w *string) error {
 // Destroy job consuming for a given pipeline.
 func (r *rpcServer) Stop(pipeline string, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	pipe := r.s.Pipelines().Get(pipeline)
@@ -58,7 +57,7 @@ func (r *rpcServer) Stop(pipeline string, w *string) (err error) {
 // Resume job consuming for a given pipeline.
 func (r *rpcServer) Resume(pipeline string, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	pipe := r.s.Pipelines().Get(pipeline)
@@ -77,7 +76,7 @@ func (r *rpcServer) Resume(pipeline string, w *string) (err error) {
 // Destroy job consuming for a given pipeline.
 func (r *rpcServer) StopAll(stop bool, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	for _, pipe := range r.s.Pipelines() {
@@ -93,7 +92,7 @@ func (r *rpcServer) StopAll(stop bool, w *string) (err error) {
 // Resume job consuming for a given pipeline.
 func (r *rpcServer) ResumeAll(resume bool, w *string) (err error) {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	for _, pipe := range r.s.Pipelines() {
@@ -109,7 +108,7 @@ func (r *rpcServer) ResumeAll(resume bool, w *string) (err error) {
 // Workers returns list of active workers and their stats.
 func (r *rpcServer) Workers(list bool, w *WorkerList) (err error) {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	w.Workers, err = util.ServerState(r.s.rr)
@@ -119,7 +118,7 @@ func (r *rpcServer) Workers(list bool, w *WorkerList) (err error) {
 // Stat returns list of active workers and their stats.
 func (r *rpcServer) Stat(list bool, l *PipelineList) (err error) {
 	if r.s == nil || r.s.rr == nil {
-		return errors.New("jobs server is not running")
+		return fmt.Errorf("jobs server is not running")
 	}
 
 	*l = PipelineList{}

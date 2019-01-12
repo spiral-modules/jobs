@@ -10,7 +10,7 @@ type Config struct {
 	// Addr of AMQP server (example: amqp://guest:guest@localhost:5672/).
 	Addr string
 
-	// Timeout to allocate the conn. Default 10 seconds.
+	// Timeout to allocate the connection. Default 10 seconds.
 	Timeout int
 }
 

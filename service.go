@@ -11,13 +11,14 @@ import (
 	"time"
 )
 
-// ID defines public service name.
+// String defines public service name.
 const ID = "jobs"
 
 // Service wraps roadrunner container and manage set of parent within it.
 type Service struct {
 	// Associated parent
-	Brokers   map[string]Broker
+	Brokers map[string]Broker
+
 	cfg       *Config
 	env       env.Environment
 	log       *logrus.Logger
@@ -29,7 +30,7 @@ type Service struct {
 	consuming map[*Pipeline]bool
 }
 
-// AddListener attaches event watcher.
+// Listen attaches event watcher.
 func (s *Service) AddListener(l func(event int, ctx interface{})) {
 	s.lsns = append(s.lsns, l)
 }
@@ -58,8 +59,6 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
-	s.services = service.NewContainer(l)
-
 	s.mu.Lock()
 	s.consuming = make(map[*Pipeline]bool)
 	for _, p := range s.Pipelines() {
@@ -67,10 +66,12 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	}
 	s.mu.Unlock()
 
+	// run all brokers in nested container
+	s.services = service.NewContainer(l)
 	for name, b := range s.Brokers {
 		s.services.Register(name, b)
 		if eb, ok := b.(EventProvider); ok {
-			eb.AddListener(s.throw)
+			eb.Listen(s.throw)
 		}
 	}
 
@@ -79,9 +80,9 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 		return false, err
 	}
 
+	// register all pipelines
 	for name, b := range s.Brokers {
 		for _, pipe := range s.Pipelines().Broker(name) {
-			// registering pipelines and handlers
 			if err := b.Register(pipe); err != nil {
 				return false, err
 			}
@@ -108,6 +109,7 @@ func (s *Service) Serve() error {
 	}
 	defer s.rr.Stop()
 
+	// start consuming of all the pipelines
 	for _, p := range s.Pipelines().Names(s.cfg.Consume...) {
 		if err := s.Consume(p, s.execPool, s.error); err != nil {
 			return err
@@ -122,6 +124,7 @@ func (s *Service) Stop() {
 	wg := sync.WaitGroup{}
 	for _, p := range s.Pipelines().Names(s.cfg.Consume...).Reverse() {
 		wg.Add(1)
+
 		go func(p *Pipeline) {
 			defer wg.Done()
 			if err := s.Consume(p, nil, nil); err != nil {
@@ -232,42 +235,26 @@ func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler Erro
 
 // exec executed job using local RR server. Make sure that service is started.
 func (s *Service) exec(id string, j *Job) error {
-	s.throw(EventReceived, &ReceiveEvent{ID: id, Job: j})
-
-	ctx, err := j.Context(id)
-	if err != nil {
-		s.error(id, j, err)
-		return err
-	}
-
 	start := time.Now()
-	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
-	if err == nil {
-		s.throw(EventJobComplete, &JobEvent{
-			ID:      id,
-			Job:     j,
-			start:   start,
-			elapsed: time.Since(start),
-		})
+	s.throw(EventJobReceived, &JobEvent{ID: id, Job: j, start: start})
 
-		return nil
-	}
-
-	// broker can handle retry or register job as errored
-	s.throw(EventJobError, &JobError{
-		ID:      id,
-		Job:     j,
-		Caused:  err,
-		start:   start,
-		elapsed: time.Since(start),
+	_, err := s.rr.Exec(&roadrunner.Payload{
+		Body:    j.Body(),
+		Context: j.Context(id),
 	})
+
+	if err == nil {
+		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j, start: start, elapsed: time.Since(start)})
+	} else {
+		s.throw(EventJobError, &JobError{ID: id, Job: j, Caused: err, start: start, elapsed: time.Since(start)})
+	}
 
 	return err
 }
 
 // register died job, can be used to move to fallback queue or log
 func (s *Service) error(id string, j *Job, err error) {
-	// nothing now
+	// nothing for now
 }
 
 // throw handles service, server and pool events.

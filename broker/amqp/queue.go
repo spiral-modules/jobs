@@ -1,7 +1,6 @@
 package amqp
 
 import (
-	"errors"
 	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
@@ -12,13 +11,11 @@ import (
 )
 
 type queue struct {
-	active int32
-	pipe   *jobs.Pipeline
-
+	active         int32
+	pipe           *jobs.Pipeline
 	exchange, name string
 	consumer       string
 	publishPool    *chanPool
-	consumePool    *chanPool
 
 	// tube events
 	lsn func(event int, ctx interface{})
@@ -34,27 +31,25 @@ type queue struct {
 }
 
 // newQueue creates new queue wrapper for AMQP.
-func newQueue(pipe *jobs.Pipeline, publish, consume *chanPool, lsn func(event int, ctx interface{})) (*queue, error) {
+func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue, error) {
 	if pipe.String("exchange", "amqp.direct") == "" {
-		return nil, errors.New("missing `exchange` parameter on amqp pipeline")
+		return nil, fmt.Errorf("missing `exchange` parameter on amqp pipeline")
 	}
 
 	if pipe.String("queue", "") == "" {
-		return nil, errors.New("missing `queue` parameter on amqp pipeline")
+		return nil, fmt.Errorf("missing `queue` parameter on amqp pipeline")
 	}
 
-	if pipe.Integer("prefetch", 1) == 0 {
-		return nil, errors.New("queue `prefetch` option can not be 0")
+	if pipe.Integer("prefetch", 4) == 0 {
+		return nil, fmt.Errorf("queue `prefetch` option can not be 0")
 	}
 
 	return &queue{
-		exchange:    pipe.String("exchange", "amqp.direct"),
-		name:        pipe.String("queue", ""),
-		consumer:    pipe.String("consumer", fmt.Sprintf("rr-jobs:%s-%v", pipe.Name(), os.Getpid())),
-		pipe:        pipe,
-		publishPool: publish,
-		consumePool: consume,
-		lsn:         lsn,
+		exchange: pipe.String("exchange", "amqp.direct"),
+		name:     pipe.String("queue", ""),
+		consumer: pipe.String("consumer", fmt.Sprintf("rr-jobs:%s-%v", pipe.Name(), os.Getpid())),
+		pipe:     pipe,
+		lsn:      lsn,
 	}, nil
 }
 
@@ -63,107 +58,108 @@ func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) err
 	q.execPool = execPool
 	q.err = err
 
-	return q.declare(q.name, q.name, nil)
+	return nil
 }
 
-func (q *queue) serve() {
+// serve consumes queue
+func (q *queue) serve(publishPool, consumePool *chanPool) {
 	atomic.StoreInt32(&q.active, 1)
 
+	q.publishPool = publishPool
+
 	var (
-		breakConsuming = false
-		breakDelivery  = false
+		cc  *channel
+		err error
 	)
 
+	// declare queue
+	if err := q.declare(q.name, q.name, nil); err != nil {
+		q.report(err)
+		return
+	}
+
+serving:
 	for {
-		<-q.consumePool.ensureConnection()
+		<-consumePool.waitConnected()
 		if atomic.LoadInt32(&q.active) == 0 {
 			// stopped
-			return
+			break serving
 		}
 
-		// isolate (!)
-		c, err := q.consumePool.channel(q.name)
+		// allocate channel for the consuming
+		if cc, err = consumePool.channel(q.name); err != nil {
+			q.report(err)
+			break serving
+		}
+
+		if err := cc.ch.Qos(q.pipe.Integer("prefetch", 4), 0, false); err != nil {
+			consumePool.release(cc, err)
+			q.report(err)
+			break serving
+		}
+
+		delivery, err := cc.ch.Consume(q.name, q.consumer, false, false, false, false, nil)
 		if err != nil {
-			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-			return
+			consumePool.release(cc, err)
+			q.report(err)
+			break serving
 		}
 
-		if err := c.ch.Qos(q.pipe.Integer("prefetch", 1), 0, false); err != nil {
-			q.consumePool.release(c, err)
-			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-			return
-		}
-
-		delivery, err := c.ch.Consume(q.name, q.consumer, false, false, false, false, nil)
-		if err != nil {
-			q.consumePool.release(c, err)
-			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-			return
-		}
-
-		breakDelivery = false
-		breakConsuming = false
+	consuming:
 		for {
 			select {
-			case err := <-c.signal:
+			case err := <-cc.signal:
 				// channel error, we need new channel
-				q.consumePool.release(c, err)
-				breakConsuming = true
+				consumePool.release(cc, err)
 
-				if err == nil {
-					// graceful stop signal
-					breakDelivery = true
+				if err != nil {
+					q.report(err)
 				} else {
-					q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+					// closed
+					break serving
 				}
+
+				break consuming
 
 			case d := <-delivery:
 				if d.Body == nil {
-					// consuming has been closed?
-					breakConsuming = true
-					break
+					break consuming
 				}
 
 				q.wg.Add(1)
+				atomic.AddInt32(&q.running, 1)
 				h := <-q.execPool
 
 				go func(h jobs.Handler, d amqp.Delivery) {
 					err := q.do(h, d)
+
+					atomic.AddInt32(&q.running, ^int32(0))
+					q.execPool <- h
 					q.wg.Done()
 
 					if err != nil {
-						q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+						q.report(err)
 					}
 				}(h, d)
 			}
-
-			if breakConsuming {
-				break
-			}
 		}
+	}
 
-		if breakDelivery {
-			return
-		}
+	if cc != nil {
+		consumePool.release(cc, err)
 	}
 }
 
 func (q *queue) do(h jobs.Handler, d amqp.Delivery) error {
-	atomic.AddInt32(&q.running, 1)
-	defer atomic.AddInt32(&q.running, ^int32(0))
-
 	id, attempt, j, err := unpack(d)
 	if err != nil {
-		q.execPool <- h
-		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		q.report(err)
 		return d.Nack(false, false)
 	}
 
 	err = h(id, j)
-	q.execPool <- h
 
 	if err == nil {
-		// success
 		return d.Ack(false)
 	}
 
@@ -176,7 +172,7 @@ func (q *queue) do(h jobs.Handler, d amqp.Delivery) error {
 
 	// retry as new j (to accommodate attempt number and new delay)
 	if err = q.publish(id, attempt+1, j, j.Options.RetryDuration()); err != nil {
-		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		q.report(err)
 		return d.Nack(false, true)
 	}
 
@@ -190,42 +186,30 @@ func (q *queue) stop() {
 
 	atomic.StoreInt32(&q.active, 0)
 
-	c, err := q.consumePool.channel(q.name)
-	if err == nil {
-		err = c.ch.Cancel(q.consumer, true)
-	}
-
 	q.muw.Lock()
 	q.wg.Wait() // wait for all the jobs to complete
 	q.muw.Unlock()
-
-	// we can release channel now
-	q.consumePool.release(c, err)
 }
 
-// publish message to queue or to delayed queue.
+// publishPool message to queue or to delayed queue.
 func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration) error {
 	c, err := q.publishPool.channel(q.name)
 	if err != nil {
 		return err
 	}
 
-	queueName := q.name
+	qName := q.name
 
 	if delay != 0 {
 		delayMs := int64(delay.Seconds() * 1000)
-		queueName = fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
+		qName = fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
 
-		err := q.declare(
-			queueName,
-			queueName,
-			amqp.Table{
-				"x-dead-letter-exchange":    q.exchange,
-				"x-dead-letter-routing-key": q.name,
-				"x-message-ttl":             delayMs,
-				"x-expires":                 delayMs * 2,
-			},
-		)
+		err := q.declare(qName, qName, amqp.Table{
+			"x-dead-letter-exchange":    q.exchange,
+			"x-dead-letter-routing-key": q.name,
+			"x-message-ttl":             delayMs,
+			"x-expires":                 delayMs * 2,
+		})
 
 		if err != nil {
 			return err
@@ -234,11 +218,11 @@ func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration
 
 	err = c.ch.Publish(
 		q.exchange, // exchange
-		queueName,  // routing key
+		qName,      // routing key
 		false,      // mandatory
 		false,      // immediate
 		amqp.Publishing{
-			ContentType:  "application/json",
+			ContentType:  "application/octet-stream",
 			Body:         j.Body(),
 			DeliveryMode: amqp.Persistent,
 			Headers:      pack(id, attempt, j),
@@ -288,13 +272,13 @@ func (q *queue) inspect() (*amqp.Queue, error) {
 
 	queue, err := c.ch.QueueInspect(q.name)
 	if err != nil {
-		go q.publishPool.release(c, err)
+		q.publishPool.release(c, err)
 	}
 
 	return &queue, err
 }
 
 // throw handles service, server and pool events.
-func (q *queue) throw(event int, ctx interface{}) {
-	q.lsn(event, ctx)
+func (q *queue) report(err error) {
+	q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 }

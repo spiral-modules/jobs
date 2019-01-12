@@ -1,7 +1,6 @@
 package amqp
 
 import (
-	"errors"
 	"fmt"
 	"github.com/gofrs/uuid"
 	"github.com/spiral/jobs"
@@ -12,7 +11,7 @@ import (
 // Broker represents AMQP broker.
 type Broker struct {
 	cfg         *Config
-	lsns        []func(event int, ctx interface{})
+	lsn         func(event int, ctx interface{})
 	publishPool *chanPool
 	consumePool *chanPool
 	mu          sync.Mutex
@@ -20,27 +19,15 @@ type Broker struct {
 	queues      map[*jobs.Pipeline]*queue
 }
 
-// AddListener attaches server event watcher.
-func (b *Broker) AddListener(l func(event int, ctx interface{})) {
-	b.lsns = append(b.lsns, l)
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
 }
 
 // Init configures AMQP job broker (always 2 connections).
 func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
 	b.queues = make(map[*jobs.Pipeline]*queue)
-
-	conn, err := newConn(b.cfg.Addr, cfg.TimeoutDuration())
-	if err != nil {
-		return false, err
-	}
-	b.publishPool = conn
-
-	conn, err = newConn(b.cfg.Addr, cfg.TimeoutDuration())
-	if err != nil {
-		return false, err
-	}
-	b.consumePool = conn
 
 	return true, nil
 }
@@ -50,7 +37,11 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	q, err := newQueue(pipe, b.publishPool, b.consumePool, b.throw)
+	if _, ok := b.queues[pipe]; ok {
+		return fmt.Errorf("queue `%s` has already been registered", pipe.Name())
+	}
+
+	q, err := newQueue(pipe, b.throw)
 	if err != nil {
 		return err
 	}
@@ -61,12 +52,24 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 }
 
 // Serve broker pipelines.
-func (b *Broker) Serve() error {
+func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
+
+	if b.publishPool, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+		return err
+	}
+	defer b.publishPool.Close()
+
+	if b.consumePool, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+		return err
+	}
+	defer b.consumePool.Close()
+
 	for _, q := range b.queues {
-		go q.serve()
+		go q.serve(b.publishPool, b.consumePool)
 	}
 	b.wait = make(chan error)
+
 	b.mu.Unlock()
 
 	return <-b.wait
@@ -96,7 +99,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	q, ok := b.queues[pipe]
 	if !ok {
-		return errors.New("invalid pipeline")
+		return fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
 	q.stop()
@@ -105,8 +108,8 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.wait != nil && q.execPool != nil {
-		go q.serve()
+	if b.publishPool != nil && q.execPool != nil {
+		go q.serve(b.publishPool, b.consumePool)
 	}
 
 	return nil
@@ -178,7 +181,7 @@ func (b *Broker) isServing() error {
 	defer b.mu.Unlock()
 
 	if b.wait == nil {
-		return errors.New("broker is not running")
+		return fmt.Errorf("broker is not running")
 	}
 
 	return nil
@@ -186,7 +189,7 @@ func (b *Broker) isServing() error {
 
 // throw handles service, server and pool events.
 func (b *Broker) throw(event int, ctx interface{}) {
-	for _, l := range b.lsns {
-		l(event, ctx)
+	if b.lsn != nil {
+		b.lsn(event, ctx)
 	}
 }

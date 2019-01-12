@@ -2,25 +2,20 @@ package beanstalk
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/spiral/jobs"
 	"sync"
 )
 
-// Broker run jobs using Broker service.
+// Broker run consume using Broker service.
 type Broker struct {
 	cfg        *Config
-	lsns       []func(event int, ctx interface{})
+	mul        sync.Mutex
+	lsn        func(event int, ctx interface{})
 	mu         sync.Mutex
 	wait       chan error
 	sharedConn *conn
 	tubes      map[*jobs.Pipeline]*tube
-}
-
-// AddListener attaches server event watcher.
-func (b *Broker) AddListener(l func(event int, ctx interface{})) {
-	b.lsns = append(b.lsns, l)
 }
 
 // Init configures broker.
@@ -28,13 +23,12 @@ func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
 	b.tubes = make(map[*jobs.Pipeline]*tube)
 
-	conn, err := b.cfg.newConn()
-	if err != nil {
-		return false, err
-	}
-	b.sharedConn = conn
-
 	return true, nil
+}
+
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
 }
 
 // Register broker pipeline.
@@ -42,8 +36,11 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	t, err := newTube(pipe, b.sharedConn, b.throw)
+	if _, ok := b.tubes[pipe]; ok {
+		return fmt.Errorf("tube `%s` has already been registered", pipe.Name())
+	}
 
+	t, err := newTube(pipe, b.throw)
 	if err != nil {
 		return err
 	}
@@ -56,13 +53,21 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 // Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
+
+	if b.sharedConn, err = b.cfg.newConn(); err != nil {
+		return err
+	}
+	defer b.sharedConn.Close()
+
 	for _, t := range b.tubes {
-		if t.execPool != nil {
-			go t.serve(b.cfg)
+		if t.execPool == nil {
+			continue
 		}
+		go t.serve(b.sharedConn, connFactory(b.cfg))
 	}
 
 	b.wait = make(chan error)
+
 	b.mu.Unlock()
 
 	return <-b.wait
@@ -82,7 +87,6 @@ func (b *Broker) Stop() {
 	}
 
 	b.wait <- nil
-	b.sharedConn.Close()
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -93,7 +97,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	t, ok := b.tubes[pipe]
 	if !ok {
-		return errors.New("invalid pipeline")
+		return fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
 	t.stop()
@@ -102,9 +106,9 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.wait != nil && t.execPool != nil {
+	if b.sharedConn != nil && t.execPool != nil {
 		// resume wg
-		go t.serve(b.cfg)
+		go t.serve(b.sharedConn, connFactory(b.cfg))
 	}
 
 	return nil
@@ -162,7 +166,7 @@ func (b *Broker) isServing() error {
 	defer b.mu.Unlock()
 
 	if b.wait == nil {
-		return errors.New("broker is not running")
+		return fmt.Errorf("broker is not running")
 	}
 
 	return nil
@@ -170,7 +174,7 @@ func (b *Broker) isServing() error {
 
 // throw handles service, server and pool events.
 func (b *Broker) throw(event int, ctx interface{}) {
-	for _, l := range b.lsns {
-		l(event, ctx)
+	if b.lsn != nil {
+		b.lsn(event, ctx)
 	}
 }

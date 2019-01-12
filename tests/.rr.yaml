@@ -1,7 +1,7 @@
 jobs:
   # worker pool configuration
   workers:
-    command: "php handler.php"
+    command: "php consumer.php"
     pool:
       numWorkers: 8
 
@@ -33,9 +33,8 @@ jobs:
       broker: local
 
     amqp:
-      broker:   amqp
-      queue:    default
-      prefetch: 2
+      broker: amqp
+      queue:  default
 
     beanstalk:
       broker: beanstalk

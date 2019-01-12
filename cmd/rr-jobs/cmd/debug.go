@@ -60,8 +60,8 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.ID,
 		))
 
-	case jobs.EventReceived:
-		e := ctx.(*jobs.ReceiveEvent)
+	case jobs.EventJobReceived:
+		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
 			"job.<cyan+h>RECV</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
 			e.Job.Job,

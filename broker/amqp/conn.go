@@ -1,13 +1,13 @@
 package amqp
 
 import (
-	"errors"
+	"fmt"
 	"github.com/streadway/amqp"
-	"log"
 	"sync"
 	"time"
 )
 
+// manages set of AMQP channels
 type chanPool struct {
 	tout      time.Duration
 	mu        sync.Mutex
@@ -17,7 +17,14 @@ type chanPool struct {
 	connected chan interface{}
 }
 
-// newConn creates new watched connection
+// manages single channel
+type channel struct {
+	ch       *amqp.Channel
+	consumer string
+	signal   chan error
+}
+
+// newConn creates new watched AMQP connection
 func newConn(addr string, tout time.Duration) (*chanPool, error) {
 	conn, err := amqp.Dial(addr)
 	if err != nil {
@@ -45,7 +52,7 @@ func (cp *chanPool) Close() error {
 
 	close(cp.wait)
 	if cp.channels == nil {
-		return errors.New("connection is dead")
+		return fmt.Errorf("connection is dead")
 	}
 
 	// close all channels and consumers
@@ -61,6 +68,15 @@ func (cp *chanPool) Close() error {
 
 	wg.Wait()
 	return cp.conn.Close()
+}
+
+// waitConnected waits till connection is connected again or eventually closed.
+// must only be invoked after connection error has been delivered to channel.signal.
+func (cp *chanPool) waitConnected() chan interface{} {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+
+	return cp.connected
 }
 
 // watch manages connection state and reconnects if needed
@@ -84,7 +100,8 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			cp.channels = nil
 			cp.mu.Unlock()
 
-			// ensureConnection loop
+			// waitConnected loop
+		reconnecting:
 			for {
 				select {
 				case <-cp.wait:
@@ -93,7 +110,6 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					return
 
 				case <-time.NewTimer(cp.tout).C:
-					log.Println("try to ensureConnection")
 
 					// todo: need better dial method (TSL and etc)
 					conn, err := amqp.Dial(addr)
@@ -112,20 +128,11 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					close(cp.connected)
 					cp.mu.Unlock()
 
-					break
+					break reconnecting
 				}
 			}
 		}
 	}
-}
-
-// ensureConnection waits till connection is connected again or eventually closed.
-// must only be invoked after connection error has been delivered to channel.signal.
-func (cp *chanPool) ensureConnection() chan interface{} {
-	cp.mu.Lock()
-	defer cp.mu.Unlock()
-
-	return cp.connected
 }
 
 // channel allocates new channel on amqp connection
@@ -134,7 +141,7 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 	defer cp.mu.Unlock()
 
 	if cp.channels == nil {
-		return nil, errors.New("connection is dead")
+		return nil, fmt.Errorf("connection is dead")
 	}
 
 	if ch, ok := cp.channels[name]; ok {
@@ -149,7 +156,7 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 
 	// we expect that every allocated channel would have listener on signal
 	// this is not true only in case of pure producing channels
-	cp.channels[name] = newChannel(ch)
+	cp.channels[name] = &channel{ch: ch, signal: make(chan error, 1)}
 
 	return cp.channels[name], nil
 }
@@ -159,7 +166,11 @@ func (cp *chanPool) release(c *channel, err error) {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 
-	go c.Close()
+	go func() {
+		c.signal <- nil
+		c.ch.Close()
+	}()
+
 	for name, ch := range cp.channels {
 		if ch == c {
 			delete(cp.channels, name)

@@ -18,8 +18,8 @@ type Broker interface {
 
 // EventProvider defines the ability to throw events for the broker.
 type EventProvider interface {
-	// AddListener attaches the even listener.
-	AddListener(l func(event int, ctx interface{}))
+	// Listen attaches the even listener.
+	Listen(lsn func(event int, ctx interface{}))
 }
 
 // Stat contains information about pipeline.

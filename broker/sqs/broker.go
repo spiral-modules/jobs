@@ -21,7 +21,7 @@ type Broker struct {
 	queues map[*jobs.Pipeline]*queue
 }
 
-// AddListener attaches server event watcher.
+// Listen attaches server event watcher.
 func (b *Broker) AddListener(l func(event int, ctx interface{})) {
 	b.lsns = append(b.lsns, l)
 }

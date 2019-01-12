@@ -9,8 +9,8 @@ const (
 	// EventPushError caused when job can not be registered.
 	EventPushError
 
-	// EventReceived thrown when new job received.
-	EventReceived
+	// EventJobReceived thrown when new job received.
+	EventJobReceived
 
 	// EventJobComplete thrown when job execution is successfully completed. JobEvent is passed as context.
 	EventJobComplete
@@ -35,17 +35,8 @@ const (
 )
 
 // JobEvent represent job event.
-type ReceiveEvent struct {
-	// ID is job id.
-	ID string
-
-	// Job is failed job.
-	Job *Job
-}
-
-// JobEvent represent job event.
 type JobEvent struct {
-	// ID is job id.
+	// String is job id.
 	ID string
 
 	// Job is failed job.
@@ -63,7 +54,7 @@ func (e *JobEvent) Elapsed() time.Duration {
 
 // JobError represents singular Job error event.
 type JobError struct {
-	// ID is job id.
+	// String is job id.
 	ID string
 
 	// Job is failed job.

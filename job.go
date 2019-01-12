@@ -28,14 +28,16 @@ func (j *Job) Body() []byte {
 	return []byte(j.Payload)
 }
 
-// Context pack job context (job, id) into binary payload.
-func (j *Job) Context(id string) ([]byte, error) {
-	return json.Marshal(
+// Context packs job context (job, id) into binary payload.
+func (j *Job) Context(id string) []byte {
+	ctx, _ := json.Marshal(
 		struct {
 			ID  string `json:"id"`
 			Job string `json:"job"`
 		}{ID: id, Job: j.Job},
 	)
+
+	return ctx
 }
 
 // Options carry information about how to handle given job.

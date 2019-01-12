@@ -1,7 +1,6 @@
 package beanstalk
 
 import (
-	"errors"
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"strings"
@@ -11,7 +10,8 @@ import (
 
 var connErrors = []string{"pipe", "read tcp", "write tcp", "EOF"}
 
-type connector interface {
+// creates new connections
+type connFactory interface {
 	newConn() (*conn, error)
 }
 
@@ -49,20 +49,21 @@ func newConn(network, addr string, tout time.Duration) (cn *conn, err error) {
 // close the connection and reconnect watcher.
 func (cn *conn) Close() error {
 	cn.lock.L.Lock()
+	defer cn.lock.L.Unlock()
+
 	close(cn.stop)
 	for cn.free != nil {
 		cn.lock.Wait()
 	}
-	cn.lock.L.Unlock()
 
 	return nil
 }
 
-// Acquire connection instance or return error in case of timeout.
-func (cn *conn) Acquire() (*beanstalk.Conn, error) {
+// acquire connection instance or return error in case of timeout.
+func (cn *conn) acquire() (*beanstalk.Conn, error) {
 	select {
 	case <-cn.stop:
-		return nil, errors.New("connection closed")
+		return nil, fmt.Errorf("connection closed")
 	case <-cn.free:
 		return cn.conn, nil
 	default:
@@ -71,7 +72,7 @@ func (cn *conn) Acquire() (*beanstalk.Conn, error) {
 		select {
 		case <-cn.stop:
 			tout.Stop()
-			return nil, errors.New("connection closed")
+			return nil, fmt.Errorf("connection closed")
 		case <-cn.free:
 			tout.Stop()
 			return cn.conn, nil
@@ -81,8 +82,8 @@ func (cn *conn) Acquire() (*beanstalk.Conn, error) {
 	}
 }
 
-// Release acquired connection.
-func (cn *conn) Release(err error) error {
+// release acquired connection.
+func (cn *conn) release(err error) error {
 	if isConnError(err) {
 		// reconnect is required
 		cn.dead <- err

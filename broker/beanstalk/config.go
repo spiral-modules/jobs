@@ -1,7 +1,7 @@
 package beanstalk
 
 import (
-	"errors"
+	"fmt"
 	"github.com/spiral/roadrunner/service"
 	"strings"
 	"syscall"
@@ -36,7 +36,7 @@ func (c *Config) TimeoutDuration() time.Duration {
 func (c *Config) newConn() (*conn, error) {
 	dsn := strings.Split(c.Addr, "://")
 	if len(dsn) != 2 {
-		return nil, errors.New("invalid socket DSN (tcp://localhost:11300, unix://beanstalk.sock)")
+		return nil, fmt.Errorf("invalid socket DSN (tcp://localhost:11300, unix://beanstalk.sock)")
 	}
 
 	if dsn[0] == "unix" {

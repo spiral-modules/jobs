@@ -14,7 +14,7 @@ use Spiral\RoadRunner\Worker;
 /***
  * @codeCoverageIgnore handled on Golang end.
  */
-class Handler
+final class Consumer
 {
     /*** @var Worker */
     private $worker;

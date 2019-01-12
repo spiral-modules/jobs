@@ -37,7 +37,7 @@ func newQueue() *queue {
 	return &queue{stat: &jobs.Stat{InternalName: ":memory:"}, jobs: make(chan *entry)}
 }
 
-// associate queue with new consume pool
+// associate queue with new do pool
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	q.execPool = execPool
 	q.err = err
@@ -51,17 +51,23 @@ func (q *queue) serve() {
 	atomic.StoreInt32(&q.active, 1)
 
 	for {
-		e := q.fetchJob()
+		e := q.consume()
 		if e == nil {
 			return
 		}
 
-		go q.consume(e, <-q.execPool)
+		h := <-q.execPool
+		go func(e *entry) {
+			q.do(e, h)
+			atomic.AddInt64(&q.stat.Active, ^int64(0))
+			q.execPool <- h
+			q.wg.Done()
+		}(e)
 	}
 }
 
 // allocate one job entry
-func (q *queue) fetchJob() *entry {
+func (q *queue) consume() *entry {
 	q.muw.Lock()
 	defer q.muw.Unlock()
 
@@ -76,15 +82,9 @@ func (q *queue) fetchJob() *entry {
 	}
 }
 
-// consume singe job
-func (q *queue) consume(e *entry, h jobs.Handler) {
-	defer atomic.AddInt64(&q.stat.Active, ^int64(0))
-	defer q.wg.Done()
-
-	e.attempt++
-
+// do singe job
+func (q *queue) do(e *entry, h jobs.Handler) {
 	err := h(e.id, e.job)
-	q.execPool <- h
 
 	if err == nil {
 		atomic.AddInt64(&q.stat.Queue, ^int64(0))
@@ -93,12 +93,12 @@ func (q *queue) consume(e *entry, h jobs.Handler) {
 
 	q.err(e.id, e.job, err)
 
+	e.attempt++
 	if !e.job.Options.CanRetry(e.attempt) {
 		atomic.AddInt64(&q.stat.Queue, ^int64(0))
 		return
 	}
 
-	// todo: test retry counters
 	go q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
 }
 

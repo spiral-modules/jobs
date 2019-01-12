@@ -3,7 +3,6 @@ package local
 import (
 	"fmt"
 	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 	"github.com/spiral/jobs"
 	"sync"
 )
@@ -11,7 +10,7 @@ import (
 // Broker run queue using local goroutines.
 type Broker struct {
 	mu     sync.Mutex
-	wait   chan interface{}
+	wait   chan error
 	queues map[*jobs.Pipeline]*queue
 }
 
@@ -27,6 +26,10 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	if _, ok := b.queues[pipe]; ok {
+		return fmt.Errorf("pipe `%s` has already been registered", pipe.Name())
+	}
+
 	b.queues[pipe] = newQueue()
 
 	return nil
@@ -41,26 +44,23 @@ func (b *Broker) Serve() error {
 			go q.serve()
 		}
 	}
-	b.wait = make(chan interface{})
+	b.wait = make(chan error)
 	b.mu.Unlock()
 
-	<-b.wait
-
-	return nil
+	return <-b.wait
 }
 
 // Stop all pipelines.
 func (b *Broker) Stop() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if b.wait == nil {
 		return
 	}
 
-	// wait consuming after all jobs are complete
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
+	// stop all consuming
 	for _, q := range b.queues {
-		// wait for stop
 		q.stop()
 	}
 
@@ -94,12 +94,9 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 // Push job into the worker.
 func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
-	b.mu.Lock()
-	if b.wait == nil {
-		b.mu.Unlock()
-		return "", errors.New("broker is not running")
+	if err := b.isServing(); err != nil {
+		return "", err
 	}
-	b.mu.Unlock()
 
 	q := b.queue(pipe)
 	if q == nil {
@@ -116,8 +113,12 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 	return id.String(), nil
 }
 
-// Stat must fetch statistics about given pipeline or return error.
+// Stat must consume statistics about given pipeline or return error.
 func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	if err := b.isServing(); err != nil {
+		return nil, err
+	}
+
 	q := b.queue(pipe)
 	if q == nil {
 		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
@@ -137,4 +138,16 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	}
 
 	return q
+}
+
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
+	}
+
+	return nil
 }
