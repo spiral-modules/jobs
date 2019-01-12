@@ -7,7 +7,6 @@ import (
 	"github.com/spiral/jobs"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // Broker represents AMQP broker.
@@ -31,13 +30,13 @@ func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
 	b.queues = make(map[*jobs.Pipeline]*queue)
 
-	conn, err := newConn(b.cfg.Addr, time.Second)
+	conn, err := newConn(b.cfg.Addr, cfg.TimeoutDuration())
 	if err != nil {
 		return false, err
 	}
 	b.publishPool = conn
 
-	conn, err = newConn(b.cfg.Addr, time.Second)
+	conn, err = newConn(b.cfg.Addr, cfg.TimeoutDuration())
 	if err != nil {
 		return false, err
 	}
@@ -149,7 +148,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 
 	queue, err := q.inspect()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	// this the closest approximation we can get for now

@@ -7,7 +7,7 @@ jobs:
 
   # rabbitmq and similar servers
   amqp:
-    addr:     amqp://guest:guest@localhost:5672/
+    addr:     amqp://guest:guest@localhost:5673/
 
   # beanstalk configuration
   beanstalk:
@@ -35,7 +35,7 @@ jobs:
     amqp:
       broker:   amqp
       queue:    default
-      prefetch: 8
+      prefetch: 2
 
     beanstalk:
       broker: beanstalk

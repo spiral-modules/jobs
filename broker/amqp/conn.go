@@ -3,17 +3,18 @@ package amqp
 import (
 	"errors"
 	"github.com/streadway/amqp"
+	"log"
 	"sync"
 	"time"
 )
 
 type chanPool struct {
-	tout     time.Duration
-	mu       sync.Mutex
-	conn     *amqp.Connection
-	channels map[string]*channel
-	wait     chan interface{}
-	restored chan interface{}
+	tout      time.Duration
+	mu        sync.Mutex
+	conn      *amqp.Connection
+	channels  map[string]*channel
+	wait      chan interface{}
+	connected chan interface{}
 }
 
 // newConn creates new watched connection
@@ -24,12 +25,14 @@ func newConn(addr string, tout time.Duration) (*chanPool, error) {
 	}
 
 	cp := &chanPool{
-		tout:     tout,
-		conn:     conn,
-		channels: make(map[string]*channel),
-		wait:     make(chan interface{}),
+		tout:      tout,
+		conn:      conn,
+		channels:  make(map[string]*channel),
+		wait:      make(chan interface{}),
+		connected: make(chan interface{}),
 	}
 
+	close(cp.connected)
 	go cp.watch(addr, conn.NotifyClose(make(chan *amqp.Error)))
 
 	return cp, nil
@@ -69,7 +72,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			return
 		case err := <-errors:
 			cp.mu.Lock()
-			cp.restored = make(chan interface{})
+			cp.connected = make(chan interface{})
 
 			// broadcast error to all consumers to let them for the tryReconnect
 			for _, ch := range cp.channels {
@@ -81,18 +84,19 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			cp.channels = nil
 			cp.mu.Unlock()
 
-			// reconnect loop
+			// ensureConnection loop
 			for {
 				select {
 				case <-cp.wait:
-					// restored is not possible
-					close(cp.restored)
+					// connection has been cancelled is not possible
+					close(cp.connected)
 					return
 
 				case <-time.NewTimer(cp.tout).C:
+					log.Println("try to ensureConnection")
+
 					// todo: need better dial method (TSL and etc)
 					conn, err := amqp.Dial(addr)
-
 					if err != nil {
 						// still failing
 						continue
@@ -105,11 +109,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					// return to normal watch state
 					errors = conn.NotifyClose(make(chan *amqp.Error))
 
-					if cp.restored != nil {
-						close(cp.restored)
-					}
-
-					cp.restored = nil
+					close(cp.connected)
 					cp.mu.Unlock()
 
 					break
@@ -119,13 +119,13 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 	}
 }
 
-// reconnected waits till connection is connected again or eventually closed.
+// ensureConnection waits till connection is connected again or eventually closed.
 // must only be invoked after connection error has been delivered to channel.signal.
-func (cp *chanPool) reconnect() chan interface{} {
+func (cp *chanPool) ensureConnection() chan interface{} {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 
-	return cp.restored
+	return cp.connected
 }
 
 // channel allocates new channel on amqp connection
@@ -156,13 +156,13 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 
 // release gracefully closes and removes channel allocation.
 func (cp *chanPool) release(c *channel, err error) {
-	c.Close()
-
 	cp.mu.Lock()
+	defer cp.mu.Unlock()
+
+	go c.Close()
 	for name, ch := range cp.channels {
 		if ch == c {
 			delete(cp.channels, name)
 		}
 	}
-	cp.mu.Unlock()
 }

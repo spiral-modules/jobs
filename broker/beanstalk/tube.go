@@ -97,7 +97,7 @@ func (t *tube) serve(connector connector) {
 			}
 
 			h := <-t.execPool
-			go func() {
+			go func(h jobs.Handler) {
 				defer t.wg.Done()
 
 				err := t.consume(conn, <-t.execPool, e)
@@ -109,7 +109,7 @@ func (t *tube) serve(connector connector) {
 						Caused:   err,
 					})
 				}
-			}()
+			}(h)
 		}
 	}
 }

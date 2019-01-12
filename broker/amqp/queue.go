@@ -43,6 +43,10 @@ func newQueue(pipe *jobs.Pipeline, publish, consume *chanPool, lsn func(event in
 		return nil, errors.New("missing `queue` parameter on amqp pipeline")
 	}
 
+	if pipe.Integer("prefetch", 1) == 0 {
+		return nil, errors.New("queue `prefetch` option can not be 0")
+	}
+
 	return &queue{
 		exchange:    pipe.String("exchange", "amqp.direct"),
 		name:        pipe.String("queue", ""),
@@ -65,65 +69,75 @@ func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) err
 func (q *queue) serve() {
 	atomic.StoreInt32(&q.active, 1)
 
-	breakDelivery := false
+	var (
+		breakConsuming = false
+		breakDelivery  = false
+	)
+
 	for {
-		reconnect := q.consumePool.reconnect()
-		if reconnect != nil {
-			select {
-			case <-reconnect:
-				// wait for connection restoration
-			}
+		<-q.consumePool.ensureConnection()
+		if atomic.LoadInt32(&q.active) == 0 {
+			// stopped
+			return
 		}
 
+		// isolate (!)
 		c, err := q.consumePool.channel(q.name)
 		if err != nil {
-			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 			return
 		}
 
 		if err := c.ch.Qos(q.pipe.Integer("prefetch", 1), 0, false); err != nil {
 			q.consumePool.release(c, err)
-			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 			return
 		}
 
 		delivery, err := c.ch.Consume(q.name, q.consumer, false, false, false, false, nil)
 		if err != nil {
 			q.consumePool.release(c, err)
-			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 			return
 		}
 
 		breakDelivery = false
+		breakConsuming = false
 		for {
 			select {
+			case err := <-c.signal:
+				// channel error, we need new channel
+				q.consumePool.release(c, err)
+				breakConsuming = true
+
+				if err == nil {
+					// graceful stop signal
+					breakDelivery = true
+				} else {
+					q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+				}
+
 			case d := <-delivery:
 				if d.Body == nil {
-					breakDelivery = true
+					// consuming has been closed?
+					breakConsuming = true
 					break
 				}
 
 				q.wg.Add(1)
+				h := <-q.execPool
 
-				go func(d amqp.Delivery) {
-					err := q.consume(<-q.execPool, d)
+				go func(h jobs.Handler, d amqp.Delivery) {
+					err := q.do(h, d)
 					q.wg.Done()
 
 					if err != nil {
 						q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 					}
-				}(d)
-
-			case err := <-c.signal:
-				q.consumePool.release(c, err)
-				if err == nil {
-					breakDelivery = true
-				} else {
-					q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-				}
+				}(h, d)
 			}
 
-			if breakDelivery {
+			if breakConsuming {
 				break
 			}
 		}
@@ -134,18 +148,18 @@ func (q *queue) serve() {
 	}
 }
 
-func (q *queue) consume(h jobs.Handler, d amqp.Delivery) error {
+func (q *queue) do(h jobs.Handler, d amqp.Delivery) error {
+	atomic.AddInt32(&q.running, 1)
+	defer atomic.AddInt32(&q.running, ^int32(0))
+
 	id, attempt, j, err := unpack(d)
 	if err != nil {
 		q.execPool <- h
 		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-		return d.Nack(false, true)
+		return d.Nack(false, false)
 	}
 
-	atomic.AddInt32(&q.running, 1)
 	err = h(id, j)
-	atomic.AddInt32(&q.running, ^int32(0))
-
 	q.execPool <- h
 
 	if err == nil {
@@ -161,8 +175,7 @@ func (q *queue) consume(h jobs.Handler, d amqp.Delivery) error {
 	}
 
 	// retry as new j (to accommodate attempt number and new delay)
-	err = q.publish(id, attempt+1, j, j.Options.RetryDuration())
-	if err != nil {
+	if err = q.publish(id, attempt+1, j, j.Options.RetryDuration()); err != nil {
 		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 		return d.Nack(false, true)
 	}
