@@ -159,11 +159,7 @@ func (q *queue) consume(h jobs.Handler, msg *sqs.Message, j *jobs.Job) (err erro
 
 	if err == nil {
 		// success
-		_, err = q.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-			QueueUrl:      q.url,
-			ReceiptHandle: msg.ReceiptHandle,
-		})
-
+		_, err = q.sqs.DeleteMessage(&sqs.DeleteMessageInput{QueueUrl: q.url, ReceiptHandle: msg.ReceiptHandle})
 		return err
 	}
 
@@ -172,7 +168,9 @@ func (q *queue) consume(h jobs.Handler, msg *sqs.Message, j *jobs.Job) (err erro
 
 	reserves, ok := strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
 	if ok != nil || !j.Options.CanRetry(reserves) {
-		return nil
+		// failure
+		_, err = q.sqs.DeleteMessage(&sqs.DeleteMessageInput{QueueUrl: q.url, ReceiptHandle: msg.ReceiptHandle})
+		return err
 	}
 
 	// retry after specified duration

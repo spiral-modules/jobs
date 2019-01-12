@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"errors"
+	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
 	"log"
@@ -129,19 +130,24 @@ func (q *queue) serve() {
 	for {
 		reconnect := q.consumePool.reconnect()
 		if reconnect != nil {
-			// wait for connection restoration
-			<-reconnect
+			select {
+			case <-reconnect:
+				// wait for connection restoration
+			case <-q.wait:
+				// or till manual stop
+				return
+			}
 		}
 
 		// todo: consumer name, todo: what if connection is dead?
 		delivery, err := c.ch.Consume(
-			"default",          // queue
-			"super-consumer-x", // consumer
-			false,              // auto-ack
-			false,              // exclusive
-			false,              // no-local
-			false,              // no-wait
-			nil,                // args
+			"default",        // queue
+			"super-consumer", // consumer
+			false,            // auto-ack
+			false,            // exclusive
+			false,            // no-local
+			false,            // no-wait
+			nil,              // args
 		)
 
 		// unable to start consuming
@@ -167,8 +173,14 @@ func (q *queue) serve() {
 				}(d)
 
 			case err := <-c.signal:
+				// todo: test it
 				log.Println(err)
+
 				q.consumePool.release(c, err)
+				if err == nil {
+					return
+				}
+
 				break
 			}
 		}
@@ -182,7 +194,7 @@ func (q *queue) consume(h jobs.Handler, d amqp.Delivery) error {
 	if err != nil {
 		q.execPool <- h
 		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
-		return d.Nack(false, false)
+		return d.Nack(false, true)
 	}
 
 	err = h(id, j)
@@ -197,7 +209,7 @@ func (q *queue) consume(h jobs.Handler, d amqp.Delivery) error {
 	q.err(id, j, err)
 
 	if !j.Options.CanRetry(attempt) {
-		return nil
+		return d.Nack(false, false)
 	}
 
 	// retry as new j (to accommodate attempt number and new delay)
@@ -236,11 +248,36 @@ func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration
 		return err
 	}
 
-	// todo: publish with delay
+	queueName := q.name
+
+	// publishing to dead letter queue
+	if delay != 0 {
+		delayMs := int64(delay.Seconds() * 1000)
+		queueName := fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
+
+		_, err = c.ch.QueueDeclare(
+			queueName, // name
+			true,      // type
+			false,     // durable
+			false,     // auto-deleted
+			false,     // internal
+			amqp.Table{
+				"x-dead-letter-exchange":    q.exchange,
+				"x-dead-letter-routing-key": q.name,
+				"x-message-ttl":             delayMs,
+				"x-expires":                 delayMs * 2,
+			},
+		)
+
+		if err != nil {
+			go q.publishPool.release(c, err)
+			return err
+		}
+	}
 
 	err = c.ch.Publish(
 		q.exchange, // exchange
-		q.name,     // routing key
+		queueName,  // routing key
 		false,      // mandatory
 		false,      // immediate
 		amqp.Publishing{
@@ -253,13 +290,13 @@ func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration
 
 	if err != nil {
 		go q.publishPool.release(c, err)
-		return err
 	}
 
-	return nil
+	return err
 }
 
 func (q *queue) inspect() (*amqp.Queue, error) {
+	// todo: implement
 	return nil, nil
 }
 
