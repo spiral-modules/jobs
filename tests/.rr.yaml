@@ -35,6 +35,7 @@ jobs:
     amqp:
       broker:   amqp
       queue:    default
+      prefetch: 8
 
     beanstalk:
       broker: beanstalk
