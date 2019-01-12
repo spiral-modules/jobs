@@ -59,54 +59,7 @@ func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) err
 	q.execPool = execPool
 	q.err = err
 
-	c, cerr := q.publishPool.channel(q.name)
-	if cerr != nil {
-		return cerr
-	}
-
-	cerr = c.ch.ExchangeDeclare(
-		q.exchange,
-		"direct",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if cerr != nil {
-		go q.publishPool.release(c, cerr)
-		return cerr
-	}
-
-	_, cerr = c.ch.QueueDeclare(
-		q.name,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-
-	if cerr != nil {
-		go q.publishPool.release(c, cerr)
-		return cerr
-	}
-
-	cerr = c.ch.QueueBind(
-		q.name,
-		q.name,
-		q.exchange,
-		false,
-		nil,
-	)
-
-	if cerr != nil {
-		go q.publishPool.release(c, cerr)
-		return cerr
-	}
-
-	return nil
+	return q.declare(q.name, q.name, nil)
 }
 
 func (q *queue) serve() {
@@ -250,17 +203,13 @@ func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration
 
 	queueName := q.name
 
-	// publishing to dead letter queue
 	if delay != 0 {
 		delayMs := int64(delay.Seconds() * 1000)
-		queueName := fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
+		queueName = fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
 
-		_, err = c.ch.QueueDeclare(
-			queueName, // name
-			true,      // type
-			false,     // durable
-			false,     // auto-deleted
-			false,     // internal
+		err := q.declare(
+			queueName,
+			queueName,
 			amqp.Table{
 				"x-dead-letter-exchange":    q.exchange,
 				"x-dead-letter-routing-key": q.name,
@@ -270,7 +219,6 @@ func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration
 		)
 
 		if err != nil {
-			go q.publishPool.release(c, err)
 			return err
 		}
 	}
@@ -295,9 +243,46 @@ func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration
 	return err
 }
 
+// declare queue and binding to it
+func (q *queue) declare(queue string, key string, args amqp.Table) error {
+	c, err := q.publishPool.channel(q.name)
+	if err != nil {
+		return err
+	}
+
+	err = c.ch.ExchangeDeclare(q.exchange, "direct", true, false, false, false, nil)
+	if err != nil {
+		go q.publishPool.release(c, err)
+		return err
+	}
+
+	_, err = c.ch.QueueDeclare(queue, true, false, false, false, args)
+	if err != nil {
+		go q.publishPool.release(c, err)
+		return err
+	}
+
+	err = c.ch.QueueBind(queue, key, q.exchange, false, nil)
+	if err != nil {
+		go q.publishPool.release(c, err)
+	}
+
+	return err
+}
+
+// inspect the queue
 func (q *queue) inspect() (*amqp.Queue, error) {
-	// todo: implement
-	return nil, nil
+	c, err := q.publishPool.channel(q.name)
+	if err != nil {
+		return nil, err
+	}
+
+	queue, err := c.ch.QueueInspect(q.name)
+	if err != nil {
+		go q.publishPool.release(c, err)
+	}
+
+	return &queue, err
 }
 
 // throw handles service, server and pool events.
