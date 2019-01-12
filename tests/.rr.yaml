@@ -8,7 +8,6 @@ jobs:
   # rabbitmq and similar servers
   amqp:
     addr:     amqp://guest:guest@localhost:5672/
-    exchange: default
 
   # beanstalk configuration
   beanstalk:
@@ -23,14 +22,10 @@ jobs:
 
   # job destinations and options
   dispatch:
-    spiral-jobs-tests-local-*:
-      pipeline: local
-
-    spiral-jobs-tests-beanstalk-*:
-      pipeline: beanstalk
-
-    spiral-jobs-tests-sqs-*:
-      pipeline: sqs
+    spiral-jobs-tests-amqp-*.pipeline:      amqp
+    spiral-jobs-tests-local-*.pipeline:     local
+    spiral-jobs-tests-beanstalk-*.pipeline: beanstalk
+    spiral-jobs-tests-sqs-*.pipeline:       sqs
 
   # list of broker pipelines associated with endpoints
   pipelines:
@@ -38,11 +33,9 @@ jobs:
       broker: local
 
     amqp:
-      broker: amqp
-      queue:  default
-      declare:
-        type:    direct
-        durable: true
+      broker:   amqp
+      queue:    default
+      prefetch: 5
 
     beanstalk:
       broker: beanstalk

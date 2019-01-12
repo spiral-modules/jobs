@@ -1,10 +1,7 @@
 package amqp
 
 import (
-	"fmt"
-	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
-	"time"
 )
 
 type channel struct {
@@ -26,104 +23,24 @@ func newChannel(ch *amqp.Channel) *channel {
 	}
 }
 
-func (c *channel) exchangeDeclare(exchange string) error {
-	return c.ch.ExchangeDeclare(
-		exchange, // name
-		"direct", // type
-		true,     // durable
-		false,    // auto-deleted
-		false,    // internal
-		false,    // noWait
-		nil,      // arguments
-	)
-}
-
-func (c *channel) queueDeclare(queue string) error {
-	// todo: more options
-	_, err := c.ch.QueueDeclare(
-		queue, // name
-		true,  // type
-		false, // durable
-		false, // auto-deleted
-		false, // internal
-		nil,
-	)
-
-	return err
-}
-
-// bind queue (todo: better options)
-func (c *channel) queueBind(queue, routingKey, exchange string) error {
-	return c.ch.QueueBind(
-		queue,
-		routingKey,
-		exchange,
-		false,
-		nil,
-	)
-}
-
-func (c *channel) publish(id string, body []byte, attempt int, opts *jobs.Options) error {
-	// todo: watch for publishPool delivery
-
-	err := c.ch.Publish(
-		"",         // exchange (DEFAULT?)
-		routingKey, // routing key
-		false,      // mandatory
-		false,      // immediate
+// publish message into queue
+func (c *channel) publish(id string, key string, body []byte, attempt int, headers amqp.Table) error {
+	return c.ch.Publish(
+		"",    // exchange
+		key,   // routing key
+		false, // mandatory
+		false, // immediate
 		amqp.Publishing{
-			ContentType:  "text/plain",
-			Body:         []byte(time.Now().String()),
+			ContentType:  "application/octet-stream",
+			Body:         body,
 			DeliveryMode: amqp.Persistent,
+			Headers:      headers,
 		},
 	)
-
-	if err != nil {
-		return 0, err
-	}
-
-	confirm := <-c.confirm
-
-	if !confirm.Ack {
-		return 0, fmt.Errorf("unable to publishPool message into queue `%s`", queue)
-	}
-
-	return confirm.DeliveryTag, nil
 }
 
-func (c *channel) publishDelay(queue string) (uint64, error) {
-	// todo: watch for publishPool delivery
-
-	err := c.ch.Publish(
-		"",        // exchange
-		"default", // routing key
-		false,     // mandatory
-		false,     // immediate
-		amqp.Publishing{
-			ContentType:  "text/plain",
-			Body:         []byte(time.Now().String()),
-			DeliveryMode: amqp.Persistent,
-		},
-	)
-
-	if err != nil {
-		return 0, err
-	}
-
-	confirm := <-c.confirm
-
-	if !confirm.Ack {
-		return 0, fmt.Errorf("unable to publishPool message into queue `%s`", queue)
-	}
-
-	return confirm.DeliveryTag, nil
-}
-
-func (c *channel) consume() (<-chan amqp.Delivery, chan error, error) {
-
-}
-
-// close channel (automatically stops consuming).
-func (c *channel) close() {
+// gracefully stop channel
+func (c *channel) Close() error {
 	c.signal <- nil
+	return c.ch.Close()
 }

@@ -103,6 +103,7 @@ func (q *queue) fetchMessage() (msg *sqs.Message, job *jobs.Job, eof bool) {
 			QueueUrl:            q.url,
 			MaxNumberOfMessages: aws.Int64(1),
 			WaitTimeSeconds:     aws.Int64(int64(q.reserve.Seconds())),
+			VisibilityTimeout:   aws.Int64(300),
 			AttributeNames:      []*string{aws.String("ApproximateReceiveCount")},
 		})
 
@@ -125,6 +126,8 @@ func (q *queue) fetchMessage() (msg *sqs.Message, job *jobs.Job, eof bool) {
 
 		q.wg.Add(1)
 
+		// todo: place job options into attributes
+
 		job := &jobs.Job{}
 		err = json.Unmarshal([]byte(*result.Messages[0].Body), &job)
 		if err != nil {
@@ -139,7 +142,7 @@ func (q *queue) fetchMessage() (msg *sqs.Message, job *jobs.Job, eof bool) {
 
 // consume single message
 func (q *queue) consume(h jobs.Handler, msg *sqs.Message, j *jobs.Job) (err error) {
-	// block the job
+	// ensure that we block the job
 	_, err = q.sqs.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
 		QueueUrl:          q.url,
 		ReceiptHandle:     msg.ReceiptHandle,
@@ -167,19 +170,19 @@ func (q *queue) consume(h jobs.Handler, msg *sqs.Message, j *jobs.Job) (err erro
 	// failed
 	q.err(*msg.MessageId, j, err)
 
-	reserves, _ := strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
-	if reserves != 0 && j.Options.CanRetry(reserves) {
-		// retry after specified duration
-		_, err = q.sqs.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-			QueueUrl:          q.url,
-			ReceiptHandle:     msg.ReceiptHandle,
-			VisibilityTimeout: aws.Int64(int64(j.Options.RetryDelay)),
-		})
-
-		return err
+	reserves, ok := strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
+	if ok != nil || !j.Options.CanRetry(reserves) {
+		return nil
 	}
 
-	return nil
+	// retry after specified duration
+	_, err = q.sqs.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+		QueueUrl:          q.url,
+		ReceiptHandle:     msg.ReceiptHandle,
+		VisibilityTimeout: aws.Int64(int64(j.Options.RetryDelay)),
+	})
+
+	return err
 }
 
 // stop the queue consuming
@@ -197,7 +200,7 @@ func (q *queue) stop() {
 }
 
 // add job to the queue
-func (q *queue) send(data []byte, delay, retry time.Duration) (string, error) {
+func (q *queue) send(data []byte, delay time.Duration) (string, error) {
 	result, err := q.sqs.SendMessage(&sqs.SendMessageInput{
 		DelaySeconds: aws.Int64(int64(delay.Seconds())),
 		MessageBody:  aws.String(string(data)),

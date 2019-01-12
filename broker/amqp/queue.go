@@ -1,23 +1,56 @@
 package amqp
 
 import (
-	"encoding/json"
+	"errors"
 	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
+	"log"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type queue struct {
-	name        string
-	publishPool *chanPool
-	consumePool *chanPool
+	active int32
+	pipe   *jobs.Pipeline
+
+	exchange, name string
+	publishPool    *chanPool
+	consumePool    *chanPool
+
+	// tube events
+	lsn func(event int, ctx interface{})
+
+	// stop channel
+	wait chan interface{}
+
+	// active operations
+	muw sync.RWMutex
+	wg  sync.WaitGroup
 
 	// exec handlers
 	execPool chan jobs.Handler
 	err      jobs.ErrorHandler
 }
 
+// newQueue creates new queue wrapper for AMQP.
 func newQueue(pipe *jobs.Pipeline, publish, consume *chanPool, lsn func(event int, ctx interface{})) (*queue, error) {
-	return nil, nil
+	if pipe.String("exchange", "amqp.direct") == "" {
+		return nil, errors.New("missing `exchange` parameter on amqp pipeline")
+	}
+
+	if pipe.String("queue", "") == "" {
+		return nil, errors.New("missing `queue` parameter on amqp pipeline")
+	}
+
+	return &queue{
+		exchange:    pipe.String("exchange", "amqp.direct"),
+		name:        pipe.String("queue", ""),
+		pipe:        pipe,
+		publishPool: publish,
+		consumePool: consume,
+		lsn:         lsn,
+	}, nil
 }
 
 // associate queue with new consumePool pool
@@ -25,54 +58,212 @@ func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) err
 	q.execPool = execPool
 	q.err = err
 
+	c, cerr := q.publishPool.channel(q.name)
+	if cerr != nil {
+		return cerr
+	}
+
+	cerr = c.ch.ExchangeDeclare(
+		q.exchange,
+		"direct",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if cerr != nil {
+		go q.publishPool.release(c, cerr)
+		return cerr
+	}
+
+	_, cerr = c.ch.QueueDeclare(
+		q.name,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if cerr != nil {
+		go q.publishPool.release(c, cerr)
+		return cerr
+	}
+
+	cerr = c.ch.QueueBind(
+		q.name,
+		q.name,
+		q.exchange,
+		false,
+		nil,
+	)
+
+	if cerr != nil {
+		go q.publishPool.release(c, cerr)
+		return cerr
+	}
+
 	return nil
 }
 
 func (q *queue) serve() {
+	c, err := q.consumePool.channel(q.name)
+	if err != nil {
+		q.consumePool.release(c, err)
+		q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		return
+	}
 
+	if err := c.ch.Qos(q.pipe.Integer("prefetch", 1), 0, false); err != nil {
+		q.consumePool.release(c, err)
+		q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		return
+	}
+
+	q.wait = make(chan interface{})
+	atomic.StoreInt32(&q.active, 1)
+
+	// begin consuming in safe mode!
+	for {
+		reconnect := q.consumePool.reconnect()
+		if reconnect != nil {
+			// wait for connection restoration
+			<-reconnect
+		}
+
+		// todo: consumer name, todo: what if connection is dead?
+		delivery, err := c.ch.Consume(
+			"default",          // queue
+			"super-consumer-x", // consumer
+			false,              // auto-ack
+			false,              // exclusive
+			false,              // no-local
+			false,              // no-wait
+			nil,                // args
+		)
+
+		// unable to start consuming
+		if err != nil {
+			q.consumePool.release(c, err)
+			q.throw(jobs.EventPipelineError, jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+			continue
+		}
+
+		for {
+			select {
+			case d := <-delivery:
+				q.wg.Add(1)
+
+				go func(d amqp.Delivery) {
+					err := q.consume(<-q.execPool, d)
+					q.wg.Done()
+
+					if err != nil {
+						// todo: can this affect consume channel?
+						q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+					}
+				}(d)
+
+			case err := <-c.signal:
+				log.Println(err)
+				q.consumePool.release(c, err)
+				break
+			}
+		}
+
+		log.Println("broken")
+	}
+}
+
+func (q *queue) consume(h jobs.Handler, d amqp.Delivery) error {
+	id, attempt, j, err := unpack(d)
+	if err != nil {
+		q.execPool <- h
+		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		return d.Nack(false, false)
+	}
+
+	err = h(id, j)
+	q.execPool <- h
+
+	if err == nil {
+		// success
+		return d.Ack(false)
+	}
+
+	// failed
+	q.err(id, j, err)
+
+	if !j.Options.CanRetry(attempt) {
+		return nil
+	}
+
+	// retry as new j (to accommodate attempt number and new delay)
+	err = q.publish(id, attempt+1, j, j.Options.RetryDuration())
+	if err != nil {
+		q.throw(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		return d.Nack(false, true)
+	}
+
+	return d.Ack(false)
 }
 
 func (q *queue) stop() {
+	if atomic.LoadInt32(&q.active) == 0 {
+		return
+	}
 
+	atomic.StoreInt32(&q.active, 0)
+
+	c, err := q.consumePool.channel(q.name)
+	if err != nil {
+		// release channel and stop consuming
+		q.consumePool.release(c, nil)
+	}
+
+	close(q.wait)
+	q.muw.Lock()
+	q.wg.Wait() // wait for all the jobs to complete
+	q.muw.Unlock()
 }
 
-func (q *queue) publish(id string, body []byte, attempt int, opts *jobs.Options) error {
-	ch, err := q.publishChan()
+// publish message to queue or to delayed queue.
+func (q *queue) publish(id string, attempt int, j *jobs.Job, delay time.Duration) error {
+	c, err := q.publishPool.channel(q.name)
 	if err != nil {
 		return err
 	}
 
-	// todo: map options
-	if err := ch.publish(id, body, attempt, opts); err != nil {
-		q.publishPool.release(ch, err)
+	// todo: publish with delay
+
+	err = c.ch.Publish(
+		q.exchange, // exchange
+		q.name,     // routing key
+		false,      // mandatory
+		false,      // immediate
+		amqp.Publishing{
+			ContentType:  "application/json",
+			Body:         j.Body(),
+			DeliveryMode: amqp.Persistent,
+			Headers:      pack(id, attempt, j),
+		},
+	)
+
+	if err != nil {
+		go q.publishPool.release(c, err)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 func (q *queue) inspect() (*amqp.Queue, error) {
 	return nil, nil
 }
 
-func (q *queue) consume(delivery *amqp.Delivery) {
-	j := &jobs.Job{}
-	json.Unmarshal(delivery.Body, j)
-
-	var multiple, requeue = false, false
-
-	// requeue multiple with delay
-
-	delivery.Nack(multiple, requeue)
-
-	// retry
-	// delivery.Ack(multiple)
-	// delivery.Reject()
-}
-
-func (q *queue) publishChan() (*channel, error) {
-	return q.publishPool.channel(q.name)
-}
-
-func (q *queue) consumeChan() (*channel, error) {
-	return q.consumePool.channel(q.name)
+// throw handles service, server and pool events.
+func (q *queue) throw(event int, ctx interface{}) {
+	q.lsn(event, ctx)
 }

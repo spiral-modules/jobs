@@ -128,7 +128,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	if err := q.publish(id.String(), j.Body(), 0, j.Options); err != nil {
+	if err := q.publish(id.String(), 0, j, j.Options.DelayDuration()); err != nil {
 		return "", err
 	}
 
@@ -151,7 +151,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, nil
 	}
 
-	// todo: improve approximation
+	// this the closest approximation we can get for now
 	return &jobs.Stat{
 		InternalName: queue.Name,
 		Queue:        int64(queue.Messages),

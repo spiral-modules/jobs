@@ -148,7 +148,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	return q.send(data, j.Options.DelayDuration(), j.Options.RetryDuration())
+	return q.send(data, j.Options.DelayDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.

@@ -93,12 +93,13 @@ func (q *queue) consume(e *entry, h jobs.Handler) {
 
 	q.err(e.id, e.job, err)
 
-	if e.job.Options.CanRetry(e.attempt) {
-		go q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
+	if !e.job.Options.CanRetry(e.attempt) {
+		atomic.AddInt64(&q.stat.Queue, ^int64(0))
 		return
 	}
 
-	atomic.AddInt64(&q.stat.Queue, ^int64(0))
+	// todo: test retry counters
+	go q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
 }
 
 // stop the queue consuming

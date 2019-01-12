@@ -3,6 +3,7 @@ package amqp
 import (
 	"errors"
 	"github.com/streadway/amqp"
+	"log"
 	"sync"
 	"time"
 )
@@ -52,7 +53,7 @@ func (cp *chanPool) Close() error {
 
 		go func(ch *channel) {
 			defer wg.Done()
-			cp.release(ch)
+			cp.release(ch, nil)
 		}(ch)
 	}
 
@@ -68,6 +69,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			// connection has been closed
 			return
 		case err := <-errors:
+			log.Println(err)
 			cp.mu.Lock()
 			cp.restored = make(chan interface{})
 
@@ -90,7 +92,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					return
 
 				case <-time.NewTimer(cp.tout).C:
-					// todo: need better dial method
+					// todo: need better dial method (TSL and etc)
 					conn, err := amqp.Dial(addr)
 
 					if err != nil {
@@ -107,9 +109,13 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					errors = conn.NotifyClose(make(chan *amqp.Error))
 					cp.mu.Unlock()
 
+					// todo: work reconnects out
 					// ready to move on and let all subscribers know that conn is restored
 					close(cp.restored)
+
+					cp.mu.Lock()
 					cp.restored = nil
+					cp.mu.Unlock()
 
 					break
 				}
@@ -155,7 +161,7 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 
 // release gracefully closes and removes channel allocation.
 func (cp *chanPool) release(c *channel, err error) {
-	c.close()
+	c.Close()
 
 	cp.mu.Lock()
 	for name, ch := range cp.channels {

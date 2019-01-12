@@ -199,16 +199,12 @@ func (t *tube) consume(cn *conn, h jobs.Handler, e entry) error {
 
 	t.err(e.ID(), e.job, err)
 
-	reserves, _ := strconv.Atoi(stat["reserves"])
-	if reserves != 0 && e.job.Options.CanRetry(reserves) {
-		return cn.Release(conn.Release(
-			e.id,
-			0,
-			e.job.Options.RetryDuration(),
-		))
+	reserves, ok := strconv.Atoi(stat["reserves"])
+	if ok != nil || !e.job.Options.CanRetry(reserves) {
+		return cn.Release(conn.Bury(e.id, 0))
 	}
 
-	return cn.Release(conn.Bury(e.id, 0))
+	return cn.Release(conn.Release(e.id, 0, e.job.Options.RetryDuration()))
 }
 
 // stop tube consuming
