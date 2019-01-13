@@ -3,11 +3,11 @@ jobs:
   workers:
     command: "php consumer.php"
     pool:
-      numWorkers: 8
+      numWorkers: 4
 
   # rabbitmq and similar servers
   amqp:
-    addr:     amqp://guest:guest@localhost:5673/
+    addr:     amqp://guest:guest@localhost:5672/
 
   # beanstalk configuration
   beanstalk:

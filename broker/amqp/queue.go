@@ -252,7 +252,7 @@ func (q *queue) declare(cp *chanPool, queue string, key string, args amqp.Table)
 
 // inspect the queue
 func (q *queue) inspect(cp *chanPool) (*amqp.Queue, error) {
-	c, err := cp.channel(q.name)
+	c, err := cp.channel("stat")
 	if err != nil {
 		return nil, err
 	}

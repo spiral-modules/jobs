@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
+	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -214,6 +215,7 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 	cn.release(err)
 
 	stat = &jobs.Stat{InternalName: t.tube.Name}
+	log.Printf("%+v", stat)
 
 	if v, err := strconv.Atoi(values["current-consume-ready"]); err == nil {
 		stat.Queue = int64(v)
