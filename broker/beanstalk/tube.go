@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
+	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -72,9 +73,11 @@ func (t *tube) serve(connector connFactory) {
 
 	// tube specific consume connection
 	conn, err := connector.newConn()
+	log.Println("connected")
 	defer conn.Close()
 
 	if err != nil {
+		log.Println(err)
 		t.report(err)
 		return
 	}
