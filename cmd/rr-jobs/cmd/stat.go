@@ -90,8 +90,8 @@ func statsCommand(cmd *cobra.Command, args []string) (err error) {
 func showStats(client *rpc.Client) {
 	var s jobs.PipelineList
 	if err := client.Call("jobs.Stat", true, &s); err != nil {
-		// skip errors
-		return
+		tm.Flush()
+		panic(err)
 	}
 
 	StatTable(s.Pipelines).Render()
