@@ -26,6 +26,7 @@ type channel struct {
 
 // newConn creates new watched AMQP connection
 func newConn(addr string, tout time.Duration) (*chanPool, error) {
+	// todo: more conn options
 	conn, err := amqp.Dial(addr)
 	if err != nil {
 		return nil, err
@@ -110,8 +111,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 					return
 
 				case <-time.NewTimer(cp.tout).C:
-
-					// todo: need better dial method (TSL and etc)
+					// todo: more conn options
 					conn, err := amqp.Dial(addr)
 					if err != nil {
 						// still failing
