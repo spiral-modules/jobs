@@ -4,12 +4,12 @@
 [![Codecov](https://codecov.io/gh/spiral/jobs/branch/master/graph/badge.svg)](https://codecov.io/gh/spiral/jobs/)
 
 ## Features
-- supports in memory queue, Beanstalk, AWS SQS
+- supports in memory queue, Beanstalk, AMQP, AWS SQS
 - can work as standalone application or as part of RoadRunner server
 - multiple pipelines per application
 - durable (prefetch control, graceful exit, reconnects)
+- automatic queue configuration
 - plug-and-play PHP library (framework agnostic)
-- combines job and process manager
 - delayed jobs
 - job level timeouts and retries, retry delays
 - PHP and Golang consumers and producers
