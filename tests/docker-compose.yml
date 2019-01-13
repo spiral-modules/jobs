@@ -11,11 +11,6 @@ services:
     ports:
       - "9324:9324"
 
-  redis:
-    image: redis:latest
-    ports:
-      - "16379:6379"
-
   rabbitmq:
     image: rabbitmq:3-management
     environment:
