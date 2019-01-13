@@ -9,6 +9,9 @@ services:
   - docker
 
 install:
+  - cd tests
+  - docker-compose up -d
+  - cd ..
   - export GO111MODULE=on
   - go mod download
   - php -v
@@ -17,9 +20,6 @@ install:
   - php composer.phar install --no-interaction --prefer-source
 
 before_script:
-  - cd tests
-  - docker-compose up -d
-  - cd ..
   - go build -o rr-jobs cmd/rr-jobs/main.go
   - ./rr-jobs serve -c tests/.rr.yaml &
 

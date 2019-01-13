@@ -11,8 +11,8 @@ var (
 	pipe = &jobs.Pipeline{
 		"broker":   "amqp",
 		"name":     "default",
-		"exchange": "rr-exchange",
 		"queue":    "rr-queue",
+		"exchange": "rr-exchange",
 		"prefetch": 1,
 	}
 
