@@ -80,3 +80,24 @@ func TestBroker_Consume_Serve_Nil_Stop(t *testing.T) {
 
 	<-wait
 }
+
+func TestBroker_Consume_Serve_Stop(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+	b.Register(pipe)
+
+	exec := make(chan jobs.Handler)
+	err := func(id string, j *jobs.Job, err error) {}
+
+	b.Consume(pipe, exec, err)
+
+	wait := make(chan interface{})
+	go func() {
+		assert.NoError(t, b.Serve())
+		close(wait)
+	}()
+	time.Sleep(time.Millisecond * 100)
+	b.Stop()
+
+	<-wait
+}
