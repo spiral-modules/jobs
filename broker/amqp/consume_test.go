@@ -3,6 +3,7 @@ package amqp
 import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ func TestBroker_Consume_Job(t *testing.T) {
 
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
-
+	log.Println(jid)
 	waitJob := make(chan interface{})
 	exec <- func(id string, j *jobs.Job) error {
 		assert.Equal(t, jid, id)
