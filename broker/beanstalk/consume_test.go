@@ -3,6 +3,7 @@ package beanstalk
 import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestBroker_Consume_Job(t *testing.T) {
 		Payload: "body",
 		Options: &jobs.Options{},
 	})
-
+	log.Println(jid)
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
