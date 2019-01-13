@@ -47,4 +47,4 @@ jobs:
         MessageRetentionPeriod: 86400
 
   # list of pipelines to be consumed by the server, keep empty if you want to start consuming manually
-  #consume: [local, amqp, beanstalk, sqs]
+  consume: [local, amqp, beanstalk, sqs]
