@@ -3,7 +3,6 @@ package amqp
 import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"testing"
 	"time"
 )
@@ -17,7 +16,7 @@ func TestBroker_Consume_Job(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 500)
 	defer b.Stop()
 
 	jid, perr := b.Push(pipe, &jobs.Job{
@@ -28,7 +27,7 @@ func TestBroker_Consume_Job(t *testing.T) {
 
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
-	log.Println(jid)
+
 	waitJob := make(chan interface{})
 	exec <- func(id string, j *jobs.Job) error {
 		assert.Equal(t, jid, id)

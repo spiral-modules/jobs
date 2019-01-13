@@ -9,9 +9,10 @@ import (
 
 var (
 	pipe = &jobs.Pipeline{
-		"broker": "amqp",
-		"name":   "default",
-		"queue":  "default",
+		"broker":   "amqp",
+		"name":     "default",
+		"queue":    "default",
+		"prefetch": 1,
 	}
 
 	cfg = &Config{
