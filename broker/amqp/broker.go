@@ -10,18 +10,13 @@ import (
 
 // Broker represents AMQP broker.
 type Broker struct {
-	cfg         *Config
-	lsn         func(event int, ctx interface{})
-	publishPool *chanPool
-	consumePool *chanPool
-	mu          sync.Mutex
-	wait        chan error
-	queues      map[*jobs.Pipeline]*queue
-}
-
-// Listen attaches server event watcher.
-func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
-	b.lsn = lsn
+	cfg     *Config
+	lsn     func(event int, ctx interface{})
+	publish *chanPool
+	consume *chanPool
+	mu      sync.Mutex
+	wait    chan error
+	queues  map[*jobs.Pipeline]*queue
 }
 
 // Init configures AMQP job broker (always 2 connections).
@@ -30,6 +25,11 @@ func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.queues = make(map[*jobs.Pipeline]*queue)
 
 	return true, nil
+}
+
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
 }
 
 // Register broker pipeline.
@@ -55,21 +55,30 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
-	if b.publishPool, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+	if b.publish, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
-	defer b.publishPool.Close()
+	defer b.publish.Close()
 
-	if b.consumePool, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+	if b.consume, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
-	defer b.consumePool.Close()
+	defer b.consume.Close()
 
 	for _, q := range b.queues {
-		go q.serve(b.publishPool, b.consumePool)
+		err := q.declare(b.publish, q.name, q.name, nil)
+		if err != nil {
+			return err
+		}
 	}
-	b.wait = make(chan error)
 
+	for _, q := range b.queues {
+		if q.execPool != nil {
+			go q.serve(b.publish, b.consume)
+		}
+	}
+
+	b.wait = make(chan error)
 	b.mu.Unlock()
 
 	return <-b.wait
@@ -88,7 +97,7 @@ func (b *Broker) Stop() {
 		q.stop()
 	}
 
-	b.wait <- nil
+	close(b.wait)
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -108,8 +117,10 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.publishPool != nil && q.execPool != nil {
-		go q.serve(b.publishPool, b.consumePool)
+	if b.publish != nil && q.execPool != nil {
+		if q.execPool != nil {
+			go q.serve(b.publish, b.consume)
+		}
 	}
 
 	return nil
@@ -131,7 +142,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	if err := q.publish(id.String(), 0, j, j.Options.DelayDuration()); err != nil {
+	if err := q.publish(b.publish, id.String(), 0, j, j.Options.DelayDuration()); err != nil {
 		return "", err
 	}
 
@@ -149,7 +160,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	queue, err := q.inspect()
+	queue, err := q.inspect(b.publish)
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +171,18 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		Queue:        int64(queue.Messages),
 		Active:       int64(atomic.LoadInt32(&q.running)),
 	}, nil
+}
+
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
+	}
+
+	return nil
 }
 
 // queue returns queue associated with the pipeline.
@@ -173,18 +196,6 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	}
 
 	return q
-}
-
-// check if broker is serving
-func (b *Broker) isServing() error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return fmt.Errorf("broker is not running")
-	}
-
-	return nil
 }
 
 // throw handles service, server and pool events.

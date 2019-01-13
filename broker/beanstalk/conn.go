@@ -15,7 +15,7 @@ type connFactory interface {
 	newConn() (*conn, error)
 }
 
-// sharedConn protects allocation for one connection between
+// conn protects allocation for one connection between
 // threads and provides reconnecting capabilities.
 type conn struct {
 	tout time.Duration

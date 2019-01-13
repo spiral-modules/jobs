@@ -48,14 +48,13 @@ func newConn(addr string, tout time.Duration) (*chanPool, error) {
 // Close gracefully closes all underlying channels and connection.
 func (cp *chanPool) Close() error {
 	cp.mu.Lock()
-	defer cp.mu.Unlock()
 
 	close(cp.wait)
 	if cp.channels == nil {
 		return fmt.Errorf("connection is dead")
 	}
 
-	// close all channels and consumers
+	// close all channels and consume
 	var wg sync.WaitGroup
 	for _, ch := range cp.channels {
 		wg.Add(1)
@@ -65,6 +64,7 @@ func (cp *chanPool) Close() error {
 			cp.release(ch, nil)
 		}(ch)
 	}
+	cp.mu.Unlock()
 
 	wg.Wait()
 	return cp.conn.Close()
@@ -90,7 +90,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			cp.mu.Lock()
 			cp.connected = make(chan interface{})
 
-			// broadcast error to all consumers to let them for the tryReconnect
+			// broadcast error to all consume to let them for the tryReconnect
 			for _, ch := range cp.channels {
 				ch.signal <- err
 			}

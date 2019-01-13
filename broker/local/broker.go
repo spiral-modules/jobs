@@ -27,7 +27,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	defer b.mu.Unlock()
 
 	if _, ok := b.queues[pipe]; ok {
-		return fmt.Errorf("pipe `%s` has already been registered", pipe.Name())
+		return fmt.Errorf("queue `%s` has already been registered", pipe.Name())
 	}
 
 	b.queues[pipe] = newQueue()
@@ -84,9 +84,10 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.wait != nil && q.execPool != nil {
-		// resume consuming
-		go q.serve()
+	if b.wait != nil {
+		if q.execPool != nil {
+			go q.serve()
+		}
 	}
 
 	return nil
@@ -127,6 +128,18 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 	return q.stat, nil
 }
 
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
+	}
+
+	return nil
+}
+
 // queue returns queue associated with the pipeline.
 func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	b.mu.Lock()
@@ -138,16 +151,4 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	}
 
 	return q
-}
-
-// check if broker is serving
-func (b *Broker) isServing() error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return fmt.Errorf("broker is not running")
-	}
-
-	return nil
 }

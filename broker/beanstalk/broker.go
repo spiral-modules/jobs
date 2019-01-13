@@ -1,7 +1,6 @@
 package beanstalk
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/spiral/jobs"
 	"sync"
@@ -9,13 +8,13 @@ import (
 
 // Broker run consume using Broker service.
 type Broker struct {
-	cfg        *Config
-	mul        sync.Mutex
-	lsn        func(event int, ctx interface{})
-	mu         sync.Mutex
-	wait       chan error
-	sharedConn *conn
-	tubes      map[*jobs.Pipeline]*tube
+	cfg   *Config
+	mul   sync.Mutex
+	lsn   func(event int, ctx interface{})
+	mu    sync.Mutex
+	wait  chan error
+	conn  *conn
+	tubes map[*jobs.Pipeline]*tube
 }
 
 // Init configures broker.
@@ -54,16 +53,15 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
-	if b.sharedConn, err = b.cfg.newConn(); err != nil {
+	if b.conn, err = b.cfg.newConn(); err != nil {
 		return err
 	}
-	defer b.sharedConn.Close()
+	defer b.conn.Close()
 
 	for _, t := range b.tubes {
-		if t.execPool == nil {
-			continue
+		if t.execPool != nil {
+			go t.serve(connFactory(b.cfg))
 		}
-		go t.serve(b.sharedConn, connFactory(b.cfg))
 	}
 
 	b.wait = make(chan error)
@@ -106,15 +104,16 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.sharedConn != nil && t.execPool != nil {
-		// resume wg
-		go t.serve(b.sharedConn, connFactory(b.cfg))
+	if b.conn != nil {
+		if t.execPool != nil {
+			go t.serve(connFactory(b.cfg))
+		}
 	}
 
 	return nil
 }
 
-// Push job into the worker.
+// Push data into the worker.
 func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 	if err := b.isServing(); err != nil {
 		return "", err
@@ -125,12 +124,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	data, err := json.Marshal(j)
-	if err != nil {
-		return "", err
-	}
-
-	return t.put(data, 0, j.Options.DelayDuration(), j.Options.TimeoutDuration())
+	return t.put(b.conn, 0, pack(j), j.Options.DelayDuration(), j.Options.TimeoutDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.
@@ -144,7 +138,19 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	return t.stat()
+	return t.stat(b.conn)
+}
+
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
+	}
+
+	return nil
 }
 
 // queue returns queue associated with the pipeline.
@@ -158,18 +164,6 @@ func (b *Broker) tube(pipe *jobs.Pipeline) *tube {
 	}
 
 	return t
-}
-
-// check if broker is serving
-func (b *Broker) isServing() error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.wait == nil {
-		return fmt.Errorf("broker is not running")
-	}
-
-	return nil
 }
 
 // throw handles service, server and pool events.

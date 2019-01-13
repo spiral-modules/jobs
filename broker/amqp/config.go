@@ -23,7 +23,7 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return nil
 }
 
-// TimeoutDuration returns number of seconds allowed to allocate the conn.
+// TimeoutDuration returns number of seconds allowed to allocate the publish.
 func (c *Config) TimeoutDuration() time.Duration {
 	timeout := c.Timeout
 	if timeout == 0 {

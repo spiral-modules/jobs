@@ -56,6 +56,7 @@ func (q *queue) serve() {
 			return
 		}
 
+		atomic.AddInt64(&q.stat.Active, 1)
 		h := <-q.execPool
 		go func(e *entry) {
 			q.do(e, h)
@@ -75,7 +76,6 @@ func (q *queue) consume() *entry {
 	case <-q.wait:
 		return nil
 	case e := <-q.jobs:
-		atomic.AddInt64(&q.stat.Active, 1)
 		q.wg.Add(1)
 
 		return e
