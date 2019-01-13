@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
+	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -81,6 +82,8 @@ func (t *tube) serve(connector connFactory) {
 
 	for {
 		e, err := t.consume(conn)
+		log.Println(e, err)
+
 		if err != nil {
 			if isConnError(err) {
 				t.report(err)
@@ -122,6 +125,7 @@ func (t *tube) consume(cn *conn) (*entry, error) {
 		t.tubeSet.Conn = conn
 
 		id, data, err := t.tubeSet.Reserve(t.reserve)
+		log.Println(id, data, err)
 		if err != nil {
 			cn.release(err)
 			return nil, err
