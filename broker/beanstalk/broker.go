@@ -65,8 +65,9 @@ func (b *Broker) Serve() (err error) {
 	}
 
 	b.wait = make(chan error)
-
 	b.mu.Unlock()
+
+	b.throw(jobs.EventBrokerReady, b)
 
 	return <-b.wait
 }

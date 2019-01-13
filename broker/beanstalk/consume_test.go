@@ -4,7 +4,6 @@ import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestBroker_Consume_Job(t *testing.T) {
@@ -12,12 +11,20 @@ func TestBroker_Consume_Job(t *testing.T) {
 	b.Init(cfg)
 	b.Register(pipe)
 
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
 	exec := make(chan jobs.Handler, 1)
-	b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {})
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
-	time.Sleep(time.Millisecond * 100)
 	defer b.Stop()
+
+	<-ready
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",

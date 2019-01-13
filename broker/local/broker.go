@@ -9,9 +9,15 @@ import (
 
 // Broker run queue using local goroutines.
 type Broker struct {
+	lsn    func(event int, ctx interface{})
 	mu     sync.Mutex
 	wait   chan error
 	queues map[*jobs.Pipeline]*queue
+}
+
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
 }
 
 // Init configures broker.
@@ -46,6 +52,8 @@ func (b *Broker) Serve() error {
 	}
 	b.wait = make(chan error)
 	b.mu.Unlock()
+
+	b.throw(jobs.EventBrokerReady, b)
 
 	return <-b.wait
 }
@@ -151,4 +159,11 @@ func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
 	}
 
 	return q
+}
+
+// throw handles service, server and pool events.
+func (b *Broker) throw(event int, ctx interface{}) {
+	if b.lsn != nil {
+		b.lsn(event, ctx)
+	}
 }

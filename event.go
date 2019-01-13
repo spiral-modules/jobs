@@ -32,6 +32,9 @@ const (
 
 	// EventPipelineError when pipeline specific error happen.
 	EventPipelineError
+
+	// EventBrokerReady thrown when broken is ready to accept/serve tasks.
+	EventBrokerReady
 )
 
 // JobEvent represent job event.
