@@ -1,4 +1,4 @@
-package jobs
+package beanstalk
 
 import (
 	"encoding/json"

@@ -1,4 +1,4 @@
-package jobs
+package amqp
 
 import (
 	"encoding/json"
