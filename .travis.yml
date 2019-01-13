@@ -18,6 +18,7 @@ install:
 
 before_script:
   - go build -o rr-jobs cmd/rr-jobs/main.go
+  - ./rr-jobs serve -c tests/.rr.yaml &
 
 script:
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic
@@ -25,7 +26,6 @@ script:
   - go test -v -race -cover ./broker/local -coverprofile=local.txt -covermode=atomic
   - go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
   - go test -v -race -cover ./broker/sqs -coverprofile=sqs.txt -covermode=atomic
-  - ./rr-jobs serve -c tests/.rr.yaml &
   - vendor/bin/phpunit --coverage-clover=coverage.xml
 
 after_success:
