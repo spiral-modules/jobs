@@ -17,17 +17,17 @@ type Broker struct {
 	tubes map[*jobs.Pipeline]*tube
 }
 
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
+}
+
 // Init configures broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
 	b.tubes = make(map[*jobs.Pipeline]*tube)
 
 	return true, nil
-}
-
-// Listen attaches server event watcher.
-func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
-	b.lsn = lsn
 }
 
 // Register broker pipeline.

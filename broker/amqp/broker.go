@@ -19,17 +19,17 @@ type Broker struct {
 	queues  map[*jobs.Pipeline]*queue
 }
 
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
+}
+
 // Init configures AMQP job broker (always 2 connections).
 func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
 	b.queues = make(map[*jobs.Pipeline]*queue)
 
 	return true, nil
-}
-
-// Listen attaches server event watcher.
-func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
-	b.lsn = lsn
 }
 
 // Register broker pipeline.
