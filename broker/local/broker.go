@@ -1,131 +1,154 @@
 package local
 
 import (
-	"github.com/satori/go.uuid"
+	"fmt"
+	"github.com/gofrs/uuid"
 	"github.com/spiral/jobs"
 	"sync"
-	"sync/atomic"
-	"time"
 )
 
 // Broker run queue using local goroutines.
 type Broker struct {
-	mu       sync.Mutex
-	wg       sync.WaitGroup
-	queue    chan entry
-	stat     *jobs.Stat
-	execPool chan jobs.Handler
-	report   jobs.ErrorHandler
+	mu     sync.Mutex
+	wait   chan error
+	queues map[*jobs.Pipeline]*queue
 }
 
-type entry struct {
-	id      string
-	attempt int
-	job     *jobs.Job
-}
-
-// Listen configures broker with list of pipelines to listen and handler function. Broker broker groups all pipelines
-// together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, execPool chan jobs.Handler, err jobs.ErrorHandler) error {
-	b.execPool = execPool
-	b.report = err
-	return nil
-}
-
-// Init configures local job broker.
+// Init configures broker.
 func (b *Broker) Init() (bool, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.queue = make(chan entry)
-	b.stat = &jobs.Stat{Pipeline: ":memory:"}
+	b.queues = make(map[*jobs.Pipeline]*queue)
 
 	return true, nil
 }
 
-// Serve local broker.
-func (b *Broker) Serve() error {
+// Register broker pipeline.
+func (b *Broker) Register(pipe *jobs.Pipeline) error {
 	b.mu.Lock()
-	b.queue = make(chan entry)
+	defer b.mu.Unlock()
+
+	if _, ok := b.queues[pipe]; ok {
+		return fmt.Errorf("queue `%s` has already been registered", pipe.Name())
+	}
+
+	b.queues[pipe] = newQueue()
+
+	return nil
+}
+
+// Serve broker pipelines.
+func (b *Broker) Serve() error {
+	// start consuming
+	b.mu.Lock()
+	for _, q := range b.queues {
+		if q.execPool != nil {
+			go q.serve()
+		}
+	}
+	b.wait = make(chan error)
 	b.mu.Unlock()
 
-	var h jobs.Handler
-	for e := range b.queue {
-		// wait for free h
-		h = <-b.execPool
+	return <-b.wait
+}
 
-		atomic.AddInt64(&b.stat.Active, 1)
-		go func(e entry, handler jobs.Handler) {
-			defer atomic.AddInt64(&b.stat.Active, ^int64(0))
-			e.attempt++
+// Stop all pipelines.
+func (b *Broker) Stop() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-			err := handler(e.id, e.job)
-			b.execPool <- handler
+	if b.wait == nil {
+		return
+	}
 
-			if err == nil {
-				atomic.AddInt64(&b.stat.Queue, ^int64(0))
-				return
-			}
+	// stop all consuming
+	for _, q := range b.queues {
+		q.stop()
+	}
 
-			if e.job.CanRetry(e.attempt) {
-				b.schedule(e.id, e.attempt, e.job, e.job.Options.RetryDuration())
-				return
-			}
+	close(b.wait)
+}
 
-			b.report(e.id, e.job, err)
-			atomic.AddInt64(&b.stat.Queue, ^int64(0))
-		}(e, h)
+// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+// the service is started!
+func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	q, ok := b.queues[pipe]
+	if !ok {
+		return fmt.Errorf("undefined queue `%s`", pipe.Name())
+	}
+
+	q.stop()
+
+	if err := q.configure(execPool, errHandler); err != nil {
+		return err
+	}
+
+	if b.wait != nil {
+		if q.execPool != nil {
+			go q.serve()
+		}
 	}
 
 	return nil
 }
 
-// Stop local broker.
-func (b *Broker) Stop() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if b.queue != nil {
-		close(b.queue)
-		b.queue = nil
+// Push job into the worker.
+func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
+	if err := b.isServing(); err != nil {
+		return "", err
 	}
-}
 
-// Push new job to queue
-func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
+	q := b.queue(pipe)
+	if q == nil {
+		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
+	}
+
 	id, err := uuid.NewV4()
 	if err != nil {
 		return "", err
 	}
 
-	go b.schedule(id.String(), 0, j, j.Options.DelayDuration())
+	go q.push(id.String(), j, 0, j.Options.DelayDuration())
+
 	return id.String(), nil
 }
 
-// Stat must fetch statistics about given pipeline or return error.
-func (b *Broker) Stat(p *jobs.Pipeline) (stat *jobs.Stat, err error) {
-	return b.stat, nil
-}
-
-// addJob adds job to queue
-func (b *Broker) schedule(id string, attempt int, j *jobs.Job, delay time.Duration) {
-	if delay == 0 {
-		atomic.AddInt64(&b.stat.Queue, 1)
-		b.queue <- entry{id: id, job: j}
-		return
+// Stat must consume statistics about given pipeline or return error.
+func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	if err := b.isServing(); err != nil {
+		return nil, err
 	}
 
-	atomic.AddInt64(&b.stat.Delayed, 1)
+	q := b.queue(pipe)
+	if q == nil {
+		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
+	}
 
-	time.Sleep(delay)
+	return q.stat, nil
+}
 
-	atomic.AddInt64(&b.stat.Delayed, ^int64(0))
-	atomic.AddInt64(&b.stat.Queue, 1)
-
+// check if broker is serving
+func (b *Broker) isServing() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.queue != nil {
-		b.queue <- entry{id: id, attempt: attempt, job: j}
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
 	}
+
+	return nil
+}
+
+// queue returns queue associated with the pipeline.
+func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	q, ok := b.queues[pipe]
+	if !ok {
+		return nil
+	}
+
+	return q
 }

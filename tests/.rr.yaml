@@ -1,42 +1,50 @@
 jobs:
   # worker pool configuration
   workers:
-    command: "php handler.php"
+    command: "php consumer.php"
     pool:
-      numWorkers: 5
-      #maxJobs:    1
+      numWorkers: 8
 
-  # broker configuration
-  brokers:
-    beanstalk:
-      address:  tcp://localhost:11300
-      reserve:  1
+  # rabbitmq and similar servers
+  amqp:
+    addr:     amqp://guest:guest@localhost:5673/
 
-    sqs:
-      region:   us-west-1
-      key:      api-key
-      secret:   api-secret
-      endpoint: http://localhost:9324
+  # beanstalk configuration
+  beanstalk:
+    addr:    tcp://localhost:11300
+
+  # amazon sqs configuration
+  sqs:
+    key:      api-key
+    secret:   api-secret
+    region:   us-west-1
+    endpoint: http://localhost:9324
+
+  # job destinations and options
+  dispatch:
+    spiral-jobs-tests-amqp-*.pipeline:      amqp
+    spiral-jobs-tests-local-*.pipeline:     local
+    spiral-jobs-tests-beanstalk-*.pipeline: beanstalk
+    spiral-jobs-tests-sqs-*.pipeline:       sqs
 
   # list of broker pipelines associated with endpoints
   pipelines:
-    - listen: true
-      broker: beanstalk
-      options:
-        tube: default
-      handle:
-        - "spiral.jobs.tests.beanstalk.*"
-
-    - listen: true
-      broker: sqs
-      options:
-        queue: default
-        attributes:
-          MessageRetentionPeriod: "86400"
-      handle:
-        - "spiral.jobs.tests.sqs.*"
-
-    - listen: true
+    local:
       broker: local
-      handle:
-        - "spiral.jobs.tests.local.*"
+
+    amqp:
+      broker: amqp
+      queue:  default
+
+    beanstalk:
+      broker: beanstalk
+      tube:   default
+
+    sqs:
+      broker: sqs
+      queue:  default
+      declare:
+        MessageRetentionPeriod: 86400
+
+  # list of pipelines to be consumed by the server, keep empty if you want to start consuming manually
+  consume: [local, amqp, beanstalk, sqs]

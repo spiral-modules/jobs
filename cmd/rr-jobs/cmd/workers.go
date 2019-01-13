@@ -22,8 +22,6 @@ package cmd
 
 import (
 	tm "github.com/buger/goterm"
-	"github.com/dustin/go-humanize"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spiral/jobs"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
@@ -35,28 +33,33 @@ import (
 	"time"
 )
 
+var (
+	interactive bool
+	stopSignal  = make(chan os.Signal, 1)
+)
+
 func init() {
-	statsCommand := &cobra.Command{
-		Use:   "jobs:stat",
-		Short: "List all job pipeline stats",
-		RunE:  statsCommand,
+	workersCommand := &cobra.Command{
+		Use:   "jobs:workers",
+		Short: "List workers associated with RoadRunner Jobs service",
+		RunE:  workersHandler,
 	}
 
-	statsCommand.Flags().BoolVarP(
+	workersCommand.Flags().BoolVarP(
 		&interactive,
 		"interactive",
 		"i",
 		false,
-		"render interactive pipeline table",
+		"render interactive workers table",
 	)
 
-	rr.CLI.AddCommand(statsCommand)
+	rr.CLI.AddCommand(workersCommand)
 
 	signal.Notify(stopSignal, syscall.SIGTERM)
 	signal.Notify(stopSignal, syscall.SIGINT)
 }
 
-func statsCommand(cmd *cobra.Command, args []string) (err error) {
+func workersHandler(cmd *cobra.Command, args []string) (err error) {
 	defer func() {
 		if r, ok := recover().(error); ok {
 			err = r
@@ -70,7 +73,7 @@ func statsCommand(cmd *cobra.Command, args []string) (err error) {
 	defer client.Close()
 
 	if !interactive {
-		showStats(client)
+		showWorkers(client)
 		return nil
 	}
 
@@ -81,35 +84,17 @@ func statsCommand(cmd *cobra.Command, args []string) (err error) {
 			return nil
 		case <-time.NewTicker(time.Millisecond * 500).C:
 			tm.MoveCursor(1, 1)
-			showStats(client)
+			showWorkers(client)
 			tm.Flush()
 		}
 	}
 }
 
-func showStats(client *rpc.Client) {
-	var s jobs.PipelineList
-	if err := client.Call("jobs.Stat", true, &s); err != nil {
+func showWorkers(client *rpc.Client) {
+	var r jobs.WorkerList
+	if err := client.Call("jobs.Workers", true, &r); err != nil {
 		panic(err)
 	}
 
-	StatTable(s.Pipelines).Render()
-}
-
-// WorkerTable renders table with information about rr server workers.
-func StatTable(pipelines []*jobs.Stat) *tablewriter.Table {
-	tw := tablewriter.NewWriter(os.Stdout)
-	tw.SetHeader([]string{"Broker", "Pipeline", "Queue", "Delayed", "Active"})
-
-	for _, p := range pipelines {
-		tw.Append([]string{
-			util.Sprintf("<white+hb>%s</reset>", p.Broker),
-			util.Sprintf("<cyan>%s</reset>", p.Pipeline),
-			util.Sprintf("<magenta>%s</reset>", humanize.Comma(p.Queue)),
-			util.Sprintf("<yellow>%s</reset>", humanize.Comma(p.Delayed)),
-			util.Sprintf("<green>%s</reset>", humanize.Comma(p.Active)),
-		})
-	}
-
-	return tw
+	util.WorkerTable(r.Workers).Render()
 }

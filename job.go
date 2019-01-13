@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// Handler handles job execution.
+type Handler func(id string, j *Job) error
+
+// ErrorHandler handles job execution errors.
+type ErrorHandler func(id string, j *Job, err error)
+
 // Job carries information about single job.
 type Job struct {
 	// Job contains name of job broker (usually PHP class).
@@ -14,7 +20,7 @@ type Job struct {
 	Payload string `json:"payload"`
 
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
-	Options Options `json:"options,omitempty"`
+	Options *Options `json:"options,omitempty"`
 }
 
 // Body packs job payload into binary payload.
@@ -22,22 +28,23 @@ func (j *Job) Body() []byte {
 	return []byte(j.Payload)
 }
 
-// Context pack job context (job, id) into binary payload.
-func (j *Job) Context(id string) ([]byte, error) {
-	return json.Marshal(struct {
-		ID  string `json:"id"`
-		Job string `json:"job"`
-	}{ID: id, Job: j.Job})
-}
+// Context packs job context (job, id) into binary payload.
+func (j *Job) Context(id string) []byte {
+	ctx, _ := json.Marshal(
+		struct {
+			ID  string `json:"id"`
+			Job string `json:"job"`
+		}{ID: id, Job: j.Job},
+	)
 
-// CanRetry must return true if broker is allowed to re-run the job.
-func (j *Job) CanRetry(attempts int) bool {
-	return false
-	//return j.Options.MaxAttempts > attempts
+	return ctx
 }
 
 // Options carry information about how to handle given job.
 type Options struct {
+	// Pipeline manually specified pipeline.
+	Pipeline string `json:"pipeline,omitempty"`
+
 	// Delay defines time duration to delay execution for. Defaults to none.
 	Delay int `json:"delay,omitempty"`
 
@@ -51,6 +58,34 @@ type Options struct {
 	Timeout int `json:"timeout,omitempty"`
 }
 
+// Merge merges job options.
+func (o *Options) Merge(from *Options) {
+	if o.Pipeline == "" {
+		o.Pipeline = from.Pipeline
+	}
+
+	if o.MaxAttempts == 0 {
+		o.MaxAttempts = from.MaxAttempts
+	}
+
+	if o.Timeout == 0 {
+		o.Timeout = from.Timeout
+	}
+
+	if o.RetryDelay == 0 {
+		o.RetryDelay = from.RetryDelay
+	}
+
+	if o.Delay == 0 {
+		o.Delay = from.Delay
+	}
+}
+
+// CanRetry must return true if broker is allowed to re-run the job.
+func (o *Options) CanRetry(attempts int) bool {
+	return o.MaxAttempts > attempts
+}
+
 // RetryDuration returns retry delay duration in a form of time.Duration.
 func (o *Options) RetryDuration() time.Duration {
 	return time.Second * time.Duration(o.RetryDelay)
@@ -61,7 +96,7 @@ func (o *Options) DelayDuration() time.Duration {
 	return time.Second * time.Duration(o.Delay)
 }
 
-// DelayDuration returns timeout duration in a form of time.Duration.
+// TimeoutDuration returns timeout duration in a form of time.Duration.
 func (o *Options) TimeoutDuration() time.Duration {
 	if o.Timeout == 0 {
 		return 30 * time.Minute

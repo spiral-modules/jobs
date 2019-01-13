@@ -1,69 +1,261 @@
 package sqs
 
 import (
-	"errors"
+	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
-// Queue defines single SQS queue.
-type Queue struct {
-	// Indicates that tube must be listened.
-	Listen bool
+type queue struct {
+	active  int32
+	pipe    *jobs.Pipeline
+	url     *string
+	reserve time.Duration
 
-	// Queue is queue name.
-	Queue string
+	// queue events
+	lsn func(event int, ctx interface{})
 
-	// URL is queue url.
-	URL *string
+	// stop channel
+	wait chan interface{}
 
-	// Create indicates that queue must be automatically created.
-	Create bool
+	// active operations
+	muw sync.RWMutex
+	wg  sync.WaitGroup
 
-	// Attributes defines set of options to be used to create queue.
-	Attributes map[interface{}]interface{}
-
-	// Reserve - The duration (in seconds) that the received messages are hidden from subsequent. Default 600.
-	Timeout int
-
-	// WaitTime defines the number of seconds queue waits for job to arrive. Default 1.
-	WaitTime int
+	// exec handlers
+	execPool chan jobs.Handler
+	err      jobs.ErrorHandler
 }
 
-// CreateAttributes must return queue create attributes.
-func (q *Queue) CreateAttributes() (attr map[string]*string) {
-	attr = make(map[string]*string)
+func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue, error) {
+	if pipe.String("queue", "") == "" {
+		return nil, fmt.Errorf("missing `queue` parameter on sqs pipeline `%s`", pipe.Name())
+	}
 
-	for k, v := range q.Attributes {
-		if ks, ok := k.(string); ok {
-			if vs, ok := v.(string); ok {
-				attr[ks] = &vs
+	return &queue{pipe: pipe, reserve: pipe.Duration("reserve", time.Second), lsn: lsn}, nil
+}
+
+// associate queue with new do pool
+func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
+	q.execPool = execPool
+	q.err = err
+
+	return nil
+}
+
+// declareQueue declared queue
+func (q *queue) declareQueue(s *sqs.SQS) (*string, error) {
+	attr := make(map[string]*string)
+	for k, v := range q.pipe.Map("declare") {
+		if vs, ok := v.(string); ok {
+			attr[k] = aws.String(vs)
+		}
+
+		if vi, ok := v.(int); ok {
+			attr[k] = aws.String(strconv.Itoa(vi))
+		}
+	}
+
+	if len(attr) != 0 {
+		r, err := s.CreateQueue(&sqs.CreateQueueInput{
+			QueueName:  aws.String(q.pipe.String("queue", "")),
+			Attributes: attr,
+		})
+
+		return r.QueueUrl, err
+	}
+
+	// no need to create (get existed)
+	r, err := s.GetQueueUrl(&sqs.GetQueueUrlInput{
+		QueueName: aws.String(q.pipe.String("queue", "")),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r.QueueUrl, nil
+}
+
+// serve consumers
+func (q *queue) serve(s *sqs.SQS, tout time.Duration) {
+	if q.url == nil {
+		q.report(fmt.Errorf("unable to start queue without url"))
+		return
+	}
+
+	q.wait = make(chan interface{})
+	atomic.StoreInt32(&q.active, 1)
+
+	var lastError error
+	for {
+		messages, stop, err := q.consume(s)
+		if err != nil {
+			if lastError == err {
+				// reoccurring error
+				time.Sleep(tout)
+			} else {
+				lastError = err
+				q.report(err)
+			}
+		}
+
+		if stop {
+			return
+		}
+
+		for _, msg := range messages {
+			h := <-q.execPool
+			go func(h jobs.Handler, msg *sqs.Message) {
+				err := q.do(s, h, msg)
+				q.execPool <- h
+				q.wg.Done()
+
+				if err != nil {
+					q.report(err)
+				}
+			}(h, msg)
+		}
+	}
+}
+
+// consume and allocate connection.
+func (q *queue) consume(s *sqs.SQS) ([]*sqs.Message, bool, error) {
+	q.muw.Lock()
+	defer q.muw.Unlock()
+
+	select {
+	case <-q.wait:
+		return nil, true, nil
+	default:
+		r, err := s.ReceiveMessage(&sqs.ReceiveMessageInput{
+			QueueUrl:              q.url,
+			MaxNumberOfMessages:   aws.Int64(int64(q.pipe.Integer("prefetch", 1))),
+			WaitTimeSeconds:       aws.Int64(int64(q.reserve.Seconds())),
+			VisibilityTimeout:     aws.Int64(300),
+			AttributeNames:        []*string{aws.String("ApproximateReceiveCount")},
+			MessageAttributeNames: jobAttributes,
+		})
+		if err != nil {
+			return nil, false, err
+		}
+
+		q.wg.Add(len(r.Messages))
+
+		return r.Messages, false, nil
+	}
+}
+
+// do single message
+func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
+	id, attempt, j, err := unpack(msg)
+	if err != nil {
+		go q.deleteMessage(s, msg, err)
+		return err
+	}
+
+	// block the job based on known timeout
+	_, err = s.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+		QueueUrl:          q.url,
+		ReceiptHandle:     msg.ReceiptHandle,
+		VisibilityTimeout: aws.Int64(int64(j.Options.TimeoutDuration().Seconds())),
+	})
+	if err != nil {
+		return q.deleteMessage(s, msg, err)
+	}
+
+	err = h(id, j)
+	if err == nil {
+		return q.deleteMessage(s, msg, nil)
+	}
+
+	q.err(id, j, err)
+
+	if !j.Options.CanRetry(attempt) {
+		return q.deleteMessage(s, msg, err)
+	}
+
+	// retry after specified duration
+	_, err = s.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+		QueueUrl:          q.url,
+		ReceiptHandle:     msg.ReceiptHandle,
+		VisibilityTimeout: aws.Int64(int64(j.Options.RetryDelay)),
+	})
+
+	return err
+}
+
+func (q *queue) deleteMessage(s *sqs.SQS, msg *sqs.Message, err error) error {
+	_, drr := s.DeleteMessage(&sqs.DeleteMessageInput{QueueUrl: q.url, ReceiptHandle: msg.ReceiptHandle})
+	return drr
+}
+
+// stop the queue consuming
+func (q *queue) stop() {
+	if atomic.LoadInt32(&q.active) == 0 {
+		return
+	}
+
+	atomic.StoreInt32(&q.active, 0)
+
+	close(q.wait)
+	q.muw.Lock()
+	q.wg.Wait()
+	q.muw.Unlock()
+}
+
+// add job to the queue
+func (q *queue) send(s *sqs.SQS, j *jobs.Job) (string, error) {
+	r, err := s.SendMessage(pack(q.url, j))
+	if err != nil {
+		return "", err
+	}
+
+	return *r.MessageId, nil
+}
+
+// return queue stats
+func (q *queue) stat(s *sqs.SQS) (stat *jobs.Stat, err error) {
+	r, err := s.GetQueueAttributes(&sqs.GetQueueAttributesInput{
+		QueueUrl: q.url,
+		AttributeNames: []*string{
+			aws.String("ApproximateNumberOfMessages"),
+			aws.String("ApproximateNumberOfMessagesDelayed"),
+			aws.String("ApproximateNumberOfMessagesNotVisible"),
+		},
+	})
+
+	stat = &jobs.Stat{InternalName: q.pipe.String("queue", "")}
+
+	for a, v := range r.Attributes {
+		if a == "ApproximateNumberOfMessages" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Queue = int64(v)
+			}
+		}
+
+		if a == "ApproximateNumberOfMessagesNotVisible" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Active = int64(v)
+			}
+		}
+
+		if a == "ApproximateNumberOfMessagesDelayed" {
+			if v, err := strconv.Atoi(*v); err == nil {
+				stat.Delayed = int64(v)
 			}
 		}
 	}
 
-	return attr
+	return stat, nil
 }
 
-// NewTube creates new tube or returns an error
-func NewQueue(p *jobs.Pipeline) (*Queue, error) {
-	if p.Options.String("queue", "") == "" {
-		return nil, errors.New("missing `queue` parameter on sqs pipeline")
-	}
-
-	q := &Queue{
-		Listen:   p.Listen,
-		Queue:    p.Options.String("queue", ""),
-		Create:   p.Options.Bool("create", false),
-		Timeout:  p.Options.Integer("timeout", 600),
-		WaitTime: p.Options.Integer("waitTime", 1),
-	}
-
-	if attrOptions, ok := p.Options["attributes"]; ok {
-		if attributes, ok := attrOptions.(map[interface{}]interface{}); ok {
-			q.Create = true
-			q.Attributes = attributes
-		}
-	}
-
-	return q, nil
+// throw handles service, server and pool events.
+func (q *queue) report(err error) {
+	q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 }

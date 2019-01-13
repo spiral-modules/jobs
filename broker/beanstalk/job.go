@@ -1,0 +1,23 @@
+package beanstalk
+
+import (
+	"bytes"
+	"encoding/gob"
+	"github.com/spiral/jobs"
+)
+
+func pack(j *jobs.Job) []byte {
+	b := new(bytes.Buffer)
+	if err := gob.NewEncoder(b).Encode(j); err != nil {
+		return nil
+	}
+
+	return b.Bytes()
+}
+
+func unpack(data []byte) (*jobs.Job, error) {
+	j := &jobs.Job{}
+	err := gob.NewDecoder(bytes.NewBuffer(data)).Decode(j)
+
+	return j, err
+}

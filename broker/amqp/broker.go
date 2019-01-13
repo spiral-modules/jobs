@@ -1,23 +1,25 @@
-package sqs
+package amqp
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/gofrs/uuid"
 	"github.com/spiral/jobs"
 	"sync"
+	"sync/atomic"
 )
 
-// Broker represents SQS broker.
+// Broker represents AMQP broker.
 type Broker struct {
-	cfg    *Config
-	sqs    *sqs.SQS
-	lsn    func(event int, ctx interface{})
-	mu     sync.Mutex
-	wait   chan error
-	queues map[*jobs.Pipeline]*queue
+	cfg     *Config
+	lsn     func(event int, ctx interface{})
+	publish *chanPool
+	consume *chanPool
+	mu      sync.Mutex
+	wait    chan error
+	queues  map[*jobs.Pipeline]*queue
 }
 
-// Start configures local job broker.
+// Init configures AMQP job broker (always 2 connections).
 func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
 	b.queues = make(map[*jobs.Pipeline]*queue)
@@ -53,13 +55,18 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
-	b.sqs, err = b.cfg.SQS()
-	if err != nil {
+	if b.publish, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
+	defer b.publish.Close()
+
+	if b.consume, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+		return err
+	}
+	defer b.consume.Close()
 
 	for _, q := range b.queues {
-		q.url, err = q.declareQueue(b.sqs)
+		err := q.declare(b.publish, q.name, q.name, nil)
 		if err != nil {
 			return err
 		}
@@ -67,12 +74,11 @@ func (b *Broker) Serve() (err error) {
 
 	for _, q := range b.queues {
 		if q.execPool != nil {
-			go q.serve(b.sqs, b.cfg.TimeoutDuration())
+			go q.serve(b.publish, b.consume)
 		}
 	}
 
 	b.wait = make(chan error)
-
 	b.mu.Unlock()
 
 	return <-b.wait
@@ -91,7 +97,7 @@ func (b *Broker) Stop() {
 		q.stop()
 	}
 
-	b.wait <- nil
+	close(b.wait)
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
@@ -111,8 +117,10 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 		return err
 	}
 
-	if b.sqs != nil && q.execPool != nil {
-		go q.serve(b.sqs, b.cfg.TimeoutDuration())
+	if b.publish != nil && q.execPool != nil {
+		if q.execPool != nil {
+			go q.serve(b.publish, b.consume)
+		}
 	}
 
 	return nil
@@ -124,8 +132,9 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	if j.Options.Delay > 900 || j.Options.RetryDelay > 900 {
-		return "", fmt.Errorf("unable to push into `%s`, maximum delay value is 900", pipe.Name())
+	id, err := uuid.NewV4()
+	if err != nil {
+		return "", err
 	}
 
 	q := b.queue(pipe)
@@ -133,7 +142,11 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	return q.send(b.sqs, j)
+	if err := q.publish(b.publish, id.String(), 0, j, j.Options.DelayDuration()); err != nil {
+		return "", err
+	}
+
+	return id.String(), nil
 }
 
 // Stat must fetch statistics about given pipeline or return error.
@@ -147,7 +160,17 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	return q.stat(b.sqs)
+	queue, err := q.inspect(b.publish)
+	if err != nil {
+		return nil, err
+	}
+
+	// this the closest approximation we can get for now
+	return &jobs.Stat{
+		InternalName: queue.Name,
+		Queue:        int64(queue.Messages),
+		Active:       int64(atomic.LoadInt32(&q.running)),
+	}, nil
 }
 
 // check if broker is serving

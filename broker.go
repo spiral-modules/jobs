@@ -1,32 +1,42 @@
 package jobs
 
-// Broker represents single broker abstraction.
+// Broker manages set of pipelines and provides ability to push jobs into them.
 type Broker interface {
-	// Listen configures broker with list of pipelines to listen and handler function.
-	Listen(pipelines []*Pipeline, pool chan Handler, err ErrorHandler) error
+	// Register broker pipeline.
+	Register(pipe *Pipeline) error
 
-	// Serve broker must listen for all associated pipelines and consume given jobs.
-	Serve() error
+	// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+	// the service is started!
+	Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error
 
-	// Stop must stop broker.
-	Stop()
-
-	// Push new job to the broker. Must return job id or error.
-	Push(p *Pipeline, j *Job) (id string, err error)
+	// Push job into the worker.
+	Push(pipe *Pipeline, j *Job) (string, error)
 
 	// Stat must fetch statistics about given pipeline or return error.
-	Stat(p *Pipeline) (stat *Stat, err error)
+	Stat(pipe *Pipeline) (stat *Stat, err error)
 }
 
-// Stat contains information about pipeline job numbers.
-type Stat struct {
-	// Broken is name of associated broker.
-	Broker string
+// EventProvider defines the ability to throw events for the broker.
+type EventProvider interface {
+	// Listen attaches the even listener.
+	Listen(lsn func(event int, ctx interface{}))
+}
 
+// Stat contains information about pipeline.
+type Stat struct {
 	// Pipeline name.
 	Pipeline string
 
-	// Queue defines number of pending jobs.
+	// Broken is name of associated broker.
+	Broker string
+
+	// InternalName defines internal broker specific pipeline name.
+	InternalName string
+
+	// Consuming indicates that pipeline is consuming jobs.
+	Consuming bool
+
+	// queue defines number of pending jobs.
 	Queue int64
 
 	// Active defines number of jobs which are currently being processed.
@@ -35,5 +45,3 @@ type Stat struct {
 	// Delayed defines number of jobs which are being processed.
 	Delayed int64
 }
-
-// todo: freeze

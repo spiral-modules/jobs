@@ -7,31 +7,30 @@ import (
 	"github.com/spiral/roadrunner/service"
 	"github.com/spiral/roadrunner/service/env"
 	"github.com/spiral/roadrunner/service/rpc"
+	"sync"
+	"time"
 )
 
-// ID defines Listen service public alias.
+// String defines public service name.
 const ID = "jobs"
 
-// Listen handles job execution.
-type Handler func(id string, j *Job) error
-
-// Listen handles job execution.
-type ErrorHandler func(id string, j *Job, err error)
-
-// Service manages job execution and connection to multiple job pipelines.
+// Service wraps roadrunner container and manage set of parent within it.
 type Service struct {
-	// Brokers define list of available container.
-	Brokers   map[string]Broker
+	// Associated parent
+	Brokers map[string]Broker
+
 	cfg       *Config
 	env       env.Environment
-	logger    *logrus.Logger
+	log       *logrus.Logger
 	lsns      []func(event int, ctx interface{})
 	rr        *roadrunner.Server
-	container service.Container
-	execs     chan Handler
+	execPool  chan Handler
+	services  service.Container
+	mu        sync.Mutex
+	consuming map[*Pipeline]bool
 }
 
-// AddListener attaches server event watcher.
+// Listen attaches event watcher.
 func (s *Service) AddListener(l func(event int, ctx interface{})) {
 	s.lsns = append(s.lsns, l)
 }
@@ -39,18 +38,17 @@ func (s *Service) AddListener(l func(event int, ctx interface{})) {
 // Init configures job service.
 func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env.Environment) (ok bool, err error) {
 	s.cfg = &Config{}
-	s.logger = l
 	s.env = e
+	s.log = l
 
 	if err := s.cfg.Hydrate(c); err != nil {
 		return false, err
 	}
 
-	// Configuring worker pools
-	s.execs = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
-
+	// configuring worker pools
+	s.execPool = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
 	for i := int64(0); i < s.cfg.Workers.Pool.NumWorkers; i++ {
-		s.execs <- s.exec
+		s.execPool <- s.exec
 	}
 
 	if r != nil {
@@ -61,32 +59,34 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 	s.rr = roadrunner.NewServer(s.cfg.Workers)
 
-	// we are going to keep all handlers withing the container
-	// so we can easier manage their state and configuration
-	s.container = service.NewContainer(s.logger)
-	for name, e := range s.Brokers {
-		pipes := make([]*Pipeline, 0)
-		for _, p := range s.cfg.Pipelines {
-			if p.Broker == name {
-				pipes = append(pipes, p)
+	s.mu.Lock()
+	s.consuming = make(map[*Pipeline]bool)
+	for _, p := range s.Pipelines() {
+		s.consuming[p] = false
+	}
+	s.mu.Unlock()
+
+	// run all brokers in nested container
+	s.services = service.NewContainer(l)
+	for name, b := range s.Brokers {
+		s.services.Register(name, b)
+		if eb, ok := b.(EventProvider); ok {
+			eb.Listen(s.throw)
+		}
+	}
+
+	// init all broker configs
+	if err := s.services.Init(s.cfg); err != nil {
+		return false, err
+	}
+
+	// register all pipelines
+	for name, b := range s.Brokers {
+		for _, pipe := range s.Pipelines().Broker(name) {
+			if err := b.Register(pipe); err != nil {
+				return false, err
 			}
 		}
-
-		if err := e.Listen(pipes, s.execs, s.error); err != nil {
-			return false, err
-		}
-
-		s.container.Register(name, e)
-	}
-
-	cfg := c.Get(BrokerConfig)
-	if cfg == nil {
-		cfg = &emptyConfig{}
-	}
-
-	if err := s.container.Init(cfg); err != nil {
-		// container will show error
-		return false, nil
 	}
 
 	return true, nil
@@ -94,95 +94,167 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 // Serve serves local rr server and creates broker association.
 func (s *Service) Serve() error {
+	// ensure that workers aware of running within jobs
 	if s.env != nil {
-		values, err := s.env.GetEnv()
-		if err != nil {
+		if err := s.env.Copy(s.cfg.Workers); err != nil {
 			return err
 		}
-
-		for k, v := range values {
-			s.cfg.Workers.SetEnv(k, v)
-		}
-
-		s.cfg.Workers.SetEnv("rr_jobs", "true")
 	}
 
+	s.cfg.Workers.SetEnv("rr_jobs", "true")
 	s.rr.Listen(s.throw)
 
 	if err := s.rr.Start(); err != nil {
 		return err
 	}
+	defer s.rr.Stop()
 
-	return s.container.Serve()
+	// start consuming of all the pipelines
+	for _, p := range s.Pipelines().Names(s.cfg.Consume...) {
+		if err := s.Consume(p, s.execPool, s.error); err != nil {
+			return err
+		}
+	}
+
+	return s.services.Serve()
 }
 
 // Stop all pipelines and rr server.
 func (s *Service) Stop() {
-	s.container.Stop()
-	s.rr.Stop()
+	wg := sync.WaitGroup{}
+	for _, p := range s.Pipelines().Names(s.cfg.Consume...).Reverse() {
+		wg.Add(1)
+
+		go func(p *Pipeline) {
+			defer wg.Done()
+			if err := s.Consume(p, nil, nil); err != nil {
+				s.throw(EventPipelineError, &PipelineError{Pipeline: p, Caused: err})
+			}
+		}(p)
+	}
+
+	wg.Wait()
+	s.services.Stop()
 }
 
 // Push job to associated broker and return job id.
-func (s *Service) Push(j *Job) (string, error) {
-	p, b, err := s.findPipeline(j.Job)
+func (s *Service) Push(job *Job) (string, error) {
+	pipe, opt, err := s.cfg.FindPipeline(job)
 	if err != nil {
 		return "", err
 	}
 
-	id, err := b.Push(p, j)
+	if opt != nil {
+		job.Options.Merge(opt)
+	}
+
+	broker, ok := s.Brokers[pipe.Broker()]
+	if !ok {
+		return "", fmt.Errorf("undefined broker `%s`", pipe.Broker())
+	}
+
+	id, err := broker.Push(pipe, job)
 
 	if err != nil {
-		s.throw(EventPushError, &ErrorEvent{Job: j, Error: err})
+		s.throw(EventPushError, &JobError{Job: job, Caused: err})
 	} else {
-		s.throw(EventJobAdded, &JobEvent{ID: id, Job: j})
+		s.throw(EventPushComplete, &JobEvent{ID: id, Job: job})
 	}
 
 	return id, err
 }
 
-// exec executed job using local RR server. Make sure that service is started.
-func (s *Service) exec(id string, j *Job) error {
-	ctx, err := j.Context(id)
+// Pipelines return all service pipelines.
+func (s *Service) Pipelines() Pipelines {
+	return s.cfg.pipelines
+}
+
+// Stat returns list of active workers and their stats.
+func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
+	b, ok := s.Brokers[pipe.Broker()]
+	if !ok {
+		return nil, fmt.Errorf("undefined broker `%s`", pipe.Broker())
+	}
+
+	stat, err = b.Stat(pipe)
 	if err != nil {
-		s.error(id, j, err)
+		return nil, err
+	}
+
+	if stat == nil {
+		return nil, fmt.Errorf("can't read %s", pipe.Name())
+	}
+
+	stat.Pipeline = pipe.Name()
+	stat.Broker = pipe.Broker()
+
+	return stat, err
+}
+
+// Consume enables or disables pipeline consuming using given handlers.
+func (s *Service) Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error {
+	s.mu.Lock()
+
+	if execPool != nil {
+		if s.consuming[pipe] {
+			s.mu.Unlock()
+			return nil
+		}
+
+		s.throw(EventPipelineConsume, pipe)
+		s.consuming[pipe] = true
+	} else {
+		if !s.consuming[pipe] {
+			s.mu.Unlock()
+			return nil
+		}
+
+		s.throw(EventPipelineStop, pipe)
+		s.consuming[pipe] = false
+	}
+
+	broker, ok := s.Brokers[pipe.Broker()]
+	if !ok {
+		s.mu.Unlock()
+		return fmt.Errorf("undefined broker `%s`", pipe.Broker())
+	}
+	s.mu.Unlock()
+
+	if err := broker.Consume(pipe, execPool, errHandler); err != nil {
 		return err
 	}
 
-	_, err = s.rr.Exec(&roadrunner.Payload{Body: j.Body(), Context: ctx})
-	if err == nil {
-		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j})
-		return nil
+	if execPool != nil {
+		s.throw(EventPipelineConsuming, pipe)
+	} else {
+		s.throw(EventPipelineStopped, pipe)
 	}
 
-	// broker can handle retry or register job as errored
+	return nil
+}
+
+// exec executed job using local RR server. Make sure that service is started.
+func (s *Service) exec(id string, j *Job) error {
+	start := time.Now()
+	s.throw(EventJobReceived, &JobEvent{ID: id, Job: j, start: start})
+
+	_, err := s.rr.Exec(&roadrunner.Payload{
+		Body:    j.Body(),
+		Context: j.Context(id),
+	})
+
+	if err == nil {
+		s.throw(EventJobComplete, &JobEvent{ID: id, Job: j, start: start, elapsed: time.Since(start)})
+	} else {
+		s.throw(EventJobError, &JobError{ID: id, Job: j, Caused: err, start: start, elapsed: time.Since(start)})
+	}
+
 	return err
 }
 
-// error must be invoked when job is declared as failed.
+// register died job, can be used to move to fallback queue or log
 func (s *Service) error(id string, j *Job, err error) {
-	s.throw(EventJobError, &ErrorEvent{ID: id, Job: j, Error: err})
-}
-
-// return broker associated with given pipeline.
-func (s *Service) findPipeline(job string) (*Pipeline, Broker, error) {
-	var pipe *Pipeline
-	for _, p := range s.cfg.Pipelines {
-		if p.Has(job) {
-			pipe = p
-			break
-		}
-	}
-
-	if pipe == nil {
-		return nil, nil, fmt.Errorf("unable to find pipeline for `%s`", job)
-	}
-
-	h, ok := s.Brokers[pipe.Broker]
-	if !ok {
-		return nil, nil, fmt.Errorf("undefined broker `%s`", pipe.Broker)
-	}
-
-	return pipe, h, nil
+	// nothing for now
 }
 
 // throw handles service, server and pool events.
@@ -192,7 +264,7 @@ func (s *Service) throw(event int, ctx interface{}) {
 	}
 
 	if event == roadrunner.EventServerFailure {
-		// underlying rr server is dead
+		// underlying rr server is dead, stop everything
 		s.Stop()
 	}
 }

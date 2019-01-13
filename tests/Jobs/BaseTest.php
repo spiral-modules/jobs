@@ -40,6 +40,7 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
+        //for($i=0;$i<50000;$i++)
         $id = $jobs->push(new $this->job(['data' => 100]));
 
         $this->assertNotEmpty($id);
@@ -97,7 +98,6 @@ abstract class BaseTest extends TestCase
 
     private function waitForJob(): float
     {
-      return 0;
         $start = microtime(true);
         $try = 0;
         while (!file_exists($this->job::JOB_FILE) && $try < 10) {
