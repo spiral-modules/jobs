@@ -13,7 +13,7 @@ func TestBroker_Consume_Job(t *testing.T) {
 	b.Register(pipe)
 
 	exec := make(chan jobs.Handler, 1)
-	b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {})
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	time.Sleep(time.Millisecond * 100)
