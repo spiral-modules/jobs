@@ -69,7 +69,7 @@ func TestBroker_Consume_Serve_Nil_Stop(t *testing.T) {
 		assert.NoError(t, b.Serve())
 		close(wait)
 	}()
-	time.Sleep(time.Microsecond * 100)
+	time.Sleep(time.Millisecond * 100)
 	b.Stop()
 
 	<-wait
