@@ -18,7 +18,6 @@ install:
 
 before_script:
   - go build -o rr-jobs cmd/rr-jobs/main.go
-  - ./rr-jobs serve -c tests/.rr.yaml &
 
 script:
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic
