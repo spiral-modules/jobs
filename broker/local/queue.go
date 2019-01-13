@@ -59,7 +59,7 @@ func (q *queue) serve() {
 		atomic.AddInt64(&q.stat.Active, 1)
 		h := <-q.execPool
 		go func(e *entry) {
-			q.do(e, h)
+			q.do(h, e)
 			atomic.AddInt64(&q.stat.Active, ^int64(0))
 			q.execPool <- h
 			q.wg.Done()
@@ -83,7 +83,7 @@ func (q *queue) consume() *entry {
 }
 
 // do singe job
-func (q *queue) do(e *entry, h jobs.Handler) {
+func (q *queue) do(h jobs.Handler, e *entry) {
 	err := h(e.id, e.job)
 
 	if err == nil {

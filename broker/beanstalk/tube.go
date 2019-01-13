@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -95,7 +94,7 @@ func (t *tube) serve(connector connFactory) {
 
 		h := <-t.execPool
 		go func(h jobs.Handler, e *entry) {
-			err := t.do(conn, <-t.execPool, e)
+			err := t.do(conn, h, e)
 			t.execPool <- h
 			t.wg.Done()
 
@@ -215,17 +214,16 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 	cn.release(err)
 
 	stat = &jobs.Stat{InternalName: t.tube.Name}
-	log.Printf("%+v", stat)
 
-	if v, err := strconv.Atoi(values["current-consume-ready"]); err == nil {
+	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
 		stat.Queue = int64(v)
 	}
 
-	if v, err := strconv.Atoi(values["current-consume-reserved"]); err == nil {
+	if v, err := strconv.Atoi(values["current-jobs-reserved"]); err == nil {
 		stat.Active = int64(v)
 	}
 
-	if v, err := strconv.Atoi(values["current-consume-delayed"]); err == nil {
+	if v, err := strconv.Atoi(values["current-jobs-delayed"]); err == nil {
 		stat.Delayed = int64(v)
 	}
 

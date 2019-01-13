@@ -96,14 +96,16 @@ func (q *queue) serve(s *sqs.SQS, tout time.Duration) {
 	for {
 		messages, stop, err := q.consume(s)
 		if err != nil {
-			if lastError == err {
+			if lastError != nil {
 				// reoccurring error
 				time.Sleep(tout)
+				continue
 			} else {
 				lastError = err
 				q.report(err)
 			}
 		}
+		lastError = nil
 
 		if stop {
 			return
