@@ -1,47 +1,139 @@
 package jobs
 
 import (
-	"strings"
+	"fmt"
 	"time"
 )
 
-// Pipeline describes broker specific pipeline.
-type Pipeline struct {
-	// Broker defines name of associated broker.
-	Broker string
+// Pipelines is list of Pipeline.
+type Pipelines []*Pipeline
 
-	// Listen define job matching pattern (i.e. - "app.jobs.email")
-	Handle []string
+func initPipelines(pipes map[string]*Pipeline) (Pipelines, error) {
+	out := make(Pipelines, 0)
 
-	// Retry defined number of job retries in case of error. Default none.
-	Retry int
+	for name, pipe := range pipes {
+		if pipe.Broker() == "" {
+			return nil, fmt.Errorf("found the pipeline without defined broker")
+		}
 
-	// RetryDelay defines for how long wait till job retry.
-	RetryDelay int
+		p := pipe.With("name", name)
+		out = append(out, &p)
+	}
 
-	// Listen tells the service that this pipeline must be consumed by the service.
-	Listen bool
-
-	// Options are broker specific PipelineOptions.
-	Options PipelineOptions
+	return out, nil
 }
 
-// Listen must return true if pipeline expect to handle given job.
-func (p *Pipeline) Has(job string) bool {
-	for _, j := range p.Handle {
-		if strings.Contains(job, strings.Trim(j, ".*")) {
-			return true
+// Reverse returns pipelines in reversed order.
+func (ps Pipelines) Reverse() Pipelines {
+	out := make(Pipelines, len(ps))
+
+	for i, p := range ps {
+		out[len(ps)-i-1] = p
+	}
+
+	return out
+}
+
+// Broker return pipelines associated with specific broker.
+func (ps Pipelines) Broker(broker string) Pipelines {
+	out := make(Pipelines, 0)
+
+	for _, p := range ps {
+		if p.Broker() != broker {
+			continue
 		}
+
+		out = append(out, p)
+	}
+
+	return out
+}
+
+// Names returns only pipelines with specified names.
+func (ps Pipelines) Names(only ...string) Pipelines {
+	out := make(Pipelines, 0)
+
+	for _, name := range only {
+		for _, p := range ps {
+			if p.Name() == name {
+				out = append(out, p)
+			}
+		}
+	}
+
+	return out
+}
+
+// Get returns pipeline by it's name.
+func (ps Pipelines) Get(name string) *Pipeline {
+	for _, p := range ps {
+		if p.Name() == name {
+			return p
+		}
+	}
+
+	return nil
+}
+
+// Pipeline defines pipeline options.
+type Pipeline map[string]interface{}
+
+// With pipeline value. Immutable.
+func (p Pipeline) With(name string, value interface{}) Pipeline {
+	out := make(map[string]interface{})
+	for k, v := range p {
+		out[k] = v
+	}
+	out[name] = value
+
+	return Pipeline(out)
+}
+
+// Name returns pipeline name.
+func (p Pipeline) Name() string {
+	return p.String("name", "")
+}
+
+// Broker associated with the pipeline.
+func (p Pipeline) Broker() string {
+	return p.String("broker", "")
+}
+
+// Has checks if value presented in pipeline.
+func (p Pipeline) Has(name string) bool {
+	if _, ok := p[name]; ok {
+		return true
 	}
 
 	return false
 }
 
-type PipelineOptions map[string]interface{}
+// Map must return nested map value or empty config.
+func (p Pipeline) Map(name string) Pipeline {
+	out := make(map[string]interface{})
+
+	if value, ok := p[name]; ok {
+		if m, ok := value.(map[string]interface{}); ok {
+			for k, v := range m {
+				out[k] = v
+			}
+		}
+
+		if m, ok := value.(map[interface{}]interface{}); ok {
+			for k, v := range m {
+				if ks, ok := k.(string); ok {
+					out[ks] = v
+				}
+			}
+		}
+	}
+
+	return Pipeline(out)
+}
 
 // Bool must return option value as string or return default value.
-func (o PipelineOptions) Bool(name string, d bool) bool {
-	if value, ok := o[name]; ok {
+func (p Pipeline) Bool(name string, d bool) bool {
+	if value, ok := p[name]; ok {
 		if b, ok := value.(bool); ok {
 			return b
 		}
@@ -51,8 +143,8 @@ func (o PipelineOptions) Bool(name string, d bool) bool {
 }
 
 // String must return option value as string or return default value.
-func (o PipelineOptions) String(name string, d string) string {
-	if value, ok := o[name]; ok {
+func (p Pipeline) String(name string, d string) string {
+	if value, ok := p[name]; ok {
 		if str, ok := value.(string); ok {
 			return str
 		}
@@ -61,9 +153,9 @@ func (o PipelineOptions) String(name string, d string) string {
 	return d
 }
 
-// Int must return option value as string or return default value.
-func (o PipelineOptions) Integer(name string, d int) int {
-	if value, ok := o[name]; ok {
+// Integer must return option value as string or return default value.
+func (p Pipeline) Integer(name string, d int) int {
+	if value, ok := p[name]; ok {
 		if str, ok := value.(int); ok {
 			return str
 		}
@@ -73,8 +165,8 @@ func (o PipelineOptions) Integer(name string, d int) int {
 }
 
 // Duration must return option value as time.Duration (seconds) or return default value.
-func (o PipelineOptions) Duration(name string, d time.Duration) time.Duration {
-	if value, ok := o[name]; ok {
+func (p Pipeline) Duration(name string, d time.Duration) time.Duration {
+	if value, ok := p[name]; ok {
 		if str, ok := value.(int); ok {
 			return time.Second * time.Duration(str)
 		}

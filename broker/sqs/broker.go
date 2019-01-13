@@ -1,206 +1,183 @@
 package sqs
 
 import (
-	"encoding/json"
-	"github.com/aws/aws-sdk-go/aws"
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
 	"sync"
 )
 
-// Broker run jobs using Broker service.
+// Broker represents SQS broker.
 type Broker struct {
-	cfg         *Config
-	mu          sync.Mutex
-	stop        chan interface{}
-	sqs         *sqs.SQS
-	wg          sync.WaitGroup
-	queue       map[*jobs.Pipeline]*Queue
-	handlerPool chan jobs.Handler
-	err         jobs.ErrorHandler
+	cfg    *Config
+	sqs    *sqs.SQS
+	lsn    func(event int, ctx interface{})
+	mu     sync.Mutex
+	wait   chan error
+	queues map[*jobs.Pipeline]*queue
 }
 
-// Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
-// together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
-	b.queue = make(map[*jobs.Pipeline]*Queue)
-	for _, p := range pipelines {
-		if err := b.registerQueue(p); err != nil {
-			return err
-		}
-	}
-
-	b.handlerPool = pool
-	b.err = err
-	return nil
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
 }
 
-// Init configures local job broker.
-func (b *Broker) Init(cfg *Config) (bool, error) {
+// Start configures local job broker.
+func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
+	b.queues = make(map[*jobs.Pipeline]*queue)
+
 	return true, nil
 }
 
-// Serve tubes.
+// Register broker pipeline.
+func (b *Broker) Register(pipe *jobs.Pipeline) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, ok := b.queues[pipe]; ok {
+		return fmt.Errorf("queue `%s` has already been registered", pipe.Name())
+	}
+
+	q, err := newQueue(pipe, b.throw)
+	if err != nil {
+		return err
+	}
+
+	b.queues[pipe] = q
+
+	return nil
+}
+
+// Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
+	b.mu.Lock()
+
 	b.sqs, err = b.cfg.SQS()
 	if err != nil {
 		return err
 	}
 
-	b.mu.Lock()
-	b.stop = make(chan interface{})
-	b.mu.Unlock()
-
-	for _, q := range b.queue {
-		if q.Create {
-			if err := b.createQueue(q); err != nil {
-				return err
-			}
-		}
-
-		url, err := b.sqs.GetQueueUrl(&sqs.GetQueueUrlInput{
-			QueueName: aws.String(q.Queue),
-		})
-
+	for _, q := range b.queues {
+		q.url, err = q.declareQueue(b.sqs)
 		if err != nil {
 			return err
 		}
+	}
 
-		q.URL = url.QueueUrl
-
-		if q.Listen {
-			b.wg.Add(1)
-			go b.listen(q)
+	for _, q := range b.queues {
+		if q.execPool != nil {
+			go q.serve(b.sqs, b.cfg.TimeoutDuration())
 		}
 	}
 
-	b.wg.Wait()
-	<-b.stop
+	b.wait = make(chan error)
 
-	return nil
+	b.mu.Unlock()
+
+	return <-b.wait
 }
 
-// Stop serving.
+// Stop all pipelines.
 func (b *Broker) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.stop != nil {
-		close(b.stop)
+	if b.wait == nil {
+		return
 	}
+
+	for _, q := range b.queues {
+		q.stop()
+	}
+
+	b.wait <- nil
 }
 
-// Push new job to queue
-func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
-	data, err := json.Marshal(j)
-	if err != nil {
-		return "", err
+// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+// the service is started!
+func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	q, ok := b.queues[pipe]
+	if !ok {
+		return fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	result, err := b.sqs.SendMessage(&sqs.SendMessageInput{
-		DelaySeconds: aws.Int64(int64(j.Options.Delay)),
-		MessageBody:  aws.String(string(data)),
-		QueueUrl:     b.queue[p].URL,
-	})
+	q.stop()
 
-	if err != nil {
-		return "", err
-	}
-
-	return *result.MessageId, nil
-}
-
-// registerTube new beanstalk pipeline
-func (b *Broker) registerQueue(pipeline *jobs.Pipeline) error {
-	queue, err := NewQueue(pipeline)
-	if err != nil {
+	if err := q.configure(execPool, errHandler); err != nil {
 		return err
 	}
 
-	b.queue[pipeline] = queue
+	if b.sqs != nil && q.execPool != nil {
+		go q.serve(b.sqs, b.cfg.TimeoutDuration())
+	}
+
 	return nil
 }
 
-// createQueue creates sqs queue.
-func (b *Broker) createQueue(q *Queue) error {
-	_, err := b.sqs.CreateQueue(&sqs.CreateQueueInput{
-		QueueName:  aws.String(q.Queue),
-		Attributes: q.CreateAttributes(),
-	})
+// Push job into the worker.
+func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
+	if err := b.isServing(); err != nil {
+		return "", err
+	}
 
-	return err
+	if j.Options.Delay > 900 || j.Options.RetryDelay > 900 {
+		return "", fmt.Errorf("unable to push into `%s`, maximum delay value is 900", pipe.Name())
+	}
+
+	q := b.queue(pipe)
+	if q == nil {
+		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
+	}
+
+	return q.send(b.sqs, j)
 }
 
-// listen jobs from given tube
-func (b *Broker) listen(q *Queue) {
-	defer b.wg.Done()
-	var job *jobs.Job
-	var handler jobs.Handler
-	for {
-		select {
-		case <-b.stop:
-			return
-		default:
-			result, err := b.sqs.ReceiveMessage(&sqs.ReceiveMessageInput{
-				QueueUrl:            q.URL,
-				MaxNumberOfMessages: aws.Int64(1),
-				VisibilityTimeout:   aws.Int64(int64(q.Timeout)),
-				WaitTimeSeconds:     aws.Int64(int64(q.WaitTime)),
-			})
+// Stat must fetch statistics about given pipeline or return error.
+func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	if err := b.isServing(); err != nil {
+		return nil, err
+	}
 
-			if err != nil {
-				// need additional logging
-				continue
-			}
+	q := b.queue(pipe)
+	if q == nil {
+		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
+	}
 
-			if len(result.Messages) == 0 {
-				continue
-			}
+	return q.stat(b.sqs)
+}
 
-			err = json.Unmarshal([]byte(*result.Messages[0].Body), &job)
-			if err != nil {
-				// need additional logging
-				continue
-			}
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-			handler = <-b.handlerPool
-			go func() {
-				jerr := handler(*result.Messages[0].MessageId, job)
-				b.handlerPool <- handler
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
+	}
 
-				if jerr == nil {
-					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
-					})
-					return
-				}
+	return nil
+}
 
-				if !job.CanRetry() {
-					b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-						QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
-					})
+// queue returns queue associated with the pipeline.
+func (b *Broker) queue(pipe *jobs.Pipeline) *queue {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-					b.err(*result.Messages[0].MessageId, job, jerr)
-					return
-				}
+	q, ok := b.queues[pipe]
+	if !ok {
+		return nil
+	}
 
-				data, err := json.Marshal(job)
-				if err != nil {
-					return
-				}
+	return q
+}
 
-				b.sqs.DeleteMessage(&sqs.DeleteMessageInput{
-					QueueUrl: q.URL, ReceiptHandle: result.Messages[0].ReceiptHandle,
-				})
-
-				// retry job
-				b.sqs.SendMessage(&sqs.SendMessageInput{
-					DelaySeconds: aws.Int64(int64(job.Options.RetryDelay)),
-					MessageBody:  aws.String(string(data)),
-					QueueUrl:     q.URL,
-				})
-			}()
-		}
+// throw handles service, server and pool events.
+func (b *Broker) throw(event int, ctx interface{}) {
+	if b.lsn != nil {
+		b.lsn(event, ctx)
 	}
 }

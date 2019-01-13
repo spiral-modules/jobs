@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Spiral Framework.
  *
@@ -7,8 +8,6 @@
  */
 
 namespace Spiral\Jobs;
-
-use Ramsey\Uuid\Uuid;
 
 /**
  * Runs all the jobs in the same process.
@@ -26,9 +25,28 @@ class ShortCircuit implements QueueInterface
 
         $job->unserialize($job->serialize());
 
-        $uuid = Uuid::uuid4()->toString();
-        $job->execute($uuid);
+        $id = $this->random();
+        $job->execute($id);
 
-        return $uuid;
+        return $id;
+    }
+
+    /**
+     * Create a random string with desired length.
+     *
+     * @param int $length String length. 32 symbols by default.
+     * @return string
+     */
+    private function random(int $length = 32): string
+    {
+        try {
+            if (empty($string = random_bytes($length))) {
+                throw new \RuntimeException("Unable to generate random string");
+            }
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Unable to generate random string", $e->getCode(), $e);
+        }
+
+        return substr(base64_encode($string), 0, $length);
     }
 }

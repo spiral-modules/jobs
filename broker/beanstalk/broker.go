@@ -1,181 +1,174 @@
 package beanstalk
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
-	"strconv"
 	"sync"
-	"time"
 )
 
-// Broker run jobs using Broker service.
+// Broker run consume using Broker service.
 type Broker struct {
-	cfg         *Config
-	mu          sync.Mutex
-	stop        chan interface{}
-	conn        *beanstalk.Conn
-	tubes       map[*jobs.Pipeline]*Tube
-	tubeset     *beanstalk.TubeSet
-	handlerPool chan jobs.Handler
-	err         jobs.ErrorHandler
+	cfg   *Config
+	mul   sync.Mutex
+	lsn   func(event int, ctx interface{})
+	mu    sync.Mutex
+	wait  chan error
+	conn  *conn
+	tubes map[*jobs.Pipeline]*tube
 }
 
-// Listen configures broker with list of tubes to listen and handler function. Local broker groups all tubes
-// together.
-func (b *Broker) Listen(pipelines []*jobs.Pipeline, pool chan jobs.Handler, err jobs.ErrorHandler) error {
-	b.tubes = make(map[*jobs.Pipeline]*Tube)
-	for _, p := range pipelines {
-		if err := b.registerTube(p); err != nil {
-			return err
-		}
-	}
-
-	b.handlerPool = pool
-	b.err = err
-	return nil
+// Listen attaches server event watcher.
+func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
+	b.lsn = lsn
 }
 
-// Init configures local job broker.
+// Init configures broker.
 func (b *Broker) Init(cfg *Config) (bool, error) {
 	b.cfg = cfg
+	b.tubes = make(map[*jobs.Pipeline]*tube)
+
 	return true, nil
 }
 
-// Serve tubes.
-func (b *Broker) Serve() error {
-	conn, err := b.cfg.Conn()
+// Register broker pipeline.
+func (b *Broker) Register(pipe *jobs.Pipeline) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if _, ok := b.tubes[pipe]; ok {
+		return fmt.Errorf("tube `%s` has already been registered", pipe.Name())
+	}
+
+	t, err := newTube(pipe, b.throw)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
-	b.conn = conn
-
-	b.mu.Lock()
-	b.stop = make(chan interface{})
-	b.mu.Unlock()
-
-	var names []string
-	for _, t := range b.tubes {
-		t.Tube.Conn = b.conn
-
-		if t.Listen {
-			names = append(names, t.Name)
-		}
-	}
-
-	if len(names) != 0 {
-		tconn, err := b.cfg.Conn()
-		if err != nil {
-			return err
-		}
-		defer tconn.Close()
-
-		b.listen(beanstalk.NewTubeSet(tconn, names...))
-	}
-	<-b.stop
+	b.tubes[pipe] = t
 
 	return nil
 }
 
-// Stop serving.
+// Serve broker pipelines.
+func (b *Broker) Serve() (err error) {
+	b.mu.Lock()
+
+	if b.conn, err = b.cfg.newConn(); err != nil {
+		return err
+	}
+	defer b.conn.Close()
+
+	for _, t := range b.tubes {
+		if t.execPool != nil {
+			go t.serve(connFactory(b.cfg))
+		}
+	}
+
+	b.wait = make(chan error)
+
+	b.mu.Unlock()
+
+	return <-b.wait
+}
+
+// Stop all pipelines.
 func (b *Broker) Stop() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.stop != nil {
-		close(b.stop)
+	if b.wait == nil {
+		return
 	}
+
+	for _, t := range b.tubes {
+		t.stop()
+	}
+
+	b.wait <- nil
 }
 
-// Push new job to queue
-func (b *Broker) Push(p *jobs.Pipeline, j *jobs.Job) (string, error) {
-	data, err := json.Marshal(j)
-	if err != nil {
-		return "", err
+// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+// the service is started!
+func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	t, ok := b.tubes[pipe]
+	if !ok {
+		return fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	id, err := b.tubes[p].Put(
-		data,
-		0,
-		j.Options.DelayDuration(),
-		j.Options.TimeoutDuration(),
-	)
+	t.stop()
 
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%v", id), err
-}
-
-// registerTube new beanstalk pipeline
-func (b *Broker) registerTube(pipeline *jobs.Pipeline) error {
-	tube, err := NewTube(pipeline)
-	if err != nil {
+	if err := t.configure(execPool, errHandler); err != nil {
 		return err
 	}
 
-	b.tubes[pipeline] = tube
+	if b.conn != nil {
+		if t.execPool != nil {
+			go t.serve(connFactory(b.cfg))
+		}
+	}
+
 	return nil
 }
 
-// listen jobs from given tube
-func (b *Broker) listen(t *beanstalk.TubeSet) {
-	var job *jobs.Job
-	var handler jobs.Handler
+// Push data into the worker.
+func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
+	if err := b.isServing(); err != nil {
+		return "", err
+	}
 
-	for {
-		select {
-		case <-b.stop:
-			return
-		default:
-			id, body, err := t.Reserve(time.Duration(b.cfg.Reserve) * time.Second)
-			if err != nil {
-				continue
-			}
+	t := b.tube(pipe)
+	if t == nil {
+		return "", fmt.Errorf("undefined tube `%s`", pipe.Name())
+	}
 
-			err = json.Unmarshal(body, &job)
-			if err != nil {
-				// need additional logging
-				continue
-			}
+	return t.put(b.conn, 0, pack(j), j.Options.DelayDuration(), j.Options.TimeoutDuration())
+}
 
-			handler = <-b.handlerPool
-			go func() {
-				jerr := handler(fmt.Sprintf("%v", id), job)
-				b.handlerPool <- handler
+// Stat must fetch statistics about given pipeline or return error.
+func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
+	if err := b.isServing(); err != nil {
+		return nil, err
+	}
 
-				if jerr == nil {
-					t.Conn.Delete(id)
-					return
-				}
+	t := b.tube(pipe)
+	if t == nil {
+		return nil, fmt.Errorf("undefined tube `%s`", pipe.Name())
+	}
 
-				stats, err := t.Conn.StatsJob(id)
-				if err != nil {
-					t.Conn.Bury(id, 0)
-					b.err(fmt.Sprintf("%v", id), job, err)
-					return
-				}
+	return t.stat(b.conn)
+}
 
-				if job.Attempt, err = strconv.Atoi(stats["reserves"]); err != nil {
-					job.Attempt++
-					t.Conn.Bury(id, 0)
-					b.err(fmt.Sprintf("%v", id), job, err)
-					return
-				}
+// check if broker is serving
+func (b *Broker) isServing() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-				if !job.CanRetry() {
-					t.Conn.Bury(id, 0)
-					b.err(fmt.Sprintf("%v", id), job, jerr)
-					return
-				}
+	if b.wait == nil {
+		return fmt.Errorf("broker is not running")
+	}
 
-				// retry
-				t.Conn.Release(id, 0, job.Options.RetryDuration())
-			}()
-		}
+	return nil
+}
+
+// queue returns queue associated with the pipeline.
+func (b *Broker) tube(pipe *jobs.Pipeline) *tube {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	t, ok := b.tubes[pipe]
+	if !ok {
+		return nil
+	}
+
+	return t
+}
+
+// throw handles service, server and pool events.
+func (b *Broker) throw(event int, ctx interface{}) {
+	if b.lsn != nil {
+		b.lsn(event, ctx)
 	}
 }

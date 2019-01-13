@@ -52,11 +52,11 @@ abstract class BaseTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
-  public function testErrorJob()
+    public function testErrorJob()
     {
         $jobs = $this->makeJobs();
-        $id = $jobs->push(new $this->errorJob(['data' => 100]));
 
+        $id = $jobs->push(new $this->errorJob(['data' => 100]));
         $this->assertNotEmpty($id);
     }
 
@@ -66,7 +66,7 @@ abstract class BaseTest extends TestCase
 
         $id = $jobs->push(new $this->job([
             'data' => 100
-        ]), new Options(1));
+        ]), Options::delayed(1));
 
         $this->assertNotEmpty($id);
 

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Spiral Framework.
  *
@@ -8,8 +9,8 @@
 
 namespace Spiral\Jobs;
 
-use Spiral\Jobs\Exception\JobException;
 use Spiral\Core\ResolverInterface;
+use Spiral\Jobs\Exception\JobException;
 
 /**
  * Job with array based context and method injection support for do function.

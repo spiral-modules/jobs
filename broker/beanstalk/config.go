@@ -1,20 +1,20 @@
 package beanstalk
 
 import (
-	"errors"
+	"fmt"
 	"github.com/spiral/roadrunner/service"
-	"github.com/beanstalkd/go-beanstalk"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Config defines beanstalk broker configuration.
 type Config struct {
-	// Address of beanstalk server.
-	Address string
+	// Addr of beanstalk server.
+	Addr string
 
-	// Reserve timeout in seconds.
-	Reserve int
+	// Timeout to allocate the connection. Default 10 seconds.
+	Timeout int
 }
 
 // Hydrate config values.
@@ -22,16 +22,26 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return cfg.Unmarshal(c)
 }
 
-// Conn creates new rpc socket Listener.
-func (c *Config) Conn() (*beanstalk.Conn, error) {
-	dsn := strings.Split(c.Address, "://")
+// TimeoutDuration returns number of seconds allowed to allocate the connection.
+func (c *Config) TimeoutDuration() time.Duration {
+	timeout := c.Timeout
+	if timeout == 0 {
+		timeout = 10
+	}
+
+	return time.Duration(timeout) * time.Second
+}
+
+// size creates new rpc socket Listener.
+func (c *Config) newConn() (*conn, error) {
+	dsn := strings.Split(c.Addr, "://")
 	if len(dsn) != 2 {
-		return nil, errors.New("invalid socket DSN (tcp://:6001, unix://rpc.sock)")
+		return nil, fmt.Errorf("invalid socket DSN (tcp://localhost:11300, unix://beanstalk.sock)")
 	}
 
 	if dsn[0] == "unix" {
 		syscall.Unlink(dsn[1])
 	}
 
-	return beanstalk.Dial(dsn[0], dsn[1])
+	return newConn(dsn[0], dsn[1], c.TimeoutDuration())
 }

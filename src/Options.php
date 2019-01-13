@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Spiral Framework.
  *
@@ -10,27 +11,44 @@ namespace Spiral\Jobs;
 
 final class Options implements \JsonSerializable
 {
-    /** @var int */
+    /** @var int|null */
     private $delay = null;
 
-    /**
-     * @param int $delay
-     */
-    public function __construct(?int $delay = null)
-    {
-        $this->delay = $delay;
-    }
+    /** @var string|null */
+    private $pipeline = null;
 
     /**
      * @param int $delay
+     * @return self
      */
     public function setDelay(?int $delay)
     {
         $this->delay = $delay;
+
+        return $this;
     }
 
     /**
-     * @return int
+     * @return string|null
+     */
+    public function getPipeline(): ?string
+    {
+        return $this->pipeline;
+    }
+
+    /**
+     * @param string|null $pipeline
+     * @return self
+     */
+    public function setPipeline(?string $pipeline): self
+    {
+        $this->pipeline = $pipeline;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
      */
     public function getDelay(): ?int
     {
@@ -42,6 +60,18 @@ final class Options implements \JsonSerializable
      */
     public function jsonSerialize()
     {
-        return ['delay' => $this->delay];
+        return ['delay' => $this->delay, 'pipeline' => $this->pipeline];
+    }
+
+    /**
+     * @param int $delay
+     * @return Options
+     */
+    public static function delayed(int $delay): Options
+    {
+        $options = new self;
+        $options->delay = $delay;
+
+        return $options;
     }
 }

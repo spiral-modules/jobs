@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/roadrunner/service"
+	"time"
 )
 
 // Config defines sqs broker configuration.
@@ -22,30 +23,9 @@ type Config struct {
 
 	// Endpoint can be used to re-define SQS endpoint to custom location. Only for local development.
 	Endpoint string
-}
 
-// Session returns new AWS session.
-func (c *Config) Session() (*session.Session, error) {
-	return session.NewSession(&aws.Config{
-		Region:      aws.String("us-west-2"),
-		Credentials: credentials.NewStaticCredentials(c.Key, c.Secret, ""),
-	})
-}
-
-// SQS returns new SQS instance or error.
-func (c *Config) SQS() (*sqs.SQS, error) {
-	sess, err := c.Session()
-	if err != nil {
-		return nil, err
-	}
-
-	if c.Endpoint == "" {
-		return sqs.New(sess), nil
-	}
-
-	return sqs.New(sess, &aws.Config{
-		Endpoint: aws.String(c.Endpoint),
-	}), nil
+	// Timeout to allocate the connection. Default 10 seconds.
+	Timeout int
 }
 
 // Hydrate config values.
@@ -67,4 +47,36 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	}
 
 	return nil
+}
+
+// TimeoutDuration returns number of seconds allowed to allocate the connection.
+func (c *Config) TimeoutDuration() time.Duration {
+	timeout := c.Timeout
+	if timeout == 0 {
+		timeout = 10
+	}
+
+	return time.Duration(timeout) * time.Second
+}
+
+// Session returns new AWS session.
+func (c *Config) Session() (*session.Session, error) {
+	return session.NewSession(&aws.Config{
+		Region:      aws.String(c.Region),
+		Credentials: credentials.NewStaticCredentials(c.Key, c.Secret, ""),
+	})
+}
+
+// SQS returns new SQS instance or error.
+func (c *Config) SQS() (*sqs.SQS, error) {
+	sess, err := c.Session()
+	if err != nil {
+		return nil, err
+	}
+
+	if c.Endpoint == "" {
+		return sqs.New(sess), nil
+	}
+
+	return sqs.New(sess, &aws.Config{Endpoint: aws.String(c.Endpoint)}), nil
 }
