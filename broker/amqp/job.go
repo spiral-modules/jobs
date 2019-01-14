@@ -43,11 +43,11 @@ func unpack(d amqp.Delivery) (id string, attempt int, j *jobs.Job, err error) {
 		j.Options.Timeout = int(d.Headers["rr-timeout"].(int64))
 	}
 
-	if _, ok := d.Headers["rr-delay"]; !ok {
+	if _, ok := d.Headers["rr-delay"]; ok {
 		j.Options.Delay = int(d.Headers["rr-delay"].(int64))
 	}
 
-	if _, ok := d.Headers["rr-retryDelay"]; !ok {
+	if _, ok := d.Headers["rr-retryDelay"]; ok {
 		j.Options.RetryDelay = int(d.Headers["rr-retryDelay"].(int64))
 	}
 
