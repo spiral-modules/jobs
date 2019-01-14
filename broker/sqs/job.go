@@ -41,35 +41,26 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 		return "", 0, nil, err
 	}
 
-	delay, err := strconv.Atoi(msg.MessageAttributes["rr-delay"].String())
-	if ok != nil {
-		return "", 0, nil, err
-	}
-
-	maxAttempts, err := strconv.Atoi(msg.MessageAttributes["rr-maxAttempts"].String())
-	if ok != nil {
-		return "", 0, nil, err
-	}
-
-	timeout, err := strconv.Atoi(msg.MessageAttributes["rr-timeout"].String())
-	if ok != nil {
-		return "", 0, nil, err
-	}
-
-	retryDelay, err := strconv.Atoi(msg.MessageAttributes["rr-retryDelay"].String())
-	if ok != nil {
-		return "", 0, nil, err
-	}
-
 	j = &jobs.Job{
 		Job:     *msg.MessageAttributes["rr-job"].StringValue,
 		Payload: *msg.Body,
-		Options: &jobs.Options{
-			Delay:       delay,
-			MaxAttempts: maxAttempts,
-			Timeout:     timeout,
-			RetryDelay:  retryDelay,
-		},
+		Options: &jobs.Options{},
+	}
+
+	if delay, err := strconv.Atoi(msg.MessageAttributes["rr-delay"].String()); err == nil {
+		j.Options.Delay = delay
+	}
+
+	if maxAttempts, err := strconv.Atoi(msg.MessageAttributes["rr-maxAttempts"].String()); err == nil {
+		j.Options.MaxAttempts = maxAttempts
+	}
+
+	if timeout, err := strconv.Atoi(msg.MessageAttributes["rr-timeout"].String()); err == nil {
+		j.Options.Timeout = timeout
+	}
+
+	if retryDelay, err := strconv.Atoi(msg.MessageAttributes["rr-retryDelay"].String()); err == nil {
+		j.Options.RetryDelay = retryDelay
 	}
 
 	return *msg.MessageId, attempt, j, nil
