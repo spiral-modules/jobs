@@ -71,10 +71,7 @@ func (q *queue) declareQueue(s *sqs.SQS) (*string, error) {
 	}
 
 	// no need to create (get existed)
-	r, err := s.GetQueueUrl(&sqs.GetQueueUrlInput{
-		QueueName: aws.String(q.pipe.String("queue", "")),
-	})
-
+	r, err := s.GetQueueUrl(&sqs.GetQueueUrlInput{QueueName: aws.String(q.pipe.String("queue", ""))})
 	if err != nil {
 		return nil, err
 	}
