@@ -52,6 +52,13 @@ func TestBroker_Consume_Nil_BeforeServe(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, nil, nil))
 }
 
+func TestBroker_Consume_Undefined(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+
+	assert.Error(t, b.Consume(pipe, nil, nil))
+}
+
 func TestBroker_Consume_BeforeServe(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
