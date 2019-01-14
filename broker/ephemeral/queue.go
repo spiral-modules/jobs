@@ -1,4 +1,4 @@
-package local
+package ephemeral
 
 import (
 	"github.com/spiral/jobs"

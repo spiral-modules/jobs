@@ -30,7 +30,7 @@ jobs:
   # list of broker pipelines associated with endpoints
   pipelines:
     local:
-      broker: local
+      broker: ephemeral
 
     amqp:
       broker: amqp

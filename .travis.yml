@@ -23,7 +23,7 @@ before_script:
 script:
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic
   - go test -v -race -cover ./broker/amqp -coverprofile=amqp.txt -covermode=atomic
-  - go test -v -race -cover ./broker/local -coverprofile=local.txt -covermode=atomic
+  - go test -v -race -cover ./broker/local -coverprofile=ephemeral.txt -covermode=atomic
   - go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
   - go test -v -race -cover ./broker/sqs -coverprofile=sqs.txt -covermode=atomic
   - vendor/bin/phpunit --coverage-clover=coverage.xml
@@ -31,7 +31,7 @@ script:
 after_success:
   - bash <(curl -s https://codecov.io/bash) -f jobs.txt
   - bash <(curl -s https://codecov.io/bash) -f amqp.txt
-  - bash <(curl -s https://codecov.io/bash) -f local.txt
+  - bash <(curl -s https://codecov.io/bash) -f ephemeral.txt
   - bash <(curl -s https://codecov.io/bash) -f beanstalk.txt
   - bash <(curl -s https://codecov.io/bash) -f sqs.txt
   - bash <(curl -s https://codecov.io/bash) -f coverage.xml

@@ -21,11 +21,12 @@ final class Options implements \JsonSerializable
      * @param int $delay
      * @return self
      */
-    public function setDelay(?int $delay)
+    public function withDelay(?int $delay): self
     {
-        $this->delay = $delay;
+        $options = clone $this;
+        $options->delay = $delay;
 
-        return $this;
+        return $options;
     }
 
     /**
@@ -40,11 +41,12 @@ final class Options implements \JsonSerializable
      * @param string|null $pipeline
      * @return self
      */
-    public function setPipeline(?string $pipeline): self
+    public function withPipeline(?string $pipeline): self
     {
-        $this->pipeline = $pipeline;
+        $options = clone $this;
+        $options->pipeline = $pipeline;
 
-        return $this;
+        return $options;
     }
 
     /**

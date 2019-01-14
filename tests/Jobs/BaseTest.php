@@ -66,7 +66,7 @@ abstract class BaseTest extends TestCase
 
         $id = $jobs->push(new $this->job([
             'data' => 100
-        ]), Options::delayed(1));
+        ]), Options::delayed(1);
 
         $this->assertNotEmpty($id);
 
