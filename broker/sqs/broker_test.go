@@ -11,7 +11,7 @@ var (
 	pipe = &jobs.Pipeline{
 		"broker": "sqs",
 		"name":   "default",
-		"queue":  "default",
+		"queue":  "test",
 		"declare": map[string]interface{}{
 			"MessageRetentionPeriod": 86400,
 		},
