@@ -18,3 +18,30 @@ func Test_Config_Hydrate_Error(t *testing.T) {
 
 	assert.Error(t, c.Hydrate(cfg))
 }
+
+func Test_Config_Hydrate_Error2(t *testing.T) {
+	cfg := &mockCfg{`{"addr":""}`}
+	c := &Config{}
+
+	assert.Error(t, c.Hydrate(cfg))
+}
+
+func Test_Config_Hydrate_Error3(t *testing.T) {
+	cfg := &mockCfg{`{"addr":"tcp"}`}
+	c := &Config{}
+
+	assert.NoError(t, c.Hydrate(cfg))
+
+	_, err := c.newConn()
+	assert.Error(t, err)
+}
+
+func Test_Config_Hydrate_Error4(t *testing.T) {
+	cfg := &mockCfg{`{"addr":"unix://sock.bean"}`}
+	c := &Config{}
+
+	assert.NoError(t, c.Hydrate(cfg))
+
+	_, err := c.newConn()
+	assert.Error(t, err)
+}

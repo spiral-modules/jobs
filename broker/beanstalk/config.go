@@ -19,7 +19,15 @@ type Config struct {
 
 // Hydrate config values.
 func (c *Config) Hydrate(cfg service.Config) error {
-	return cfg.Unmarshal(c)
+	if err := cfg.Unmarshal(c); err != nil {
+		return err
+	}
+
+	if c.Addr == "" {
+		return fmt.Errorf("beanstalk address is missing")
+	}
+
+	return nil
 }
 
 // TimeoutDuration returns number of seconds allowed to allocate the connection.

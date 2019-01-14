@@ -18,3 +18,10 @@ func Test_Config_Hydrate_Error(t *testing.T) {
 
 	assert.Error(t, c.Hydrate(cfg))
 }
+
+func Test_Config_Hydrate_Error2(t *testing.T) {
+	cfg := &mockCfg{`{"addr:""}`}
+	c := &Config{}
+
+	assert.Error(t, c.Hydrate(cfg))
+}

@@ -18,3 +18,31 @@ func Test_Config_Hydrate_Error(t *testing.T) {
 
 	assert.Error(t, c.Hydrate(cfg))
 }
+
+func Test_Config_Hydrate_Error2(t *testing.T) {
+	cfg := &mockCfg{`{}`}
+	c := &Config{}
+
+	assert.Error(t, c.Hydrate(cfg))
+}
+
+func Test_Config_Hydrate_Error3(t *testing.T) {
+	cfg := &mockCfg{`{"region":"us-east-1"}`}
+	c := &Config{}
+
+	assert.Error(t, c.Hydrate(cfg))
+}
+
+func Test_Config_Hydrate_Error4(t *testing.T) {
+	cfg := &mockCfg{`{"region":"us-east-1","key":"key"}`}
+	c := &Config{}
+
+	assert.Error(t, c.Hydrate(cfg))
+}
+
+func Test_Config_Hydrate_Error5(t *testing.T) {
+	cfg := &mockCfg{`{"region":"us-east-1","key":"key","secret":"secret"}`}
+	c := &Config{}
+
+	assert.NoError(t, c.Hydrate(cfg))
+}
