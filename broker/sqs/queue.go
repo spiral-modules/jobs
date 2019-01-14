@@ -157,7 +157,8 @@ func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 		VisibilityTimeout: aws.Int64(int64(j.Options.TimeoutDuration().Seconds())),
 	})
 	if err != nil {
-		return q.deleteMessage(s, msg, err)
+		go q.deleteMessage(s, msg, err)
+		return err
 	}
 
 	err = h(id, j)
