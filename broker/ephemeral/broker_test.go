@@ -90,3 +90,61 @@ func TestBroker_Consume_Serve_Stop(t *testing.T) {
 
 	<-wait
 }
+
+func TestBroker_PushToNotRunning(t *testing.T) {
+	b := &Broker{}
+	b.Init()
+	b.Register(pipe)
+
+	_, err := b.Push(pipe, &jobs.Job{})
+	assert.Error(t, err)
+}
+
+func TestBroker_StatNotRunning(t *testing.T) {
+	b := &Broker{}
+	b.Init()
+	b.Register(pipe)
+
+	_, err := b.Stat(pipe)
+	assert.Error(t, err)
+}
+
+func TestBroker_PushToNotRegistered(t *testing.T) {
+	b := &Broker{}
+	b.Init()
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	_, err := b.Push(pipe, &jobs.Job{})
+	assert.Error(t, err)
+}
+
+func TestBroker_StatNotRegistered(t *testing.T) {
+	b := &Broker{}
+	b.Init()
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	_, err := b.Stat(pipe)
+	assert.Error(t, err)
+}

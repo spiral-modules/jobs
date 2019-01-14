@@ -125,13 +125,13 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	if j.Options.Delay > 900 || j.Options.RetryDelay > 900 {
-		return "", fmt.Errorf("unable to push into `%s`, maximum delay value is 900", pipe.Name())
-	}
-
 	q := b.queue(pipe)
 	if q == nil {
 		return "", fmt.Errorf("undefined queue `%s`", pipe.Name())
+	}
+
+	if j.Options.Delay > 900 || j.Options.RetryDelay > 900 {
+		return "", fmt.Errorf("unable to push into `%s`, maximum delay value is 900", pipe.Name())
 	}
 
 	return q.send(b.sqs, j)
