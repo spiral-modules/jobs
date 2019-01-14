@@ -59,6 +59,14 @@ func (q *queue) declareQueue(s *sqs.SQS) (*string, error) {
 		if vi, ok := v.(int); ok {
 			attr[k] = aws.String(strconv.Itoa(vi))
 		}
+
+		if vb, ok := v.(bool); ok {
+			if vb {
+				attr[k] = aws.String("true")
+			} else {
+				attr[k] = aws.String("false")
+			}
+		}
 	}
 
 	if len(attr) != 0 {

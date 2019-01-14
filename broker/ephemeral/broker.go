@@ -117,7 +117,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", err
 	}
 
-	go q.push(id.String(), j, 0, j.Options.DelayDuration())
+	q.push(id.String(), j, 0, j.Options.DelayDuration())
 
 	return id.String(), nil
 }
@@ -133,7 +133,7 @@ func (b *Broker) Stat(pipe *jobs.Pipeline) (stat *jobs.Stat, err error) {
 		return nil, fmt.Errorf("undefined queue `%s`", pipe.Name())
 	}
 
-	return q.stat, nil
+	return q.stat(), nil
 }
 
 // check if broker is serving

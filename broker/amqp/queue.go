@@ -87,6 +87,7 @@ func (q *queue) serve(publish, consume *chanPool) {
 			q.wg.Add(1)
 			q.muw.Unlock()
 
+			atomic.AddInt32(&q.running, 1)
 			h := <-q.execPool
 
 			go func(h jobs.Handler, d amqp.Delivery) {

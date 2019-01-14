@@ -188,6 +188,10 @@ func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
 	stat.Pipeline = pipe.Name()
 	stat.Broker = pipe.Broker()
 
+	s.mu.Lock()
+	stat.Consuming = s.consuming[pipe]
+	s.mu.Unlock()
+
 	return stat, err
 }
 

@@ -9,7 +9,7 @@ import (
 
 type queue struct {
 	active int32
-	stat   *jobs.Stat
+	st     *jobs.Stat
 
 	// job pipeline
 	jobs chan *entry
@@ -34,7 +34,7 @@ type entry struct {
 
 // create new queue
 func newQueue() *queue {
-	return &queue{stat: &jobs.Stat{InternalName: ":memory:"}, jobs: make(chan *entry)}
+	return &queue{st: &jobs.Stat{}, jobs: make(chan *entry)}
 }
 
 // associate queue with new do pool
@@ -56,11 +56,11 @@ func (q *queue) serve() {
 			return
 		}
 
-		atomic.AddInt64(&q.stat.Active, 1)
+		atomic.AddInt64(&q.st.Active, 1)
 		h := <-q.execPool
 		go func(e *entry) {
 			q.do(h, e)
-			atomic.AddInt64(&q.stat.Active, ^int64(0))
+			atomic.AddInt64(&q.st.Active, ^int64(0))
 			q.execPool <- h
 			q.wg.Done()
 		}(e)
@@ -87,7 +87,7 @@ func (q *queue) do(h jobs.Handler, e *entry) {
 	err := h(e.id, e.job)
 
 	if err == nil {
-		atomic.AddInt64(&q.stat.Queue, ^int64(0))
+		atomic.AddInt64(&q.st.Queue, ^int64(0))
 		return
 	}
 
@@ -95,11 +95,11 @@ func (q *queue) do(h jobs.Handler, e *entry) {
 
 	e.attempt++
 	if !e.job.Options.CanRetry(e.attempt) {
-		atomic.AddInt64(&q.stat.Queue, ^int64(0))
+		atomic.AddInt64(&q.st.Queue, ^int64(0))
 		return
 	}
 
-	go q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
+	q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
 }
 
 // stop the queue consuming
@@ -119,17 +119,29 @@ func (q *queue) stop() {
 // add job to the queue
 func (q *queue) push(id string, j *jobs.Job, attempt int, delay time.Duration) {
 	if delay == 0 {
-		atomic.AddInt64(&q.stat.Queue, 1)
-		q.jobs <- &entry{id: id, job: j, attempt: attempt}
+		atomic.AddInt64(&q.st.Queue, 1)
+		go func() {
+			q.jobs <- &entry{id: id, job: j, attempt: attempt}
+		}()
+
 		return
 	}
 
-	atomic.AddInt64(&q.stat.Delayed, 1)
+	atomic.AddInt64(&q.st.Delayed, 1)
+	go func() {
+		time.Sleep(delay)
+		atomic.AddInt64(&q.st.Delayed, ^int64(0))
+		atomic.AddInt64(&q.st.Queue, 1)
 
-	time.Sleep(delay)
+		q.jobs <- &entry{id: id, job: j, attempt: attempt}
+	}()
+}
 
-	atomic.AddInt64(&q.stat.Delayed, ^int64(0))
-	atomic.AddInt64(&q.stat.Queue, 1)
-
-	q.jobs <- &entry{id: id, job: j, attempt: attempt}
+func (q *queue) stat() *jobs.Stat {
+	return &jobs.Stat{
+		InternalName: ":memory:",
+		Queue:        atomic.LoadInt64(&q.st.Queue),
+		Active:       atomic.LoadInt64(&q.st.Active),
+		Delayed:      atomic.LoadInt64(&q.st.Delayed),
+	}
 }
