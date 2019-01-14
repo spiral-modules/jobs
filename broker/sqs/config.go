@@ -1,7 +1,7 @@
 package sqs
 
 import (
-	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -35,15 +35,15 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	}
 
 	if c.Region == "" {
-		return errors.New("SQS region is missing")
+		return fmt.Errorf("SQS region is missing")
 	}
 
 	if c.Key == "" {
-		return errors.New("SQS key is missing")
+		return fmt.Errorf("SQS key is missing")
 	}
 
 	if c.Secret == "" {
-		return errors.New("SQS secret is missing")
+		return fmt.Errorf("SQS secret is missing")
 	}
 
 	return nil
