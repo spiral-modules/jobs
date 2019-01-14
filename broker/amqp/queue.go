@@ -213,6 +213,7 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 		return cp.closeChan(c, err)
 	}
 
+	// keep channel open
 	return err
 }
 
@@ -238,7 +239,7 @@ func (q *queue) declare(cp *chanPool, queue string, key string, args amqp.Table)
 		return cp.closeChan(c, err)
 	}
 
-	// do not closeChan connection
+	// keep channel open
 	return err
 }
 
@@ -254,6 +255,7 @@ func (q *queue) inspect(cp *chanPool) (*amqp.Queue, error) {
 		return nil, cp.closeChan(c, err)
 	}
 
+	// keep channel open
 	return &queue, err
 }
 
