@@ -11,7 +11,7 @@
 - automatic queue configuration
 - plug-and-play PHP library (framework agnostic)
 - delayed jobs
-- job level timeouts and retries, retry delays
+- job level timeouts, retries, retry delays
 - PHP and Golang consumers and producers
 - per pipeline stop/resume
 - works on Windows
