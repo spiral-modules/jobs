@@ -17,7 +17,7 @@ class OptionsTest extends TestCase
     {
         $o = new Options();
         $this->assertNull($o->getDelay());
-        $o->setDelay(10);
+        $o = $o->withDelay(10);
         $this->assertSame(10, $o->getDelay());
     }
 }
