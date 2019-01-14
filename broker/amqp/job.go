@@ -27,13 +27,12 @@ func unpack(d amqp.Delivery) (id string, attempt int, j *jobs.Job, err error) {
 		return "", 0, nil, fmt.Errorf("missing header `%s`", "rr-id")
 	}
 
-	if _, ok := d.Headers["rr-job"]; !ok {
-		return "", 0, nil, fmt.Errorf("missing header `%s`", "rr-job")
-	}
-	j.Job = d.Headers["rr-job"].(string)
-
 	if _, ok := d.Headers["rr-attempt"]; !ok {
 		return "", 0, nil, fmt.Errorf("missing header `%s`", "rr-attempt")
+	}
+
+	if _, ok := d.Headers["rr-job"]; ok {
+		j.Job = d.Headers["rr-job"].(string)
 	}
 
 	if _, ok := d.Headers["rr-maxAttempts"]; ok {
