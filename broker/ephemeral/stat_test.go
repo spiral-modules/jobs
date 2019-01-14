@@ -19,7 +19,6 @@ func TestBroker_Stat(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
@@ -35,6 +34,8 @@ func TestBroker_Stat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), stat.Queue)
 	assert.Equal(t, int64(0), stat.Active)
+
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	waitJob := make(chan interface{})
 	exec <- func(id string, j *jobs.Job) error {
