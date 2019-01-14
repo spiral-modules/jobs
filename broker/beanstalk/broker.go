@@ -101,9 +101,8 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	t.stop()
 
-	if err := t.configure(execPool, errHandler); err != nil {
-		return err
-	}
+	t.execPool = execPool
+	t.errHandler = errHandler
 
 	if b.conn != nil {
 		if t.execPool != nil {

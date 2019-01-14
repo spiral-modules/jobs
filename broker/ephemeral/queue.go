@@ -22,8 +22,8 @@ type queue struct {
 	wait chan interface{}
 
 	// exec handlers
-	execPool chan jobs.Handler
-	err      jobs.ErrorHandler
+	execPool   chan jobs.Handler
+	errHandler jobs.ErrorHandler
 }
 
 type entry struct {
@@ -40,7 +40,7 @@ func newQueue() *queue {
 // associate queue with new do pool
 func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
 	q.execPool = execPool
-	q.err = err
+	q.errHandler = err
 
 	return nil
 }
@@ -91,7 +91,7 @@ func (q *queue) do(h jobs.Handler, e *entry) {
 		return
 	}
 
-	q.err(e.id, e.job, err)
+	q.errHandler(e.id, e.job, err)
 
 	e.attempt++
 	if !e.job.Options.CanRetry(e.attempt) {

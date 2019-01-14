@@ -28,9 +28,9 @@ type queue struct {
 	wg  sync.WaitGroup
 
 	// exec handlers
-	running  int32
-	execPool chan jobs.Handler
-	err      jobs.ErrorHandler
+	running    int32
+	execPool   chan jobs.Handler
+	errHandler jobs.ErrorHandler
 }
 
 // newQueue creates new queue wrapper for AMQP.
@@ -46,14 +46,6 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 		pipe:     pipe,
 		lsn:      lsn,
 	}, nil
-}
-
-// associate queue with new consume pool
-func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
-	q.execPool = execPool
-	q.err = err
-
-	return nil
 }
 
 // serve consumes queue
@@ -150,7 +142,7 @@ func (q *queue) do(cp *chanPool, h jobs.Handler, d amqp.Delivery) error {
 	}
 
 	// failed
-	q.err(id, j, err)
+	q.errHandler(id, j, err)
 
 	if !j.Options.CanRetry(attempt) {
 		return d.Nack(false, false)

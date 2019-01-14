@@ -28,8 +28,8 @@ type queue struct {
 	wg  sync.WaitGroup
 
 	// exec handlers
-	execPool chan jobs.Handler
-	err      jobs.ErrorHandler
+	execPool   chan jobs.Handler
+	errHandler jobs.ErrorHandler
 }
 
 func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue, error) {
@@ -38,14 +38,6 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 	}
 
 	return &queue{pipe: pipe, reserve: pipe.Duration("reserve", time.Second), lsn: lsn}, nil
-}
-
-// associate queue with new do pool
-func (q *queue) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
-	q.execPool = execPool
-	q.err = err
-
-	return nil
 }
 
 // declareQueue declared queue
@@ -184,7 +176,7 @@ func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 		return q.deleteMessage(s, msg, nil)
 	}
 
-	q.err(id, j, err)
+	q.errHandler(id, j, err)
 
 	if !j.Options.CanRetry(attempt) {
 		return q.deleteMessage(s, msg, err)

@@ -88,9 +88,8 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 
 	q.stop()
 
-	if err := q.configure(execPool, errHandler); err != nil {
-		return err
-	}
+	q.execPool = execPool
+	q.errHandler = errHandler
 
 	if b.wait != nil {
 		if q.execPool != nil {

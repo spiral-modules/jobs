@@ -29,8 +29,8 @@ type tube struct {
 	wg  sync.WaitGroup
 
 	// exec handlers
-	execPool chan jobs.Handler
-	err      jobs.ErrorHandler
+	execPool   chan jobs.Handler
+	errHandler jobs.ErrorHandler
 }
 
 type entry struct {
@@ -55,14 +55,6 @@ func newTube(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*tube, 
 		reserve: pipe.Duration("reserve", time.Second),
 		lsn:     lsn,
 	}, nil
-}
-
-// associate tube with new do pool
-func (t *tube) configure(execPool chan jobs.Handler, err jobs.ErrorHandler) error {
-	t.execPool = execPool
-	t.err = err
-
-	return nil
 }
 
 // run consumers
@@ -156,7 +148,7 @@ func (t *tube) do(cn *conn, h jobs.Handler, e *entry) error {
 		return cn.release(statErr)
 	}
 
-	t.err(e.String(), j, err)
+	t.errHandler(e.String(), j, err)
 
 	reserves, ok := strconv.Atoi(stat["reserves"])
 	if ok != nil || !j.Options.CanRetry(reserves) {

@@ -28,6 +28,13 @@ func TestBroker_Init(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestBroker_StopNotStarted(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+
+	b.Stop()
+}
+
 func TestBroker_Register(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
