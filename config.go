@@ -11,7 +11,7 @@ type Config struct {
 	// Workers configures roadrunner server and worker busy.
 	Workers *roadrunner.ServerConfig
 
-	// Dispatch defines where and how to clarify jobs.
+	// Dispatch defines where and how to match jobs.
 	Dispatch Dispatcher
 
 	// Pipelines defines mapping between PHP job pipeline and associated job broker.
@@ -50,7 +50,7 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 
 // FindPipeline locates the pipeline associated with the job.
 func (c *Config) FindPipeline(job *Job) (*Pipeline, *Options, error) {
-	opt := c.Dispatch.clarify(job)
+	opt := c.Dispatch.match(job)
 
 	pipe := job.Options.Pipeline
 	if pipe == "" && opt != nil {

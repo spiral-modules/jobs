@@ -1,24 +1,41 @@
 package jobs
 
-// func Test_Map_All(t *testing.T) {
-// 	m := Dispatcher{"default": []string{"*"}}
-// 	assert.Equal(t, "default", m.find("any"))
-// }
-//
-// func Test_Map_Miss(t *testing.T) {
-// 	m := Dispatcher{
-// 		"default": []string{"some.*"},
-// 	}
-// 	assert.Equal(t, "", m.find("any"))
-// }
-//
-// func Test_Map_Best(t *testing.T) {
-// 	m := Dispatcher{
-// 		"default": []string{"some.*"},
-// 		"other":   []string{"some.other.*"},
-// 	}
-//
-// 	assert.Equal(t, "default", m.find("some"))
-// 	assert.Equal(t, "default", m.find("some.any"))
-// 	assert.Equal(t, "other", m.find("some.other"))
-// }
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+
+func Test_Map_All(t *testing.T) {
+	m := Dispatcher{"default": &Options{Pipeline: "default"}}
+	assert.Equal(t, "default", m.match(&Job{Job: "default"}).Pipeline)
+}
+
+func Test_Map_Miss(t *testing.T) {
+	m := Dispatcher{"some.*": &Options{Pipeline: "default"}}
+
+	assert.Nil(t, m.match(&Job{Job: "miss"}))
+}
+
+func Test_Map_Best(t *testing.T) {
+	m := Dispatcher{
+		"some.*":       &Options{Pipeline: "default"},
+		"some.other.*": &Options{Pipeline: "other"},
+	}
+
+	assert.Equal(t, "default", m.match(&Job{Job: "some"}).Pipeline)
+	assert.Equal(t, "default", m.match(&Job{Job: "some.any"}).Pipeline)
+	assert.Equal(t, "other", m.match(&Job{Job: "some.other"}).Pipeline)
+	assert.Equal(t, "other", m.match(&Job{Job: "some.other.job"}).Pipeline)
+}
+
+func Test_Map_BestReversed(t *testing.T) {
+	m := Dispatcher{
+		"some.*":       &Options{Pipeline: "default"},
+		"some.other.*": &Options{Pipeline: "other"},
+	}
+
+	assert.Equal(t, "other", m.match(&Job{Job: "some.other.job"}).Pipeline)
+	assert.Equal(t, "other", m.match(&Job{Job: "some.other"}).Pipeline)
+	assert.Equal(t, "default", m.match(&Job{Job: "some.any"}).Pipeline)
+	assert.Equal(t, "default", m.match(&Job{Job: "some"}).Pipeline)
+}

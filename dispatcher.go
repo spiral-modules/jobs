@@ -6,19 +6,15 @@ import (
 
 // Dispatcher provides ability to automatically locate the pipeline for the specific job
 // and update job options (if none set).
-type Dispatcher map[string]Options
+type Dispatcher map[string]*Options
 
-// clarify clarifies target job pipeline and other job options. Can return nil.
-func (d Dispatcher) clarify(job *Job) *Options {
-	var (
-		found Options
-		best  = 0
-	)
+// match clarifies target job pipeline and other job options. Can return nil.
+func (d Dispatcher) match(job *Job) (found *Options) {
+	var best = 0
 
 	for pattern, opts := range d {
-		pattern = strings.Replace(strings.Trim(pattern, "-.*"), "-", ".", -1)
-
-		if strings.Contains(job.Job, pattern) && len(pattern) > best {
+		pattern = d.prepare(pattern)
+		if strings.HasPrefix(job.Job, pattern) && len(pattern) > best {
 			found = opts
 			best = len(pattern)
 		}
@@ -28,5 +24,10 @@ func (d Dispatcher) clarify(job *Job) *Options {
 		return nil
 	}
 
-	return &found
+	return found
+}
+
+// prepare pattern for comparision
+func (d *Dispatcher) prepare(pattern string) string {
+	return strings.Replace(strings.Trim(pattern, "-.*"), "-", ".", -1)
 }
