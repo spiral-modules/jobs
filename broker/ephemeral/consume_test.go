@@ -175,3 +175,53 @@ func TestBroker_Consume_Errored(t *testing.T) {
 	<-waitJob
 	<-errHandled
 }
+
+func TestBroker_Consume_Errored_Attempts(t *testing.T) {
+	b := &Broker{}
+	b.Init()
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	attempts := 0
+	errHandled := make(chan interface{})
+	errHandler := func(id string, j *jobs.Job, err error) {
+		assert.Equal(t, "job failed", err.Error())
+		attempts++
+		errHandled <- nil
+	}
+
+	exec := make(chan jobs.Handler, 1)
+
+	assert.NoError(t, b.Consume(pipe, exec, errHandler))
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{MaxAttempts: 3},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+
+	exec <- func(id string, j *jobs.Job) error {
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+		return fmt.Errorf("job failed")
+	}
+
+	<-errHandled
+	<-errHandled
+	<-errHandled
+	assert.Equal(t, 3, attempts)
+}

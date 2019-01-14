@@ -64,7 +64,7 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 		j.Options.RetryDelay = retryDelay
 	}
 
-	return *msg.MessageId, attempt, j, nil
+	return *msg.MessageId, attempt - 1, j, nil
 }
 
 func awsString(n int) *string {

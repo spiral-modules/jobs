@@ -148,7 +148,7 @@ func (t *tube) do(cn *conn, h jobs.Handler, e *entry) error {
 	t.errHandler(e.String(), j, err)
 
 	reserves, ok := strconv.Atoi(stat["reserves"])
-	if ok != nil || !j.Options.CanRetry(reserves) {
+	if ok != nil || !j.Options.CanRetry(reserves-1) {
 		return cn.release(conn.Bury(e.id, 0))
 	}
 

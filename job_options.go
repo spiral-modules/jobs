@@ -45,7 +45,8 @@ func (o *Options) Merge(from *Options) {
 
 // CanRetry must return true if broker is allowed to re-run the job.
 func (o *Options) CanRetry(attempts int) bool {
-	return o.MaxAttempts > attempts
+	// MaxAttempts 1 and 0 has identical effect
+	return o.MaxAttempts > (attempts + 1)
 }
 
 // RetryDuration returns retry delay duration in a form of time.Duration.

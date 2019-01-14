@@ -93,13 +93,12 @@ func (q *queue) do(h jobs.Handler, e *entry) {
 
 	q.errHandler(e.id, e.job, err)
 
-	e.attempt++
 	if !e.job.Options.CanRetry(e.attempt) {
 		atomic.AddInt64(&q.st.Queue, ^int64(0))
 		return
 	}
 
-	q.push(e.id, e.job, e.attempt, e.job.Options.RetryDuration())
+	q.push(e.id, e.job, e.attempt+1, e.job.Options.RetryDuration())
 }
 
 // stop the queue consuming
