@@ -14,6 +14,8 @@ use Spiral\Jobs\Exception\JobException;
 
 /**
  * Job with array based context and method injection support for do function.
+ *
+ * Attention, this class is linked to spiral\core repository!
  */
 abstract class AbstractJob implements JobInterface
 {
