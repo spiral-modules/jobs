@@ -23,7 +23,7 @@ before_script:
 script:
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic
   - go test -v -race -cover ./broker/amqp -coverprofile=amqp.txt -covermode=atomic
-  - go test -v -race -cover ./broker/local -coverprofile=ephemeral.txt -covermode=atomic
+  - go test -v -race -cover ./broker/ephemeral -coverprofile=ephemeral.txt -covermode=atomic
   - go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
   - go test -v -race -cover ./broker/sqs -coverprofile=sqs.txt -covermode=atomic
   - vendor/bin/phpunit --coverage-clover=coverage.xml
