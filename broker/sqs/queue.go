@@ -81,11 +81,6 @@ func (q *queue) declareQueue(s *sqs.SQS) (*string, error) {
 
 // serve consumers
 func (q *queue) serve(s *sqs.SQS, tout time.Duration) {
-	if q.url == nil {
-		q.report(fmt.Errorf("unable to start queue without url"))
-		return
-	}
-
 	q.wait = make(chan interface{})
 	atomic.StoreInt32(&q.active, 1)
 
