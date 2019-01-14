@@ -23,4 +23,14 @@ class FactoryTest extends TestCase
         $this->assertInstanceOf(Job::class, $j);
         $this->assertSame(json_encode(['data' => 200]), $j->serialize());
     }
+
+    /**
+     * @expectedException \Spiral\Jobs\Exception\JobException
+     */
+    public function testMakeUndefined()
+    {
+        $factory = new SpiralFactory();
+
+        $factory->make("spiral.jobs.undefined", json_encode(['data' => 200]));
+    }
 }

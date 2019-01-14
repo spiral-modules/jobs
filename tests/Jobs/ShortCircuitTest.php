@@ -41,6 +41,26 @@ class ShortCircuitTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
+    public function testLocalDelayed()
+    {
+        $jobs = new ShortCircuit();
+
+        $t = microtime(true);
+        $id = $jobs->push(new Job([
+            'data' => 100
+        ], new Container()), Options::delayed(1));
+
+        $this->assertTrue(microtime(true) - $t >= 1);
+
+        $this->assertNotEmpty($id);
+
+        $this->assertFileExists(Job::JOB_FILE);
+
+        $data = json_decode(file_get_contents(Job::JOB_FILE), true);
+        $this->assertSame($id, $data['id']);
+        $this->assertSame(100, $data['data']);
+    }
+
     /**
      * @expectedException \Spiral\Jobs\Exception\JobException
      */
