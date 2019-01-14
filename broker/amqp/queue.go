@@ -88,10 +88,7 @@ func (q *queue) serve(publish, consume *chanPool) {
 				atomic.AddInt32(&q.running, ^int32(0))
 				q.execPool <- h
 				q.wg.Done()
-
-				if err != nil {
-					q.report(err)
-				}
+				q.report(err)
 			}(h, d)
 		}
 	}
@@ -167,10 +164,9 @@ func (q *queue) stop() {
 	q.muc.Lock()
 	if q.cc != nil {
 		// gracefully stop consuming
-		if err := q.cc.ch.Cancel(q.consumer, true); err != nil {
-			q.report(err)
-		}
+		q.report(q.cc.ch.Cancel(q.consumer, true))
 	}
+
 	q.muc.Unlock()
 	q.muw.Lock()
 	q.wg.Wait()
@@ -266,5 +262,7 @@ func (q *queue) inspect(cp *chanPool) (*amqp.Queue, error) {
 
 // throw handles service, server and pool events.
 func (q *queue) report(err error) {
-	q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+	if err != nil {
+		q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+	}
 }

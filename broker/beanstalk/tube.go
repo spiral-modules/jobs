@@ -89,10 +89,7 @@ func (t *tube) serve(connector connFactory) {
 			err := t.do(conn, h, e)
 			t.execPool <- h
 			t.wg.Done()
-
-			if err != nil {
-				t.report(err)
-			}
+			t.report(err)
 		}(h, e)
 	}
 }
@@ -224,5 +221,7 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 
 // report tube specific error
 func (t *tube) report(err error) {
-	t.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
+	if err != nil {
+		t.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
+	}
 }

@@ -114,10 +114,7 @@ func (q *queue) serve(s *sqs.SQS, tout time.Duration) {
 				err := q.do(s, h, msg)
 				q.execPool <- h
 				q.wg.Done()
-
-				if err != nil {
-					q.report(err)
-				}
+				q.report(err)
 			}(h, msg)
 		}
 	}
@@ -256,5 +253,7 @@ func (q *queue) stat(s *sqs.SQS) (stat *jobs.Stat, err error) {
 
 // throw handles service, server and pool events.
 func (q *queue) report(err error) {
-	q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+	if err != nil {
+		q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+	}
 }
