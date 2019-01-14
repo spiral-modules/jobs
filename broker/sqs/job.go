@@ -1,6 +1,7 @@
 package sqs
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/spiral/jobs"
@@ -38,7 +39,7 @@ func pack(url *string, j *jobs.Job) *sqs.SendMessageInput {
 func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 	attempt, ok := strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
 	if ok != nil {
-		return "", 0, nil, err
+		return "", 0, nil, fmt.Errorf("missing attribute `%s`", "ApproximateReceiveCount")
 	}
 
 	j = &jobs.Job{
@@ -47,19 +48,19 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 		Options: &jobs.Options{},
 	}
 
-	if delay, err := strconv.Atoi(msg.MessageAttributes["rr-delay"].String()); err == nil {
+	if delay, err := strconv.Atoi(*msg.MessageAttributes["rr-delay"].StringValue); err == nil {
 		j.Options.Delay = delay
 	}
 
-	if maxAttempts, err := strconv.Atoi(msg.MessageAttributes["rr-maxAttempts"].String()); err == nil {
+	if maxAttempts, err := strconv.Atoi(*msg.MessageAttributes["rr-maxAttempts"].StringValue); err == nil {
 		j.Options.MaxAttempts = maxAttempts
 	}
 
-	if timeout, err := strconv.Atoi(msg.MessageAttributes["rr-timeout"].String()); err == nil {
+	if timeout, err := strconv.Atoi(*msg.MessageAttributes["rr-timeout"].StringValue); err == nil {
 		j.Options.Timeout = timeout
 	}
 
-	if retryDelay, err := strconv.Atoi(msg.MessageAttributes["rr-retryDelay"].String()); err == nil {
+	if retryDelay, err := strconv.Atoi(*msg.MessageAttributes["rr-retryDelay"].StringValue); err == nil {
 		j.Options.RetryDelay = retryDelay
 	}
 
