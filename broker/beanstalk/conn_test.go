@@ -19,6 +19,7 @@ var (
 	proxy = &tcpProxy{
 		listen:   "localhost:11301",
 		upstream: "localhost:11300",
+		accept:   true,
 	}
 )
 
@@ -26,6 +27,7 @@ type tcpProxy struct {
 	listen   string
 	upstream string
 	mu       sync.Mutex
+	accept   bool
 	conn     []net.Conn
 }
 
@@ -39,6 +41,10 @@ func (p *tcpProxy) serve() {
 		in, err := l.Accept()
 		if err != nil {
 			panic(err)
+		}
+
+		if !p.accepting() {
+			in.Close()
 		}
 
 		up, err := net.Dial("tcp", p.upstream)
@@ -75,6 +81,10 @@ func (p *tcpProxy) pipe(src, dst io.ReadWriter) {
 
 // wait for specific number of connections
 func (p *tcpProxy) waitFor(count int) {
+	p.mu.Lock()
+	p.accept = true
+	p.mu.Unlock()
+
 	for {
 		p.mu.Lock()
 		current := len(p.conn)
@@ -88,8 +98,9 @@ func (p *tcpProxy) waitFor(count int) {
 	}
 }
 
-func (p *tcpProxy) reset() int {
+func (p *tcpProxy) reset(accept bool) int {
 	p.mu.Lock()
+	p.accept = accept
 	defer p.mu.Unlock()
 
 	count := 0
@@ -102,12 +113,19 @@ func (p *tcpProxy) reset() int {
 	return count / 2
 }
 
+func (p *tcpProxy) accepting() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.accept
+}
+
 func init() {
 	go proxy.serve()
 }
 
 func TestBroker_Proxy_Test(t *testing.T) {
-	defer proxy.reset()
+	defer proxy.reset(true)
 
 	b := &Broker{}
 	b.Init(proxyCfg)
@@ -151,7 +169,9 @@ func TestBroker_Proxy_Test(t *testing.T) {
 	<-waitJob
 }
 
-func TestBroker_Proxy_PushInterrupted(t *testing.T) {
+func TestBroker_Proxy_StatInterrupted(t *testing.T) {
+	defer proxy.reset(true)
+
 	b := &Broker{}
 	b.Init(proxyCfg)
 	b.Register(pipe)
@@ -170,17 +190,19 @@ func TestBroker_Proxy_PushInterrupted(t *testing.T) {
 
 	<-ready
 
+	_, err := b.Stat(pipe)
+	assert.NoError(t, err)
+
 	// break the connection and cause the reconnect
 	proxy.waitFor(1)
-	assert.Equal(t, 1, proxy.reset())
+	assert.Equal(t, 1, proxy.reset(false))
 
-	_, perr := b.Push(pipe, &jobs.Job{
-		Job:     "test",
-		Payload: "body",
-		Options: &jobs.Options{},
-	})
+	_, err = b.Stat(pipe)
+	assert.Error(t, err)
 
-	assert.Error(t, perr)
+	proxy.waitFor(1)
+	_, err = b.Stat(pipe)
+	assert.NoError(t, err)
 }
 
 // func TestBroker_Proxy_ConsumeInterrupted(t *testing.T) {
