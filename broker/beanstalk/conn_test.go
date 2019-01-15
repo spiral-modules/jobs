@@ -108,7 +108,7 @@ func init() {
 	go proxy.serve()
 }
 
-func TestBroker_Proxy_Test(t *testing.T) {
+func TestBroker_Durability_Clean(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
@@ -153,7 +153,7 @@ func TestBroker_Proxy_Test(t *testing.T) {
 	<-waitJob
 }
 
-func TestBroker_Proxy_PushConsumeInterrupted(t *testing.T) {
+func TestBroker_Durability_Consume(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
@@ -208,7 +208,65 @@ func TestBroker_Proxy_PushConsumeInterrupted(t *testing.T) {
 	<-waitJob
 }
 
-func TestBroker_Proxy_StatInterrupted(t *testing.T) {
+func TestBroker_Durability_Reschedule(t *testing.T) {
+	defer proxy.reset(true)
+
+	b := &Broker{}
+	b.Init(proxyCfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	proxy.waitConn(2)
+
+	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+
+	wg := sync.WaitGroup{}
+
+	// expect job to come twice after the reconnect
+	wg.Add(2)
+
+	fired := false
+	exec <- func(id string, j *jobs.Job) error {
+		defer wg.Done()
+
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+
+		if !fired {
+			fired = true
+
+			// reset the connections
+			proxy.reset(true)
+		}
+
+		return nil
+	}
+
+	wg.Wait()
+}
+
+func TestBroker_Durability_Stat(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
@@ -228,11 +286,12 @@ func TestBroker_Proxy_StatInterrupted(t *testing.T) {
 	defer b.Stop()
 
 	<-ready
+	proxy.waitConn(1)
 
 	_, err := b.Stat(pipe)
 	assert.NoError(t, err)
 
-	proxy.waitConn(1).reset(false)
+	proxy.reset(false)
 
 	_, err = b.Stat(pipe)
 	assert.Error(t, err)
@@ -241,4 +300,30 @@ func TestBroker_Proxy_StatInterrupted(t *testing.T) {
 
 	_, err = b.Stat(pipe)
 	assert.NoError(t, err)
+}
+
+func TestBroker_Durability_StopDead(t *testing.T) {
+	defer proxy.reset(true)
+
+	b := &Broker{}
+	b.Init(proxyCfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+
+	go func() { assert.NoError(t, b.Serve()) }()
+
+	<-ready
+
+	proxy.waitConn(2).reset(false)
+
+	b.Stop()
 }
