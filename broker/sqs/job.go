@@ -25,7 +25,7 @@ func pack(url *string, j *jobs.Job) *sqs.SendMessageInput {
 		MessageBody:  aws.String(j.Payload),
 		MessageAttributes: map[string]*sqs.MessageAttributeValue{
 			"rr-job":         {DataType: aws.String("String"), StringValue: aws.String(j.Job)},
-			"rr-maxAttempts": {DataType: aws.String("String"), StringValue: awsString(j.Options.MaxAttempts)},
+			"rr-maxAttempts": {DataType: aws.String("String"), StringValue: awsString(j.Options.Attempts)},
 			"rr-delay":       {DataType: aws.String("String"), StringValue: awsDuration(j.Options.DelayDuration())},
 			"rr-timeout":     {DataType: aws.String("String"), StringValue: awsDuration(j.Options.TimeoutDuration())},
 			"rr-retryDelay":  {DataType: aws.String("Number"), StringValue: awsDuration(j.Options.RetryDuration())},
@@ -53,7 +53,7 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 	}
 
 	if maxAttempts, err := strconv.Atoi(*msg.MessageAttributes["rr-maxAttempts"].StringValue); err == nil {
-		j.Options.MaxAttempts = maxAttempts
+		j.Options.Attempts = maxAttempts
 	}
 
 	if timeout, err := strconv.Atoi(*msg.MessageAttributes["rr-timeout"].StringValue); err == nil {

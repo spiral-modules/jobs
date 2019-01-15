@@ -208,7 +208,7 @@ func TestBroker_Consume_Errored_Attempts(t *testing.T) {
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{MaxAttempts: 3},
+		Options: &jobs.Options{Attempts: 3},
 	})
 
 	assert.NotEqual(t, "", jid)

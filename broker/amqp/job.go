@@ -12,7 +12,7 @@ func pack(id string, attempt int, j *jobs.Job) amqp.Table {
 		"rr-id":          id,
 		"rr-job":         j.Job,
 		"rr-attempt":     int64(attempt),
-		"rr-maxAttempts": int64(j.Options.MaxAttempts),
+		"rr-maxAttempts": int64(j.Options.Attempts),
 		"rr-timeout":     int64(j.Options.Timeout),
 		"rr-delay":       int64(j.Options.Delay),
 		"rr-retryDelay":  int64(j.Options.RetryDelay),
@@ -37,7 +37,7 @@ func unpack(d amqp.Delivery) (id string, attempt int, j *jobs.Job, err error) {
 	j.Job = d.Headers["rr-job"].(string)
 
 	if _, ok := d.Headers["rr-maxAttempts"]; ok {
-		j.Options.MaxAttempts = int(d.Headers["rr-maxAttempts"].(int64))
+		j.Options.Attempts = int(d.Headers["rr-maxAttempts"].(int64))
 	}
 
 	if _, ok := d.Headers["rr-timeout"]; ok {
