@@ -25,6 +25,13 @@ func Test_Config_Hydrate_Error(t *testing.T) {
 	assert.Error(t, c.Hydrate(cfg))
 }
 
+func Test_Config_Hydrate_Error2(t *testing.T) {
+	cfg := &mockCfg{`{}`}
+	c := &Config{}
+
+	assert.Error(t, c.Hydrate(cfg))
+}
+
 func Test_Config_Hydrate_OK(t *testing.T) {
 	cfg := &mockCfg{`{
 	"workers":{"pool":{"numWorkers": 1}}
@@ -135,4 +142,24 @@ func Test_MatchPipeline(t *testing.T) {
 	p, opt, _ := c.MatchPipeline(&Job{Job: "job.abc", Options: &Options{}})
 	assert.Equal(t, "pipe", p.Name())
 	assert.Equal(t, 10, opt.Delay)
+}
+
+func Test_MatchPipeline_Error(t *testing.T) {
+	cfg := &mockCfg{`{
+	"workers":{
+		"pool":{"numWorkers": 1}
+	},
+	"pipelines":{
+		"pipe": {"broker":"default"}
+	},
+	"dispatch":{
+		"job.*": {"pipeline":"missing"}
+	}
+	}`}
+	c := &Config{}
+
+	assert.NoError(t, c.Hydrate(cfg))
+
+	_, _, err := c.MatchPipeline(&Job{Job: "job.abc", Options: &Options{}})
+	assert.Error(t, err)
 }

@@ -36,9 +36,7 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 		c.Workers = &roadrunner.ServerConfig{}
 	}
 
-	if err := c.Workers.InitDefaults(); err != nil {
-		return err
-	}
+	c.Workers.InitDefaults()
 
 	c.pipelines, err = initPipelines(c.Pipelines)
 	if err != nil {
