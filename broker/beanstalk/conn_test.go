@@ -52,30 +52,12 @@ func (p *tcpProxy) serve() {
 			panic(err)
 		}
 
-		go p.pipe(in, up)
-		go p.pipe(up, in)
+		go io.Copy(in, up)
+		go io.Copy(up, in)
 
 		p.mu.Lock()
 		p.conn = append(p.conn, in, up)
 		p.mu.Unlock()
-	}
-}
-
-func (p *tcpProxy) pipe(src, dst io.ReadWriter) {
-	buff := make([]byte, 0xffff)
-	for {
-		n, err := src.Read(buff)
-		if err != nil {
-			return
-		}
-		b := buff[:n]
-
-		// write out result
-		n, err = dst.Write(b)
-		if err != nil {
-			panic(err)
-			return
-		}
 	}
 }
 
