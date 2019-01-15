@@ -245,8 +245,11 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
+	done := 0
+
 	go func() {
 		exec <- func(id string, j *jobs.Job) error {
+			done++
 			assert.Equal(t, jid, id)
 			assert.Equal(t, "body", j.Payload)
 
@@ -268,6 +271,8 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 			return
 		}
 	}
+
+	assert.True(t, done >= 1)
 }
 
 func TestBroker_Durability_Stat(t *testing.T) {
