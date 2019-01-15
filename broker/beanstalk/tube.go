@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -87,8 +86,6 @@ func (t *tube) serve(connector connFactory) {
 		h := <-t.execPool
 		go func(h jobs.Handler, e *entry) {
 			err := t.do(cn, h, e)
-			log.Println("done job", err)
-
 			t.execPool <- h
 			t.wg.Done()
 			t.report(err)

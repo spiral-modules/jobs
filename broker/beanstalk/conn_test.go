@@ -4,7 +4,6 @@ import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"testing"
@@ -53,38 +52,12 @@ func (p *tcpProxy) serve() {
 			panic(err)
 		}
 
-		log.Println("new conn")
-
-		//go io.Copy(in, up)
-		//go io.Copy(up, in)
-
-		go p.pipe(">>", in, up)
-		go p.pipe("<<", up, in)
+		go io.Copy(in, up)
+		go io.Copy(up, in)
 
 		p.mu.Lock()
 		p.conn = append(p.conn, in, up)
 		p.mu.Unlock()
-	}
-}
-
-func (p *tcpProxy) pipe(prefix string, src, dst io.ReadWriter) {
-	buff := make([]byte, 0xffff)
-	for {
-		n, err := src.Read(buff)
-		if err != nil {
-			// panic(err)
-			continue
-		}
-		b := buff[:n]
-
-		log.Println(prefix, string(b))
-
-		// write out result
-		n, err = dst.Write(b)
-		if err != nil {
-			panic(err)
-			return
-		}
 	}
 }
 
@@ -246,8 +219,6 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
-		} else {
-			log.Println(ctx)
 		}
 	})
 
@@ -270,30 +241,33 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	wg := sync.WaitGroup{}
+	st, serr := b.Stat(pipe)
+	assert.NoError(t, serr)
+	assert.Equal(t, int64(1), st.Queue+st.Active)
 
-	// expect job to come twice after the reconnect
-	wg.Add(2)
-
-	fired := false
-	exec <- func(id string, j *jobs.Job) error {
-		defer wg.Done()
-
-		log.Println("got job", id)
-		assert.Equal(t, jid, id)
-		assert.Equal(t, "body", j.Payload)
-
-		if !fired {
-			fired = true
+	go func() {
+		exec <- func(id string, j *jobs.Job) error {
+			assert.Equal(t, jid, id)
+			assert.Equal(t, "body", j.Payload)
 
 			// reset the connections
 			proxy.reset(true)
+
+			return nil
+		}
+	}()
+
+	for {
+		st, err := b.Stat(pipe)
+		if err != nil {
+			continue
 		}
 
-		return nil
+		// wait till pipeline is empty
+		if st.Queue+st.Active == 0 {
+			return
+		}
 	}
-
-	wg.Wait()
 }
 
 func TestBroker_Durability_Stat(t *testing.T) {
