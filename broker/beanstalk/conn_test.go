@@ -4,6 +4,7 @@ import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"testing"
@@ -219,6 +220,8 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 
@@ -249,6 +252,8 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	fired := false
 	exec <- func(id string, j *jobs.Job) error {
 		defer wg.Done()
+
+		log.Println("got job", id)
 
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
