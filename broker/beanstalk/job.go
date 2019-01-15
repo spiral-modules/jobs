@@ -8,9 +8,7 @@ import (
 
 func pack(j *jobs.Job) []byte {
 	b := new(bytes.Buffer)
-	if err := gob.NewEncoder(b).Encode(j); err != nil {
-		return nil
-	}
+	gob.NewEncoder(b).Encode(j)
 
 	return b.Bytes()
 }
