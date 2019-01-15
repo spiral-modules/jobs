@@ -88,7 +88,7 @@ func (b *Broker) Stop() {
 	b.wait <- nil
 }
 
-// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+// Consume configures pipeline to be consumed. With execPool to nil to reset consuming. Method can be called before
 // the service is started!
 func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHandler jobs.ErrorHandler) error {
 	b.mu.Lock()

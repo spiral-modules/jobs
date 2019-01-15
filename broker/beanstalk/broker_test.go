@@ -1,6 +1,7 @@
 package beanstalk
 
 import (
+	"github.com/kr/beanstalk"
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -18,6 +19,27 @@ var (
 		Addr: "tcp://localhost:11300",
 	}
 )
+
+func init() {
+	conn, err := beanstalk.Dial("tcp", "localhost:11300")
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	t := beanstalk.Tube{Name: "testTube", Conn: conn}
+
+	for {
+		id, _, err := t.PeekReady()
+		if id == 0 || err != nil {
+			break
+		}
+
+		if err := conn.Delete(id); err != nil {
+			panic(err)
+		}
+	}
+}
 
 func TestBroker_Init(t *testing.T) {
 	b := &Broker{}

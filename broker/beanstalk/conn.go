@@ -18,22 +18,24 @@ type connFactory interface {
 // conn protects allocation for one connection between
 // threads and provides reconnecting capabilities.
 type conn struct {
-	tout time.Duration
-	conn *beanstalk.Conn
-	free chan interface{}
-	dead chan interface{}
-	stop chan interface{}
-	lock *sync.Cond
+	tout  time.Duration
+	conn  *beanstalk.Conn
+	alive bool
+	free  chan interface{}
+	dead  chan interface{}
+	stop  chan interface{}
+	lock  *sync.Cond
 }
 
 // creates new beanstalk connection and reconnect watcher.
 func newConn(network, addr string, tout time.Duration) (cn *conn, err error) {
 	cn = &conn{
-		tout: tout,
-		free: make(chan interface{}, 1),
-		dead: make(chan interface{}, 1),
-		stop: make(chan interface{}),
-		lock: sync.NewCond(&sync.Mutex{}),
+		tout:  tout,
+		alive: true,
+		free:  make(chan interface{}, 1),
+		dead:  make(chan interface{}, 1),
+		stop:  make(chan interface{}),
+		lock:  sync.NewCond(&sync.Mutex{}),
 	}
 
 	cn.conn, err = beanstalk.Dial(network, addr)
@@ -46,21 +48,32 @@ func newConn(network, addr string, tout time.Duration) (cn *conn, err error) {
 	return cn, nil
 }
 
-// close the connection and reconnect watcher.
+// reset the connection and reconnect watcher.
 func (cn *conn) Close() error {
 	cn.lock.L.Lock()
 	defer cn.lock.L.Unlock()
 
 	close(cn.stop)
-	for cn.free != nil {
+	for cn.alive {
 		cn.lock.Wait()
 	}
 
 	return nil
 }
 
-// acquire connection instance or return error in case of timeout.
-func (cn *conn) acquire() (*beanstalk.Conn, error) {
+// acquire connection instance or return error in case of timeout. When mandratory set to true
+// timeout won't be applied.
+func (cn *conn) acquire(mandatory bool) (*beanstalk.Conn, error) {
+	// do not apply timeout on mandatory connections
+	if mandatory {
+		select {
+		case <-cn.stop:
+			return nil, fmt.Errorf("connection closed")
+		case <-cn.free:
+			return cn.conn, nil
+		}
+	}
+
 	select {
 	case <-cn.stop:
 		return nil, fmt.Errorf("connection closed")
@@ -120,9 +133,9 @@ func (cn *conn) watch(network, addr string) {
 
 			// stop underlying connection
 			cn.conn.Close()
-
-			cn.free = nil
+			cn.alive = false
 			cn.lock.Signal()
+
 			cn.lock.L.Unlock()
 
 			return

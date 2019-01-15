@@ -60,18 +60,18 @@ func newTube(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*tube, 
 // run consumers
 func (t *tube) serve(connector connFactory) {
 	// tube specific consume connection
-	conn, err := connector.newConn()
+	cn, err := connector.newConn()
 	if err != nil {
 		t.report(err)
 		return
 	}
-	defer conn.Close()
+	defer cn.Close()
 
 	t.wait = make(chan interface{})
 	atomic.StoreInt32(&t.active, 1)
 
 	for {
-		e, err := t.consume(conn)
+		e, err := t.consume(cn)
 		if err != nil {
 			if isConnError(err) {
 				t.report(err)
@@ -85,7 +85,7 @@ func (t *tube) serve(connector connFactory) {
 
 		h := <-t.execPool
 		go func(h jobs.Handler, e *entry) {
-			err := t.do(conn, h, e)
+			err := t.do(cn, h, e)
 			t.execPool <- h
 			t.wg.Done()
 			t.report(err)
@@ -102,7 +102,7 @@ func (t *tube) consume(cn *conn) (*entry, error) {
 	case <-t.wait:
 		return nil, nil
 	default:
-		conn, err := cn.acquire()
+		conn, err := cn.acquire(false)
 		if err != nil {
 			return nil, err
 		}
@@ -130,9 +130,10 @@ func (t *tube) do(cn *conn, h jobs.Handler, e *entry) error {
 
 	err = h(e.String(), j)
 
-	conn, connErr := cn.acquire()
+	// mandatory acquisition
+	conn, connErr := cn.acquire(true)
 	if connErr != nil {
-		return err
+		return connErr
 	}
 
 	if err == nil {
@@ -171,7 +172,7 @@ func (t *tube) stop() {
 
 // put data into pool or return error (no wait)
 func (t *tube) put(cn *conn, attempt int, data []byte, delay, rrt time.Duration) (id string, err error) {
-	conn, err := cn.acquire()
+	conn, err := cn.acquire(false)
 	if err != nil {
 		return "", err
 	}
@@ -189,7 +190,7 @@ func (t *tube) put(cn *conn, attempt int, data []byte, delay, rrt time.Duration)
 
 // return tube stats
 func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
-	conn, err := cn.acquire()
+	conn, err := cn.acquire(false)
 	if err != nil {
 		return nil, err
 	}
