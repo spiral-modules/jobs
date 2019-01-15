@@ -1,7 +1,7 @@
 package jobs
 
 import (
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
@@ -46,4 +46,37 @@ func TestPipeline_Has(t *testing.T) {
 
 	assert.Equal(t, true, pipe.Has("options"))
 	assert.Equal(t, false, pipe.Has("other"))
+}
+
+func TestPipeline_FilterBroker(t *testing.T) {
+	pipes := Pipelines{
+		&Pipeline{"name": "first", "broker": "a"},
+		&Pipeline{"name": "second", "broker": "a"},
+		&Pipeline{"name": "third", "broker": "b"},
+		&Pipeline{"name": "forth", "broker": "b"},
+	}
+
+	filtered := pipes.Names("first", "third")
+	assert.True(t, len(filtered) == 2)
+
+	assert.Equal(t, "a", filtered[0].Broker())
+	assert.Equal(t, "b", filtered[1].Broker())
+
+	filtered = pipes.Names("first", "third").Reverse()
+	assert.True(t, len(filtered) == 2)
+
+	assert.Equal(t, "a", filtered[1].Broker())
+	assert.Equal(t, "b", filtered[0].Broker())
+
+	filtered = pipes.Broker("a")
+	assert.True(t, len(filtered) == 2)
+
+	assert.Equal(t, "first", filtered[0].Name())
+	assert.Equal(t, "second", filtered[1].Name())
+
+	filtered = pipes.Broker("a").Reverse()
+	assert.True(t, len(filtered) == 2)
+
+	assert.Equal(t, "first", filtered[1].Name())
+	assert.Equal(t, "second", filtered[0].Name())
 }
