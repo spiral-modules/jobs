@@ -256,7 +256,6 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 		defer wg.Done()
 
 		log.Println("got job", id)
-
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
