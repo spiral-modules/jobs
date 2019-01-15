@@ -139,7 +139,7 @@ func (s *Service) Stop() {
 
 // Push job to associated broker and return job id.
 func (s *Service) Push(job *Job) (string, error) {
-	pipe, opt, err := s.cfg.FindPipeline(job)
+	pipe, opt, err := s.cfg.MatchPipeline(job)
 	if err != nil {
 		return "", err
 	}

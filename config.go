@@ -48,8 +48,8 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 	return c.Workers.Pool.Valid()
 }
 
-// FindPipeline locates the pipeline associated with the job.
-func (c *Config) FindPipeline(job *Job) (*Pipeline, *Options, error) {
+// MatchPipeline locates the pipeline associated with the job.
+func (c *Config) MatchPipeline(job *Job) (*Pipeline, *Options, error) {
 	opt := c.Dispatch.match(job)
 
 	pipe := job.Options.Pipeline
