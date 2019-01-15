@@ -216,7 +216,7 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 		stat.Delayed = int64(v)
 	}
 
-	return stat, err
+	return stat, nil
 }
 
 // report tube specific error

@@ -80,8 +80,8 @@ func (cn *conn) acquire(mandatory bool) (*beanstalk.Conn, error) {
 	case <-cn.free:
 		return cn.conn, nil
 	default:
-		// try with timeout
-		tout := time.NewTimer(cn.tout)
+		// *2 to handle commands called right after the connection reset
+		tout := time.NewTimer(cn.tout * 2)
 		select {
 		case <-cn.stop:
 			tout.Stop()

@@ -62,7 +62,7 @@ func (p *tcpProxy) serve() {
 }
 
 // wait for specific number of connections
-func (p *tcpProxy) waitFor(count int) {
+func (p *tcpProxy) waitConn(count int) *tcpProxy {
 	p.mu.Lock()
 	p.accept = true
 	p.mu.Unlock()
@@ -76,8 +76,10 @@ func (p *tcpProxy) waitFor(count int) {
 			break
 		}
 
-		time.Sleep(time.Millisecond)
+		time.Sleep(time.Second)
 	}
+
+	return p
 }
 
 func (p *tcpProxy) reset(accept bool) int {
@@ -129,9 +131,64 @@ func TestBroker_Proxy_Test(t *testing.T) {
 	<-ready
 
 	// expect 2 connections
-	proxy.waitFor(2)
+	proxy.waitConn(2)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+
+	waitJob := make(chan interface{})
+	exec <- func(id string, j *jobs.Job) error {
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+		close(waitJob)
+		return nil
+	}
+
+	<-waitJob
+}
+
+func TestBroker_Proxy_PushConsumeInterrupted(t *testing.T) {
+	defer proxy.reset(true)
+
+	b := &Broker{}
+	b.Init(proxyCfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	proxy.waitConn(2).reset(false)
+
+	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.Error(t, perr)
+
+	// restore
+	proxy.waitConn(2)
+
+	jid, perr = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -175,14 +232,12 @@ func TestBroker_Proxy_StatInterrupted(t *testing.T) {
 	_, err := b.Stat(pipe)
 	assert.NoError(t, err)
 
-	// break the connection and cause the reconnect
-	proxy.waitFor(1)
-	assert.Equal(t, 1, proxy.reset(false))
+	proxy.waitConn(1).reset(false)
 
 	_, err = b.Stat(pipe)
 	assert.Error(t, err)
 
-	proxy.waitFor(1)
+	proxy.waitConn(1)
 
 	_, err = b.Stat(pipe)
 	assert.NoError(t, err)
