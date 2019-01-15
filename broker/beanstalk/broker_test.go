@@ -12,7 +12,7 @@ var (
 	pipe = &jobs.Pipeline{
 		"broker": "beanstalk",
 		"name":   "default",
-		"tube":   "testTube",
+		"tube":   "test",
 	}
 
 	cfg = &Config{

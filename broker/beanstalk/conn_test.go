@@ -183,53 +183,7 @@ func TestBroker_Proxy_StatInterrupted(t *testing.T) {
 	assert.Error(t, err)
 
 	proxy.waitFor(1)
+
 	_, err = b.Stat(pipe)
 	assert.NoError(t, err)
 }
-
-// func TestBroker_Proxy_ConsumeInterrupted(t *testing.T) {
-// 	tx.CreateProxy("beanstalk", "localhost:11301", "localhost:11300")
-// 	defer tx.ResetState()
-//
-// 	b := &Broker{}
-// 	b.Init(proxyCfg)
-// 	b.Register(pipe)
-//
-// 	ready := make(chan interface{})
-// 	b.Listen(func(event int, ctx interface{}) {
-// 		if event == jobs.EventBrokerReady {
-// 			reset(ready)
-// 		}
-// 	})
-//
-// 	exec := make(chan jobs.Handler, 1)
-// 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
-//
-// 	go func() { assert.NoError(t, b.Serve()) }()
-// 	defer b.Stop()
-//
-// 	<-ready
-//
-// 	jid, perr := b.Push(pipe, &jobs.Job{
-// 		Job:     "test",
-// 		Payload: "body",
-// 		Options: &jobs.Options{},
-// 	})
-//
-// 	assert.NotEqual(t, "", jid)
-// 	assert.NoError(t, perr)
-//
-// 	// break the connection and cause the reconnect
-// 	tx.ResetState()
-// 	tx.CreateProxy("beanstalk", "localhost:11301", "localhost:11300")
-//
-// 	waitJob := make(chan interface{})
-// 	exec <- func(id string, j *jobs.Job) error {
-// 		assert.Equal(t, jid, id)
-// 		assert.Equal(t, "body", j.Payload)
-// 		reset(waitJob)
-// 		return nil
-// 	}
-//
-// 	<-waitJob
-// }
