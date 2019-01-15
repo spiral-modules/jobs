@@ -133,6 +133,7 @@ func (t *tube) do(cn *conn, h jobs.Handler, e *entry) error {
 	// mandatory acquisition
 	conn, connErr := cn.acquire(true)
 	if connErr != nil {
+		// possible if server is dead
 		return connErr
 	}
 

@@ -3,6 +3,7 @@ package beanstalk
 import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -97,6 +98,7 @@ func (cn *conn) acquire(mandatory bool) (*beanstalk.Conn, error) {
 
 // release acquired connection.
 func (cn *conn) release(err error) error {
+	log.Println(err)
 	if isConnError(err) {
 		// reconnect is required
 		cn.dead <- err
