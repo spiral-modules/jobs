@@ -53,6 +53,8 @@ func (p *tcpProxy) serve() {
 			panic(err)
 		}
 
+		log.Println("new conn")
+
 		go io.Copy(in, up)
 		go io.Copy(up, in)
 
