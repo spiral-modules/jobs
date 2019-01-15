@@ -13,6 +13,13 @@ func TestPipeline_Map(t *testing.T) {
 	assert.Equal(t, 0, pipe.Map("other").Integer("ttl", 0))
 }
 
+func TestPipeline_MapString(t *testing.T) {
+	pipe := Pipeline{"options": map[string]interface{}{"alias": "default"}}
+
+	assert.Equal(t, "default", pipe.Map("options").String("alias", ""))
+	assert.Equal(t, "", pipe.Map("other").String("alias", ""))
+}
+
 func TestPipeline_Bool(t *testing.T) {
 	pipe := Pipeline{"value": true}
 

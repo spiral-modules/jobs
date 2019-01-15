@@ -46,6 +46,15 @@ func TestBroker_Register_Twice(t *testing.T) {
 	assert.Error(t, b.Register(pipe))
 }
 
+func TestBroker_Register_Invalid(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+	assert.Error(t, b.Register(&jobs.Pipeline{
+		"broker": "beanstalk",
+		"name":   "default",
+	}))
+}
+
 func TestBroker_Consume_Nil_BeforeServe(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
@@ -87,6 +96,15 @@ func TestBroker_Consume_Serve_Nil_Stop(t *testing.T) {
 	b.Stop()
 
 	<-wait
+}
+
+func TestBroker_Consume_Serve_Error(t *testing.T) {
+	b := &Broker{}
+	b.Init(&Config{
+		Addr: "tcp://localhost:11399",
+	})
+
+	assert.Error(t, b.Serve())
 }
 
 func TestBroker_Consume_Serve_Stop(t *testing.T) {
