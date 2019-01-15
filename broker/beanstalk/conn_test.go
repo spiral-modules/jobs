@@ -197,18 +197,108 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	waitJob := make(chan interface{})
+	done := 0
 	exec <- func(id string, j *jobs.Job) error {
+		done++
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
-		close(waitJob)
+
 		return nil
 	}
 
-	<-waitJob
+	for {
+		st, err := b.Stat(pipe)
+		if err != nil {
+			continue
+		}
+
+		// wait till pipeline is empty
+		if st.Queue+st.Active == 0 {
+			return
+		}
+	}
+
+	assert.True(t, done >= 1)
 }
 
-func TestBroker_Durability_Reschedule(t *testing.T) {
+func TestBroker_Durability_Consume2(t *testing.T) {
+	defer proxy.reset(true)
+
+	b := &Broker{}
+	b.Init(proxyCfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	proxy.waitConn(2).reset(false)
+
+	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.Error(t, perr)
+
+	// restore
+	proxy.waitConn(2)
+
+	jid, perr = b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+
+	st, serr := b.Stat(pipe)
+	assert.NoError(t, serr)
+	assert.Equal(t, int64(1), st.Queue+st.Active)
+
+	proxy.reset(true)
+
+	_, serr = b.Stat(pipe)
+	assert.Error(t, serr)
+
+	done := 0
+	exec <- func(id string, j *jobs.Job) error {
+		done++
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+
+		return nil
+	}
+
+	for {
+		st, err := b.Stat(pipe)
+		if err != nil {
+			continue
+		}
+
+		// wait till pipeline is empty
+		if st.Queue+st.Active == 0 {
+			return
+		}
+	}
+
+	assert.True(t, done >= 1)
+}
+
+func TestBroker_Durability_Consume3(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
@@ -246,19 +336,13 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
 	done := 0
+	exec <- func(id string, j *jobs.Job) error {
+		done++
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
 
-	go func() {
-		exec <- func(id string, j *jobs.Job) error {
-			done++
-			assert.Equal(t, jid, id)
-			assert.Equal(t, "body", j.Payload)
-
-			// reset the connections
-			proxy.reset(true)
-
-			return nil
-		}
-	}()
+		return nil
+	}
 
 	for {
 		st, err := b.Stat(pipe)
@@ -275,7 +359,7 @@ func TestBroker_Durability_Reschedule(t *testing.T) {
 	assert.True(t, done >= 1)
 }
 
-func TestBroker_Durability_Stat(t *testing.T) {
+func TestBroker_Durability_Consume4(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
@@ -289,26 +373,61 @@ func TestBroker_Durability_Stat(t *testing.T) {
 		}
 	})
 
-	assert.NoError(t, b.Consume(pipe, nil, nil))
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
-	proxy.waitConn(1)
 
-	_, err := b.Stat(pipe)
-	assert.NoError(t, err)
+	proxy.waitConn(2)
 
-	proxy.reset(false)
+	b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "kill",
+		Options: &jobs.Options{},
+	})
 
-	_, err = b.Stat(pipe)
-	assert.Error(t, err)
+	b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
 
-	proxy.waitConn(1)
+	b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
 
-	_, err = b.Stat(pipe)
-	assert.NoError(t, err)
+	st, serr := b.Stat(pipe)
+	assert.NoError(t, serr)
+	assert.Equal(t, int64(3), st.Queue+st.Active)
+
+	done := 0
+	exec <- func(id string, j *jobs.Job) error {
+		done++
+		if j.Payload == "kill" {
+			proxy.reset(true)
+		}
+
+		return nil
+	}
+
+	for {
+		st, err := b.Stat(pipe)
+		if err != nil {
+			continue
+		}
+
+		// wait till pipeline is empty
+		if st.Queue+st.Active == 0 {
+			return
+		}
+	}
+
+	assert.True(t, done >= 2)
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {
