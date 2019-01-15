@@ -79,7 +79,7 @@ func (p *tcpProxy) waitConn(count int) *tcpProxy {
 			break
 		}
 
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond)
 	}
 
 	return p
