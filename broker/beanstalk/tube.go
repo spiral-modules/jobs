@@ -59,17 +59,16 @@ func newTube(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*tube, 
 
 // run consumers
 func (t *tube) serve(connector connFactory) {
-	t.wait = make(chan interface{})
-	atomic.StoreInt32(&t.active, 1)
-
 	// tube specific consume connection
 	conn, err := connector.newConn()
-	defer conn.Close()
-
 	if err != nil {
 		t.report(err)
 		return
 	}
+	defer conn.Close()
+
+	t.wait = make(chan interface{})
+	atomic.StoreInt32(&t.active, 1)
 
 	for {
 		e, err := t.consume(conn)
