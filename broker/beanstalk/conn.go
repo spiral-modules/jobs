@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var connErrors = []string{"pipe", "read tcp", "write tcp", "EOF"}
+var connErrors = []string{"pipe", "read tcp", "write tcp", "connection", "EOF"}
 
 // creates new connections
 type connFactory interface {
