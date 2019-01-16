@@ -71,7 +71,6 @@ func (q *queue) serve(publish, consume *chanPool) {
 
 		for d := range delivery {
 			if atomic.LoadInt32(&q.active) == 0 {
-				q.muw.Unlock()
 				// discard all fetched jobs, AMQP must resend them to another consumer
 				return
 			}

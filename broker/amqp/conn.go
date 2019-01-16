@@ -68,7 +68,15 @@ func (cp *chanPool) Close() error {
 	cp.mu.Unlock()
 
 	wg.Wait()
-	return cp.conn.Close()
+
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+
+	if cp.conn != nil {
+		return cp.conn.Close()
+	}
+
+	return nil
 }
 
 // waitConnected waits till connection is connected again or eventually closed.
@@ -101,36 +109,42 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			cp.channels = nil
 			cp.mu.Unlock()
 
-			// waitConnected loop
-		reconnecting:
-			for {
-				select {
-				case <-cp.wait:
-					// connection has been cancelled is not possible
-					close(cp.connected)
-					return
+			conn, errChan := cp.reconnect(addr)
+			if conn == nil {
+				cp.mu.Lock()
+				close(cp.connected)
+				cp.mu.Unlock()
 
-				case <-time.NewTimer(cp.tout).C:
-					// todo: more conn options
-					conn, err := amqp.Dial(addr)
-					if err != nil {
-						// still failing
-						continue
-					}
-
-					cp.mu.Lock()
-					cp.conn = conn
-					cp.channels = make(map[string]*channel)
-
-					// return to normal watch state
-					errors = conn.NotifyClose(make(chan *amqp.Error))
-
-					close(cp.connected)
-					cp.mu.Unlock()
-
-					break reconnecting
-				}
+				// interrupted
+				return
 			}
+
+			cp.mu.Lock()
+			cp.conn = conn
+			cp.channels = make(map[string]*channel)
+			errors = errChan
+			close(cp.connected)
+			cp.mu.Unlock()
+		}
+	}
+}
+
+func (cp *chanPool) reconnect(addr string) (conn *amqp.Connection, errors chan *amqp.Error) {
+	for {
+		select {
+		case <-cp.wait:
+			// connection has been cancelled is not possible
+			return nil, nil
+
+		case <-time.NewTimer(cp.tout).C:
+			// todo: more conn options
+			conn, err := amqp.Dial(addr)
+			if err != nil {
+				// still failing
+				continue
+			}
+
+			return conn, conn.NotifyClose(make(chan *amqp.Error))
 		}
 	}
 }
@@ -138,11 +152,21 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 // channel allocates new channel on amqp connection
 func (cp *chanPool) channel(name string) (*channel, error) {
 	cp.mu.Lock()
-	defer cp.mu.Unlock()
+	alive := cp.channels == nil
+	cp.mu.Unlock()
 
-	if cp.channels == nil {
-		return nil, fmt.Errorf("connection is dead")
+	if alive {
+		// wait for connection restoration (doubled the timeout duration)
+		select {
+		case <-time.NewTimer(cp.tout * 2).C:
+			return nil, fmt.Errorf("connection is dead")
+		case <-cp.connected:
+			// connected
+		}
 	}
+
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
 
 	if ch, ok := cp.channels[name]; ok {
 		return ch, nil

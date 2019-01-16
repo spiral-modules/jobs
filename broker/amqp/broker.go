@@ -68,6 +68,7 @@ func (b *Broker) Serve() (err error) {
 	for _, q := range b.queues {
 		err := q.declare(b.publish, q.name, q.name, nil)
 		if err != nil {
+			b.mu.Unlock()
 			return err
 		}
 	}
