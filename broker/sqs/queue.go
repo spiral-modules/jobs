@@ -12,10 +12,11 @@ import (
 )
 
 type queue struct {
-	active  int32
-	pipe    *jobs.Pipeline
-	url     *string
-	reserve time.Duration
+	active       int32
+	pipe         *jobs.Pipeline
+	url          *string
+	reserve      time.Duration
+	lockReserved time.Duration
 
 	// queue events
 	lsn func(event int, ctx interface{})
@@ -37,7 +38,12 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 		return nil, fmt.Errorf("missing `queue` parameter on sqs pipeline `%s`", pipe.Name())
 	}
 
-	return &queue{pipe: pipe, reserve: pipe.Duration("reserve", time.Second), lsn: lsn}, nil
+	return &queue{
+		pipe:         pipe,
+		reserve:      pipe.Duration("reserve", time.Second),
+		lockReserved: pipe.Duration("lockReserved", 300*time.Second),
+		lsn:          lsn,
+	}, nil
 }
 
 // declareQueue declared queue
@@ -128,7 +134,7 @@ func (q *queue) consume(s *sqs.SQS) ([]*sqs.Message, bool, error) {
 			QueueUrl:              q.url,
 			MaxNumberOfMessages:   aws.Int64(int64(q.pipe.Integer("prefetch", 1))),
 			WaitTimeSeconds:       aws.Int64(int64(q.reserve.Seconds())),
-			VisibilityTimeout:     aws.Int64(300),
+			VisibilityTimeout:     aws.Int64(int64(q.lockReserved.Seconds())),
 			AttributeNames:        []*string{aws.String("ApproximateReceiveCount")},
 			MessageAttributeNames: jobAttributes,
 		})

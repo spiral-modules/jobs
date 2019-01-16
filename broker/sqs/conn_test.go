@@ -24,6 +24,16 @@ var (
 		upstream: "localhost:9324",
 		accept:   true,
 	}
+
+	proxyPipe = &jobs.Pipeline{
+		"broker":       "sqs",
+		"name":         "default",
+		"queue":        "test",
+		"lockReserved": 1,
+		"declare": map[string]interface{}{
+			"MessageRetentionPeriod": 86400,
+		},
+	}
 )
 
 type tcpProxy struct {
@@ -116,7 +126,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 
 	b := &Broker{}
 	b.Init(proxyCfg)
-	b.Register(pipe)
+	b.Register(proxyPipe)
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -126,7 +136,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
@@ -136,7 +146,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 	// expect 2 connections
 	proxy.waitConn(1)
 
-	jid, perr := b.Push(pipe, &jobs.Job{
+	jid, perr := b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -161,7 +171,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 
 	b := &Broker{}
 	b.Init(proxyCfg)
-	b.Register(pipe)
+	b.Register(proxyPipe)
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -171,7 +181,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
@@ -180,7 +190,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 
 	proxy.waitConn(1).reset(false)
 
-	jid, perr := b.Push(pipe, &jobs.Job{
+	jid, perr := b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -191,7 +201,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	// restore
 	proxy.waitConn(1)
 
-	jid, perr = b.Push(pipe, &jobs.Job{
+	jid, perr = b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -229,7 +239,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 
 	b := &Broker{}
 	b.Init(proxyCfg)
-	b.Register(pipe)
+	b.Register(proxyPipe)
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -239,7 +249,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
@@ -248,7 +258,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 
 	proxy.waitConn(1).reset(false)
 
-	jid, perr := b.Push(pipe, &jobs.Job{
+	jid, perr := b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -259,7 +269,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	// restore
 	proxy.waitConn(2)
 
-	jid, perr = b.Push(pipe, &jobs.Job{
+	jid, perr = b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -268,18 +278,18 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	st, serr := b.Stat(pipe)
+	st, serr := b.Stat(proxyPipe)
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
 	proxy.reset(false)
 
-	_, serr = b.Stat(pipe)
+	_, serr = b.Stat(proxyPipe)
 	assert.Error(t, serr)
 
 	proxy.reset(true)
 
-	_, serr = b.Stat(pipe)
+	_, serr = b.Stat(proxyPipe)
 	assert.NoError(t, serr)
 
 	mu := sync.Mutex{}
@@ -311,7 +321,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 
 	b := &Broker{}
 	b.Init(proxyCfg)
-	b.Register(pipe)
+	b.Register(proxyPipe)
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -321,7 +331,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
@@ -330,7 +340,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 
 	proxy.waitConn(1)
 
-	jid, perr := b.Push(pipe, &jobs.Job{
+	jid, perr := b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
@@ -339,7 +349,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	st, serr := b.Stat(pipe)
+	st, serr := b.Stat(proxyPipe)
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
@@ -372,7 +382,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 
 	b := &Broker{}
 	b.Init(proxyCfg)
-	b.Register(pipe)
+	b.Register(proxyPipe)
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -382,7 +392,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
@@ -391,25 +401,25 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 
 	proxy.waitConn(1)
 
-	b.Push(pipe, &jobs.Job{
+	b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "kill",
 		Options: &jobs.Options{},
 	})
 
-	b.Push(pipe, &jobs.Job{
+	b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
 	})
 
-	b.Push(pipe, &jobs.Job{
+	b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
 	})
 
-	st, serr := b.Stat(pipe)
+	st, serr := b.Stat(proxyPipe)
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(3), st.Queue+st.Active)
 
@@ -443,7 +453,7 @@ func TestBroker_Durability_StopDead(t *testing.T) {
 
 	b := &Broker{}
 	b.Init(proxyCfg)
-	b.Register(pipe)
+	b.Register(proxyPipe)
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -453,7 +463,7 @@ func TestBroker_Durability_StopDead(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 
