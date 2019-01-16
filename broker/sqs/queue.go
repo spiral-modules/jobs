@@ -222,6 +222,10 @@ func (q *queue) stat(s *sqs.SQS) (stat *jobs.Stat, err error) {
 		},
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	stat = &jobs.Stat{InternalName: q.pipe.String("queue", "")}
 
 	for a, v := range r.Attributes {

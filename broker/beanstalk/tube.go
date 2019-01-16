@@ -203,6 +203,10 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 
 	cn.release(err)
 
+	if err != nil {
+		return nil, err
+	}
+
 	stat = &jobs.Stat{InternalName: t.tube.Name}
 
 	if v, err := strconv.Atoi(values["current-jobs-ready"]); err == nil {
@@ -217,7 +221,7 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 		stat.Delayed = int64(v)
 	}
 
-	return stat, err
+	return stat, nil
 }
 
 // report tube specific error

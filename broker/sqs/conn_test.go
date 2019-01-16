@@ -1,4 +1,4 @@
-package beanstalk
+package sqs
 
 import (
 	"github.com/spiral/jobs"
@@ -12,13 +12,16 @@ import (
 
 var (
 	proxyCfg = &Config{
-		Addr:    "tcp://localhost:11301",
-		Timeout: 1,
+		Key:      "api-key",
+		Secret:   "api-secret",
+		Region:   "us-west-1",
+		Endpoint: "http://localhost:9325",
+		Timeout:  1,
 	}
 
 	proxy = &tcpProxy{
-		listen:   "localhost:11301",
-		upstream: "localhost:11300",
+		listen:   "localhost:9325",
+		upstream: "localhost:9324",
 		accept:   true,
 	}
 )
@@ -131,7 +134,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 	<-ready
 
 	// expect 2 connections
-	proxy.waitConn(2)
+	proxy.waitConn(1)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -175,7 +178,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 
 	<-ready
 
-	proxy.waitConn(2).reset(false)
+	proxy.waitConn(1).reset(false)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -186,7 +189,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	assert.Error(t, perr)
 
 	// restore
-	proxy.waitConn(2)
+	proxy.waitConn(1)
 
 	jid, perr = b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -243,7 +246,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 
 	<-ready
 
-	proxy.waitConn(2).reset(false)
+	proxy.waitConn(1).reset(false)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -269,10 +272,15 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
-	proxy.reset(true)
+	proxy.reset(false)
 
 	_, serr = b.Stat(pipe)
 	assert.Error(t, serr)
+
+	proxy.reset(true)
+
+	_, serr = b.Stat(pipe)
+	assert.NoError(t, serr)
 
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
@@ -320,7 +328,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 
 	<-ready
 
-	proxy.waitConn(2)
+	proxy.waitConn(1)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -381,7 +389,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 
 	<-ready
 
-	proxy.waitConn(2)
+	proxy.waitConn(1)
 
 	b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -451,7 +459,7 @@ func TestBroker_Durability_StopDead(t *testing.T) {
 
 	<-ready
 
-	proxy.waitConn(2).reset(false)
+	proxy.waitConn(1).reset(false)
 
 	b.Stop()
 }
