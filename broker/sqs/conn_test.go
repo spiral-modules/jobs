@@ -149,7 +149,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 	jid, perr := b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	assert.NotEqual(t, "", jid)
@@ -204,7 +204,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	jid, perr = b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	assert.NotEqual(t, "", jid)
@@ -272,7 +272,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	jid, perr = b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	assert.NotEqual(t, "", jid)
@@ -343,7 +343,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	jid, perr := b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	assert.NotEqual(t, "", jid)
@@ -404,19 +404,19 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "kill",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	b.Push(proxyPipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 1},
+		Options: &jobs.Options{Timeout: 2},
 	})
 
 	st, serr := b.Stat(proxyPipe)
