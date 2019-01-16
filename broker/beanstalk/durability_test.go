@@ -253,6 +253,15 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 
 	assert.Error(t, perr)
 
+	// reoccuring
+	jid, perr = b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.Error(t, perr)
+
 	// restore
 	time.Sleep(3 * time.Second)
 	proxy.waitConn(1)
