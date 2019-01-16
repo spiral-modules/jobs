@@ -48,6 +48,62 @@ func TestBroker_Consume_Job(t *testing.T) {
 	<-waitJob
 }
 
+func TestBroker_Consume_PushTooBigDelay(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	_, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{
+			Delay: 901,
+		},
+	})
+
+	assert.Error(t, perr)
+}
+
+func TestBroker_Consume_PushTooBigDelay2(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	_, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{
+			RetryDelay: 901,
+		},
+	})
+
+	assert.Error(t, perr)
+}
+
 func TestBroker_ConsumeAfterStart_Job(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
