@@ -108,7 +108,7 @@ func init() {
 	go proxy.serve()
 }
 
-func TestBroker_Durability_Clean(t *testing.T) {
+func TestBroker_Durability_Base(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
@@ -197,9 +197,9 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	done := 0
+	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
-		done++
+		done[id] = true
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -218,7 +218,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 		}
 	}
 
-	assert.True(t, done >= 1)
+	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume2(t *testing.T) {
@@ -274,9 +274,9 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	_, serr = b.Stat(pipe)
 	assert.Error(t, serr)
 
-	done := 0
+	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
-		done++
+		done[id] = true
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -295,7 +295,7 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 		}
 	}
 
-	assert.True(t, done >= 1)
+	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume3(t *testing.T) {
@@ -335,9 +335,9 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
-	done := 0
+	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
-		done++
+		done[id] = true
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -356,7 +356,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 		}
 	}
 
-	assert.True(t, done >= 1)
+	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume4(t *testing.T) {
@@ -405,9 +405,9 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(3), st.Queue+st.Active)
 
-	done := 0
+	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
-		done++
+		done[id] = true
 		if j.Payload == "kill" {
 			proxy.reset(true)
 		}
@@ -427,7 +427,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 		}
 	}
 
-	assert.True(t, done >= 2)
+	assert.True(t, len(done) >= 3)
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {
