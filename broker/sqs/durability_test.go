@@ -234,6 +234,75 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	}
 }
 
+func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
+	defer proxy.reset(true)
+
+	b := &Broker{}
+	b.Init(proxyCfg)
+	b.Register(proxyPipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(proxyPipe, exec, func(id string, j *jobs.Job, err error) {}))
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	proxy.waitConn(1).reset(false)
+
+	jid, perr := b.Push(proxyPipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.Error(t, perr)
+
+	// restore
+	time.Sleep(3 * time.Second)
+	proxy.waitConn(1)
+
+	jid, perr = b.Push(proxyPipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{Timeout: 2},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+
+	mu := sync.Mutex{}
+	done := make(map[string]bool)
+	exec <- func(id string, j *jobs.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
+		done[id] = true
+
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+
+		return nil
+	}
+
+	for {
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
+
+		if num >= 1 {
+			break
+		}
+	}
+}
+
 func TestBroker_Durability_Consume2(t *testing.T) {
 	defer proxy.reset(true)
 

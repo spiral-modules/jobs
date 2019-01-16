@@ -121,8 +121,8 @@ func (cn *conn) watch(network, addr string) {
 			}
 
 			// retry later
-			cn.dead <- nil
 			time.Sleep(cn.tout)
+			cn.dead <- nil
 
 		case <-cn.stop:
 			cn.lock.L.Lock()

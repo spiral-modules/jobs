@@ -110,11 +110,11 @@ func (t *tube) consume(cn *conn) (*entry, error) {
 		t.tubeSet.Conn = conn
 
 		id, data, err := t.tubeSet.Reserve(t.reserve)
+		cn.release(err)
+
 		if err != nil {
-			cn.release(err)
 			return nil, err
 		}
-		cn.release(nil)
 
 		t.wg.Add(1)
 		return &entry{id: id, data: data}, nil
@@ -171,26 +171,46 @@ func (t *tube) stop() {
 	t.muw.Unlock()
 }
 
-// put data into pool or return error (no wait)
+// put data into pool or return error (no wait), this method will try to reattempt operation if
+// dead conn found.
 func (t *tube) put(cn *conn, attempt int, data []byte, delay, rrt time.Duration) (id string, err error) {
+	id, err = t.doPut(cn, attempt, data, delay, rrt)
+	if err != nil && isConnError(err) {
+		return t.doPut(cn, attempt, data, delay, rrt)
+	}
+
+	return id, err
+}
+
+// perform put operation
+func (t *tube) doPut(cn *conn, attempt int, data []byte, delay, rrt time.Duration) (id string, err error) {
 	conn, err := cn.acquire(false)
 	if err != nil {
 		return "", err
 	}
 
 	var bid uint64
+
 	t.mut.Lock()
 	t.tube.Conn = conn
 	bid, err = t.tube.Put(data, 0, delay, rrt)
 	t.mut.Unlock()
 
-	cn.release(err)
+	return strconv.FormatUint(bid, 10), cn.release(err)
+}
 
-	return strconv.FormatUint(bid, 10), err
+// return tube stats (retries)
+func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
+	stat, err = t.doStat(cn)
+	if err != nil && isConnError(err) {
+		return t.doStat(cn)
+	}
+
+	return stat, err
 }
 
 // return tube stats
-func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
+func (t *tube) doStat(cn *conn) (stat *jobs.Stat, err error) {
 	conn, err := cn.acquire(false)
 	if err != nil {
 		return nil, err
@@ -201,10 +221,8 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 	values, err := t.tube.Stats()
 	t.mut.Unlock()
 
-	cn.release(err)
-
 	if err != nil {
-		return nil, err
+		return nil, cn.release(err)
 	}
 
 	stat = &jobs.Stat{InternalName: t.tube.Name}
@@ -221,7 +239,7 @@ func (t *tube) stat(cn *conn) (stat *jobs.Stat, err error) {
 		stat.Delayed = int64(v)
 	}
 
-	return stat, nil
+	return stat, cn.release(nil)
 }
 
 // report tube specific error
