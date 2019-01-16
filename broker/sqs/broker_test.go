@@ -45,6 +45,15 @@ func TestBroker_Register(t *testing.T) {
 	assert.NoError(t, b.Register(pipe))
 }
 
+func TestBroker_RegisterInvalid(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+	assert.Error(t, b.Register(&jobs.Pipeline{
+		"broker": "sqs",
+		"name":   "default",
+	}))
+}
+
 func TestBroker_Register_Twice(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
@@ -114,6 +123,28 @@ func TestBroker_Consume_Serve_Stop(t *testing.T) {
 	b.Stop()
 
 	<-wait
+}
+
+func TestBroker_Consume_Serve_InvalidQueue(t *testing.T) {
+	pipe := &jobs.Pipeline{
+		"broker": "sqs",
+		"name":   "default",
+		"queue":  "invalid",
+		"declare": map[string]interface{}{
+			"VisibilityTimeout": "invalid",
+		},
+	}
+
+	b := &Broker{}
+	b.Init(cfg)
+	b.Register(pipe)
+
+	exec := make(chan jobs.Handler)
+	err := func(id string, j *jobs.Job, err error) {}
+
+	b.Consume(pipe, exec, err)
+
+	assert.Error(t, b.Serve())
 }
 
 func TestBroker_PushToNotRunning(t *testing.T) {

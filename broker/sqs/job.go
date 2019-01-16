@@ -37,10 +37,10 @@ func pack(url *string, j *jobs.Job) *sqs.SendMessageInput {
 
 // unpack restores jobs.Options
 func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
-	attempt, ok := strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
-	if ok != nil {
+	if _, ok := msg.Attributes["ApproximateReceiveCount"]; !ok {
 		return "", 0, nil, fmt.Errorf("missing attribute `%s`", "ApproximateReceiveCount")
 	}
+	attempt, _ = strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
 
 	j = &jobs.Job{
 		Job:     *msg.MessageAttributes["rr-job"].StringValue,
