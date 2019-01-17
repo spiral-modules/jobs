@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gofrs/uuid"
 	"github.com/spiral/jobs"
+	"log"
 	"sync"
 	"sync/atomic"
 )
@@ -152,7 +153,7 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 	if err := q.publish(b.publish, id.String(), 0, j, j.Options.DelayDuration()); err != nil {
 		return "", err
 	}
-
+	log.Println("PUSH", id.String())
 	return id.String(), nil
 }
 
