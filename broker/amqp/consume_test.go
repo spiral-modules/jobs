@@ -129,7 +129,7 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 	<-waitJob
 
 	elapsed := time.Since(start)
-	assert.True(t, elapsed >= time.Second)
+	assert.True(t, elapsed >= time.Millisecond*950)
 	assert.True(t, elapsed < 2*time.Second)
 }
 
