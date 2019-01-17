@@ -108,6 +108,7 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 
 	<-ready
 
+	start := time.Now()
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
@@ -118,7 +119,6 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 	assert.NoError(t, perr)
 
 	waitJob := make(chan interface{})
-	start := time.Now()
 	exec <- func(id string, j *jobs.Job) error {
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
@@ -129,7 +129,7 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 	<-waitJob
 
 	elapsed := time.Since(start)
-	assert.True(t, elapsed >= time.Millisecond*950)
+	assert.True(t, elapsed >= time.Second)
 	assert.True(t, elapsed < 2*time.Second)
 }
 
