@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
-	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -55,7 +54,6 @@ func (q *queue) serve(publish, consume *chanPool) {
 
 	for {
 		<-consume.waitConnected()
-		log.Println("CONNECTED")
 		if atomic.LoadInt32(&q.active) == 0 {
 			// stopped
 			return
@@ -132,7 +130,6 @@ func (q *queue) do(cp *chanPool, h jobs.Handler, d amqp.Delivery) error {
 		q.report(err)
 		return d.Nack(false, false)
 	}
-	log.Println("GOT", id)
 	err = h(id, j)
 
 	if err == nil {
@@ -216,8 +213,12 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 		return cp.closeChan(c, err)
 	}
 
-	// keep channel open
-	return err
+	confirmed, ok := <-c.confirm
+	if ok && confirmed.Ack {
+		return nil
+	}
+
+	return fmt.Errorf("failed to publish: %v", confirmed.DeliveryTag)
 }
 
 // declare queue and binding to it

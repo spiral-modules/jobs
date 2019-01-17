@@ -21,6 +21,7 @@ type chanPool struct {
 type channel struct {
 	ch       *amqp.Channel
 	consumer string
+	confirm  chan amqp.Confirmation
 	signal   chan error
 }
 
@@ -183,9 +184,18 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 		return nil, err
 	}
 
+	// Enable publish confirmations
+	if err = ch.Confirm(false); err != nil {
+		return nil, fmt.Errorf("unable to enable confirmation mode on channel: %s", err)
+	}
+
 	// we expect that every allocated channel would have listener on signal
 	// this is not true only in case of pure producing channels
-	cp.channels[name] = &channel{ch: ch, signal: make(chan error, 1)}
+	cp.channels[name] = &channel{
+		ch:      ch,
+		confirm: ch.NotifyPublish(make(chan amqp.Confirmation, 1)),
+		signal:  make(chan error, 1),
+	}
 
 	return cp.channels[name], nil
 }
