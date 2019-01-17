@@ -457,13 +457,9 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	st, serr := b.Stat(pipe)
-	assert.NoError(t, serr)
-	assert.Equal(t, int64(1), st.Queue+st.Active)
-
 	proxy.reset(false)
 
-	_, serr = b.Stat(pipe)
+	_, serr := b.Stat(pipe)
 	assert.Error(t, serr)
 
 	proxy.reset(true)
