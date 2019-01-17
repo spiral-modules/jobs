@@ -221,7 +221,16 @@ func TestBroker_Durability_Consume(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			break
+			st, err := b.Stat(pipe)
+			if err != nil {
+				continue
+			}
+
+			if st.Active+st.Queue == 0 {
+				return
+			} else {
+				log.Println("not done")
+			}
 		}
 	}
 }
@@ -302,7 +311,16 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			break
+			st, err := b.Stat(pipe)
+			if err != nil {
+				continue
+			}
+
+			if st.Active+st.Queue == 0 {
+				return
+			} else {
+				log.Println("not done")
+			}
 		}
 	}
 }
@@ -383,7 +401,16 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			break
+			st, err := b.Stat(pipe)
+			if err != nil {
+				continue
+			}
+
+			if st.Active+st.Queue == 0 {
+				return
+			} else {
+				log.Println("not done")
+			}
 		}
 	}
 }
@@ -446,7 +473,16 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			break
+			st, err := b.Stat(pipe)
+			if err != nil {
+				continue
+			}
+
+			if st.Active+st.Queue == 0 {
+				return
+			} else {
+				log.Println("not done")
+			}
 		}
 	}
 }
@@ -495,10 +531,6 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 		Options: &jobs.Options{},
 	})
 
-	st, serr := b.Stat(pipe)
-	assert.NoError(t, serr)
-	assert.Equal(t, int64(3), st.Queue+st.Active)
-
 	mu := sync.Mutex{}
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
@@ -520,7 +552,16 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 3 {
-			break
+			st, err := b.Stat(pipe)
+			if err != nil {
+				continue
+			}
+
+			if st.Active+st.Queue == 0 {
+				return
+			} else {
+				log.Println("not done")
+			}
 		}
 	}
 }

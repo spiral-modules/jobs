@@ -73,6 +73,8 @@ func (q *queue) serve(publish, consume *chanPool) {
 
 		// todo: change lock methodic?
 		for d := range delivery {
+			id, _, _, _ := unpack(d)
+			log.Println("RECV ", id)
 			if atomic.LoadInt32(&q.active) == 0 {
 				log.Println("LEAK")
 				// discard all fetched jobs, AMQP must resend them to another consumer

@@ -110,6 +110,8 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 				ch.signal <- err
 			}
 
+			log.Printf("DISTRIBUTED %p: %s\n", cp, err)
+
 			// disable channel allocation while server is dead
 			cp.conn = nil
 			cp.channels = nil
