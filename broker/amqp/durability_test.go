@@ -383,6 +383,9 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
+	if perr != nil {
+		panic(perr)
+	}
 
 	proxy.reset(true)
 
@@ -464,6 +467,9 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
+	if perr != nil {
+		panic(perr)
+	}
 
 	proxy.reset(false)
 
@@ -538,6 +544,9 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
+	if perr != nil {
+		panic(perr)
+	}
 
 	mu := sync.Mutex{}
 	done := make(map[string]bool)
