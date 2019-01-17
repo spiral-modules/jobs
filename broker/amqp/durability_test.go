@@ -221,18 +221,16 @@ func TestBroker_Durability_Consume(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			st, err := b.Stat(pipe)
-			if err != nil {
-				continue
-			}
-
-			if st.Active+st.Queue == 0 {
-				return
-			} else {
-				log.Println("not done")
-			}
+			break
 		}
 	}
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+
 }
 
 func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
@@ -311,18 +309,16 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			st, err := b.Stat(pipe)
-			if err != nil {
-				continue
-			}
-
-			if st.Active+st.Queue == 0 {
-				return
-			} else {
-				log.Println("not done")
-			}
+			break
 		}
 	}
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+
 }
 
 func TestBroker_Durability_Consume2(t *testing.T) {
@@ -401,18 +397,15 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			st, err := b.Stat(pipe)
-			if err != nil {
-				continue
-			}
-
-			if st.Active+st.Queue == 0 {
-				return
-			} else {
-				log.Println("not done")
-			}
+			break
 		}
 	}
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
 }
 
 func TestBroker_Durability_Consume3(t *testing.T) {
@@ -450,10 +443,6 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
-	st, serr := b.Stat(pipe)
-	assert.NoError(t, serr)
-	assert.Equal(t, int64(1), st.Queue+st.Active)
-
 	mu := sync.Mutex{}
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
@@ -473,18 +462,15 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 1 {
-			st, err := b.Stat(pipe)
-			if err != nil {
-				continue
-			}
-
-			if st.Active+st.Queue == 0 {
-				return
-			} else {
-				log.Println("not done")
-			}
+			break
 		}
 	}
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
 }
 
 func TestBroker_Durability_Consume4(t *testing.T) {
@@ -552,18 +538,16 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 		mu.Unlock()
 
 		if num >= 3 {
-			st, err := b.Stat(pipe)
-			if err != nil {
-				continue
-			}
-
-			if st.Active+st.Queue == 0 {
-				return
-			} else {
-				log.Println("not done")
-			}
+			break
 		}
 	}
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {
