@@ -135,6 +135,7 @@ func (q *queue) do(cp *chanPool, h jobs.Handler, d amqp.Delivery) error {
 	err = h(id, j)
 
 	if err == nil {
+		log.Println("OK ", id)
 		return d.Ack(false)
 	}
 
@@ -151,6 +152,7 @@ func (q *queue) do(cp *chanPool, h jobs.Handler, d amqp.Delivery) error {
 		return d.Nack(false, true)
 	}
 
+	log.Println("DEAD ", id)
 	return d.Ack(false)
 }
 

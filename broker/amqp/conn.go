@@ -3,6 +3,7 @@ package amqp
 import (
 	"fmt"
 	"github.com/streadway/amqp"
+	"log"
 	"sync"
 	"time"
 )
@@ -194,6 +195,8 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 func (cp *chanPool) closeChan(c *channel, err error) error {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
+
+	log.Println("close cnan cos", err)
 
 	go func() {
 		c.signal <- nil
