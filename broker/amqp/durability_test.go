@@ -253,7 +253,6 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 
 	assert.Error(t, perr)
 
-	// reoccuring
 	jid, perr = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",

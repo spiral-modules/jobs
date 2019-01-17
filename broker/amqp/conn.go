@@ -169,6 +169,10 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 
+	if cp.conn == nil {
+		return nil, fmt.Errorf("connection has been closed")
+	}
+
 	if ch, ok := cp.channels[name]; ok {
 		return ch, nil
 	}
