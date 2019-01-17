@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gofrs/uuid"
 	"github.com/spiral/jobs"
-	"log"
 	"sync"
 	"sync/atomic"
 )
@@ -55,7 +54,6 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 
 // Serve broker pipelines.
 func (b *Broker) Serve() (err error) {
-	defer log.Println("BROKER STOPPED")
 	b.mu.Lock()
 
 	b.stopped = make(chan interface{})
@@ -106,10 +104,8 @@ func (b *Broker) Stop() {
 
 	for _, q := range b.queues {
 		q.stop()
-		log.Println("pipeline stopped")
 	}
 
-	log.Println("stopping")
 	close(b.wait)
 	<-b.stopped
 }
@@ -158,8 +154,6 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 	if err := q.publish(b.publish, id.String(), 0, j, j.Options.DelayDuration()); err != nil {
 		return "", err
 	}
-
-	log.Println("PUSH", id.String())
 
 	return id.String(), nil
 }

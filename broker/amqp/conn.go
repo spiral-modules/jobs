@@ -3,7 +3,6 @@ package amqp
 import (
 	"fmt"
 	"github.com/streadway/amqp"
-	"log"
 	"sync"
 	"time"
 )
@@ -43,16 +42,12 @@ func newConn(addr string, tout time.Duration) (*chanPool, error) {
 
 	close(cp.connected)
 	go cp.watch(addr, conn.NotifyClose(make(chan *amqp.Error)))
-	log.Printf(">>> NEW    ------ %p\n", cp)
 
 	return cp, nil
 }
 
 // Close gracefully closes all underlying channels and connection.
 func (cp *chanPool) Close() error {
-	log.Printf(">>> CLOSING    ------ %p\n", cp)
-	defer log.Printf(">>> CLOSED    ------ %p\n", cp)
-
 	cp.mu.Lock()
 
 	close(cp.wait)
@@ -101,7 +96,6 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			// connection has been closed
 			return
 		case err := <-errors:
-			log.Printf("GOT ERR %p: %s\n", cp, err)
 			cp.mu.Lock()
 			cp.connected = make(chan interface{})
 
@@ -110,8 +104,6 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 				ch.signal <- err
 			}
 
-			log.Printf("DISTRIBUTED %p: %s\n", cp, err)
-
 			// disable channel allocation while server is dead
 			cp.conn = nil
 			cp.channels = nil
@@ -119,8 +111,6 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 
 			conn, errChan := cp.reconnect(addr)
 			if conn == nil {
-				log.Printf(">>> DROPPED IN ERROR ------ %p\n", cp)
-				// what is that?
 				cp.mu.Lock()
 				close(cp.connected)
 				cp.mu.Unlock()
@@ -204,8 +194,6 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 func (cp *chanPool) closeChan(c *channel, err error) error {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
-
-	log.Println("close cnan cos", err)
 
 	go func() {
 		c.signal <- nil

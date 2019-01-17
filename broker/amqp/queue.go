@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/spiral/jobs"
 	"github.com/streadway/amqp"
-	"log"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -55,7 +54,6 @@ func (q *queue) serve(publish, consume *chanPool) {
 
 	for {
 		<-consume.waitConnected()
-		log.Println("Connected")
 		if atomic.LoadInt32(&q.active) == 0 {
 			// stopped
 			return
@@ -71,12 +69,8 @@ func (q *queue) serve(publish, consume *chanPool) {
 		q.cc = cc
 		q.muc.Unlock()
 
-		// todo: change lock methodic?
 		for d := range delivery {
-			id, _, _, _ := unpack(d)
-			log.Println("RECV ", id)
 			if atomic.LoadInt32(&q.active) == 0 {
-				log.Println("LEAK")
 				// discard all fetched jobs, AMQP must resend them to another consumer
 				return
 			}
@@ -97,8 +91,6 @@ func (q *queue) serve(publish, consume *chanPool) {
 				q.report(err)
 			}(h, d)
 		}
-
-		log.Println("delivery DONE")
 	}
 }
 
@@ -139,11 +131,9 @@ func (q *queue) do(cp *chanPool, h jobs.Handler, d amqp.Delivery) error {
 		return d.Nack(false, false)
 	}
 
-	log.Println("GOT ", id)
 	err = h(id, j)
 
 	if err == nil {
-		log.Println("OK ", id)
 		return d.Ack(false)
 	}
 
@@ -160,7 +150,6 @@ func (q *queue) do(cp *chanPool, h jobs.Handler, d amqp.Delivery) error {
 		return d.Nack(false, true)
 	}
 
-	log.Println("DEAD ", id)
 	return d.Ack(false)
 }
 
