@@ -92,7 +92,7 @@ func (b *Broker) Stop() {
 		q.stop()
 	}
 
-	b.wait <- nil
+	close(b.wait)
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
