@@ -43,12 +43,16 @@ func newConn(addr string, tout time.Duration) (*chanPool, error) {
 
 	close(cp.connected)
 	go cp.watch(addr, conn.NotifyClose(make(chan *amqp.Error)))
+	log.Printf(">>> NEW    ------ %p\n", cp)
 
 	return cp, nil
 }
 
 // Close gracefully closes all underlying channels and connection.
 func (cp *chanPool) Close() error {
+	log.Printf(">>> CLOSING    ------ %p\n", cp)
+	defer log.Printf(">>> CLOSED    ------ %p\n", cp)
+
 	cp.mu.Lock()
 
 	close(cp.wait)
@@ -97,6 +101,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			// connection has been closed
 			return
 		case err := <-errors:
+			log.Printf("GOT ERR %p: %s\n", cp, err)
 			cp.mu.Lock()
 			cp.connected = make(chan interface{})
 
@@ -112,6 +117,8 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 
 			conn, errChan := cp.reconnect(addr)
 			if conn == nil {
+				log.Printf(">>> DROPPED IN ERROR ------ %p\n", cp)
+				// what is that?
 				cp.mu.Lock()
 				close(cp.connected)
 				cp.mu.Unlock()

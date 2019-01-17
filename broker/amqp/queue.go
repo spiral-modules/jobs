@@ -70,8 +70,10 @@ func (q *queue) serve(publish, consume *chanPool) {
 		q.cc = cc
 		q.muc.Unlock()
 
+		// todo: change lock methodic?
 		for d := range delivery {
 			if atomic.LoadInt32(&q.active) == 0 {
+				log.Println("LEAK")
 				// discard all fetched jobs, AMQP must resend them to another consumer
 				return
 			}
@@ -92,6 +94,8 @@ func (q *queue) serve(publish, consume *chanPool) {
 				q.report(err)
 			}(h, d)
 		}
+
+		log.Println("delivery DONE")
 	}
 }
 
@@ -165,7 +169,7 @@ func (q *queue) stop() {
 
 	q.muc.Lock()
 	if q.cc != nil {
-		// gracefully stop consuming
+		// gracefully stopped consuming
 		q.report(q.cc.ch.Cancel(q.consumer, true))
 	}
 	q.muc.Unlock()
