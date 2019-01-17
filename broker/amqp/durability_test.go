@@ -4,6 +4,7 @@ import (
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"testing"
@@ -119,6 +120,8 @@ func TestBroker_Durability_Base(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 
@@ -164,6 +167,8 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 
@@ -232,6 +237,8 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 
@@ -311,6 +318,8 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 
@@ -390,6 +399,8 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 
@@ -451,6 +462,8 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			log.Println(ctx)
 		}
 	})
 

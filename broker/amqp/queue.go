@@ -60,7 +60,7 @@ func (q *queue) serve(publish, consume *chanPool) {
 			return
 		}
 
-		delivery, cc, err := q.consume(publish, consume)
+		delivery, cc, err := q.consume(consume)
 		if err != nil {
 			q.report(err)
 			continue
@@ -95,7 +95,7 @@ func (q *queue) serve(publish, consume *chanPool) {
 	}
 }
 
-func (q *queue) consume(publish, consume *chanPool) (jobs <-chan amqp.Delivery, cc *channel, err error) {
+func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *channel, err error) {
 	// allocate channel for the consuming
 	if cc, err = consume.channel(q.name); err != nil {
 		return nil, nil, err
@@ -166,8 +166,8 @@ func (q *queue) stop() {
 		// gracefully stop consuming
 		q.report(q.cc.ch.Cancel(q.consumer, true))
 	}
-
 	q.muc.Unlock()
+
 	q.muw.Lock()
 	q.wg.Wait()
 	q.muw.Unlock()
