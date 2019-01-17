@@ -202,9 +202,13 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
 
+	mu := sync.Mutex{}
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
 		done[id] = true
+
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -212,18 +216,14 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	}
 
 	for {
-		st, err := b.Stat(pipe)
-		if err != nil {
-			continue
-		}
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
 
-		// wait till pipeline is empty
-		if st.Queue+st.Active == 0 {
-			return
+		if num >= 1 {
+			break
 		}
 	}
-
-	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
@@ -364,9 +364,13 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 
 	proxy.reset(true)
 
+	mu := sync.Mutex{}
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
 		done[id] = true
+
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -374,18 +378,14 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	}
 
 	for {
-		st, err := b.Stat(pipe)
-		if err != nil {
-			continue
-		}
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
 
-		// wait till pipeline is empty
-		if st.Queue+st.Active == 0 {
-			return
+		if num >= 1 {
+			break
 		}
 	}
-
-	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume3(t *testing.T) {
@@ -427,9 +427,13 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(1), st.Queue+st.Active)
 
+	mu := sync.Mutex{}
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
 		done[id] = true
+
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -437,18 +441,14 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	}
 
 	for {
-		st, err := b.Stat(pipe)
-		if err != nil {
-			continue
-		}
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
 
-		// wait till pipeline is empty
-		if st.Queue+st.Active == 0 {
-			return
+		if num >= 1 {
+			break
 		}
 	}
-
-	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume4(t *testing.T) {
@@ -499,29 +499,30 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	assert.NoError(t, serr)
 	assert.Equal(t, int64(3), st.Queue+st.Active)
 
+	mu := sync.Mutex{}
 	done := make(map[string]bool)
 	exec <- func(id string, j *jobs.Job) error {
+
 		if j.Payload == "kill" && len(done) == 0 {
 			proxy.reset(true)
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
 		done[id] = true
 
 		return nil
 	}
 
 	for {
-		st, err := b.Stat(pipe)
-		if err != nil {
-			continue
-		}
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
 
-		// wait till pipeline is empty
-		if st.Queue+st.Active == 0 {
-			return
+		if num >= 3 {
+			break
 		}
 	}
-
-	assert.True(t, len(done) >= 3)
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {

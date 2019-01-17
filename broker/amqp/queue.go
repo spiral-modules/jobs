@@ -55,6 +55,7 @@ func (q *queue) serve(publish, consume *chanPool) {
 
 	for {
 		<-consume.waitConnected()
+		log.Println("Connected")
 		if atomic.LoadInt32(&q.active) == 0 {
 			// stopped
 			return
@@ -114,6 +115,7 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 		return nil, nil, consume.closeChan(cc, err)
 	}
 
+	// do i like it?
 	go func() {
 		for {
 			select {
