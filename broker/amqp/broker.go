@@ -16,7 +16,6 @@ type Broker struct {
 	consume *chanPool
 	mu      sync.Mutex
 	wait    chan error
-	stopped chan interface{}
 	queues  map[*jobs.Pipeline]*queue
 }
 
@@ -56,9 +55,6 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
-	b.stopped = make(chan interface{})
-	defer close(b.stopped)
-
 	if b.publish, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
@@ -88,9 +84,7 @@ func (b *Broker) Serve() (err error) {
 
 	b.throw(jobs.EventBrokerReady, b)
 
-	<-b.wait
-
-	return nil
+	return <-b.wait
 }
 
 // Stop all pipelines.
@@ -107,7 +101,6 @@ func (b *Broker) Stop() {
 	}
 
 	close(b.wait)
-	<-b.stopped
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
