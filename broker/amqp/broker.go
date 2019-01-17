@@ -56,9 +56,6 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
-	b.stopped = make(chan interface{})
-	defer close(b.stopped)
-
 	if b.publish, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
@@ -84,6 +81,9 @@ func (b *Broker) Serve() (err error) {
 	}
 
 	b.wait = make(chan error)
+	b.stopped = make(chan interface{})
+	defer close(b.stopped)
+
 	b.mu.Unlock()
 
 	b.throw(jobs.EventBrokerReady, b)

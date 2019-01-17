@@ -8,13 +8,14 @@ import (
 
 // Broker run consume using Broker service.
 type Broker struct {
-	cfg   *Config
-	mul   sync.Mutex
-	lsn   func(event int, ctx interface{})
-	mu    sync.Mutex
-	wait  chan error
-	conn  *conn
-	tubes map[*jobs.Pipeline]*tube
+	cfg     *Config
+	mul     sync.Mutex
+	lsn     func(event int, ctx interface{})
+	mu      sync.Mutex
+	wait    chan error
+	stopped chan interface{}
+	conn    *conn
+	tubes   map[*jobs.Pipeline]*tube
 }
 
 // Listen attaches server event watcher.
@@ -65,6 +66,9 @@ func (b *Broker) Serve() (err error) {
 	}
 
 	b.wait = make(chan error)
+	b.stopped = make(chan interface{})
+	defer close(b.stopped)
+
 	b.mu.Unlock()
 
 	b.throw(jobs.EventBrokerReady, b)
@@ -86,6 +90,7 @@ func (b *Broker) Stop() {
 	}
 
 	close(b.wait)
+	<-b.stopped
 }
 
 // Consume configures pipeline to be consumed. With execPool to nil to reset consuming. Method can be called before
