@@ -57,11 +57,13 @@ func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
 	if b.publish, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
+		b.mu.Unlock()
 		return err
 	}
 	defer b.publish.Close()
 
 	if b.consume, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
+		b.mu.Unlock()
 		return err
 	}
 	defer b.consume.Close()
