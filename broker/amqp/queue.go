@@ -70,11 +70,6 @@ func (q *queue) serve(publish, consume *chanPool) {
 		q.muc.Unlock()
 
 		for d := range delivery {
-			if atomic.LoadInt32(&q.active) == 0 {
-				// discard all fetched jobs, AMQP must resend them to another consumer
-				return
-			}
-
 			q.muw.Lock()
 			q.wg.Add(1)
 			q.muw.Unlock()

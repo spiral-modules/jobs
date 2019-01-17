@@ -91,6 +91,15 @@ func TestBroker_Consume_Serve_Nil_Stop(t *testing.T) {
 	<-wait
 }
 
+func TestBroker_Consume_CantStart(t *testing.T) {
+	b := &Broker{}
+	b.Init(&Config{
+		Addr: "amqp://guest:guest@localhost:15672/",
+	})
+
+	assert.Error(t, b.Serve())
+}
+
 func TestBroker_Consume_Serve_Stop(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
