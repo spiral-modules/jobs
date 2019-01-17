@@ -24,10 +24,11 @@ type channel struct {
 	signal   chan error
 }
 
+type dialer func() (*amqp.Connection, error)
+
 // newConn creates new watched AMQP connection
-func newConn(addr string, tout time.Duration) (*chanPool, error) {
-	// todo: more conn options
-	conn, err := amqp.Dial(addr)
+func newConn(dial dialer, tout time.Duration) (*chanPool, error) {
+	conn, err := dial()
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func newConn(addr string, tout time.Duration) (*chanPool, error) {
 	}
 
 	close(cp.connected)
-	go cp.watch(addr, conn.NotifyClose(make(chan *amqp.Error)))
+	go cp.watch(dial, conn.NotifyClose(make(chan *amqp.Error)))
 
 	return cp, nil
 }
@@ -89,7 +90,7 @@ func (cp *chanPool) waitConnected() chan interface{} {
 }
 
 // watch manages connection state and reconnects if needed
-func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
+func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
 	for {
 		select {
 		case <-cp.wait:
@@ -109,7 +110,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			cp.channels = nil
 			cp.mu.Unlock()
 
-			conn, errChan := cp.reconnect(addr)
+			conn, errChan := cp.reconnect(dial)
 			if conn == nil {
 				cp.mu.Lock()
 				close(cp.connected)
@@ -130,7 +131,7 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 	}
 }
 
-func (cp *chanPool) reconnect(addr string) (conn *amqp.Connection, errors chan *amqp.Error) {
+func (cp *chanPool) reconnect(dial dialer) (conn *amqp.Connection, errors chan *amqp.Error) {
 	for {
 		select {
 		case <-cp.wait:
@@ -138,8 +139,7 @@ func (cp *chanPool) reconnect(addr string) (conn *amqp.Connection, errors chan *
 			return nil, nil
 
 		case <-time.NewTimer(cp.tout).C:
-			// todo: more conn options
-			conn, err := amqp.Dial(addr)
+			conn, err := dial()
 			if err != nil {
 				// still failing
 				continue

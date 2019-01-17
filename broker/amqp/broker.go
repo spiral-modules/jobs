@@ -59,12 +59,12 @@ func (b *Broker) Serve() (err error) {
 	b.stopped = make(chan interface{})
 	defer close(b.stopped)
 
-	if b.publish, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+	if b.publish, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
 	defer b.publish.Close()
 
-	if b.consume, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
+	if b.consume, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
 		return err
 	}
 	defer b.consume.Close()
