@@ -123,8 +123,9 @@ func (cp *chanPool) watch(addr string, errors chan *amqp.Error) {
 			cp.conn = conn
 			cp.channels = make(map[string]*channel)
 			errors = errChan
-			close(cp.connected)
 			cp.mu.Unlock()
+
+			close(cp.connected)
 		}
 	}
 }
@@ -152,10 +153,10 @@ func (cp *chanPool) reconnect(addr string) (conn *amqp.Connection, errors chan *
 // channel allocates new channel on amqp connection
 func (cp *chanPool) channel(name string) (*channel, error) {
 	cp.mu.Lock()
-	alive := cp.channels == nil
+	dead := cp.conn == nil
 	cp.mu.Unlock()
 
-	if alive {
+	if dead {
 		// wait for connection restoration (doubled the timeout duration)
 		select {
 		case <-time.NewTimer(cp.tout * 2).C:
