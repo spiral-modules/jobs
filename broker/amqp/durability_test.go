@@ -126,12 +126,18 @@ func TestBroker_Durability_Base(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	// expect 2 connections
 	proxy.waitConn(2)
@@ -173,12 +179,18 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2).reset(false)
 
@@ -224,13 +236,6 @@ func TestBroker_Durability_Consume(t *testing.T) {
 			break
 		}
 	}
-
-	ch, err := b.consume.channel("purger")
-	if err != nil {
-		panic(err)
-	}
-	ch.ch.QueuePurge("rr-queue", false)
-
 }
 
 func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
@@ -250,12 +255,18 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(1).reset(false)
 
@@ -312,13 +323,6 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 			break
 		}
 	}
-
-	ch, err := b.consume.channel("purger")
-	if err != nil {
-		panic(err)
-	}
-	ch.ch.QueuePurge("rr-queue", false)
-
 }
 
 func TestBroker_Durability_Consume2(t *testing.T) {
@@ -338,12 +342,18 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2).reset(false)
 
@@ -354,6 +364,86 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	})
 
 	assert.Error(t, perr)
+
+	// restore
+	proxy.waitConn(2)
+
+	jid, perr = b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+
+	proxy.reset(true)
+
+	mu := sync.Mutex{}
+	done := make(map[string]bool)
+	exec <- func(id string, j *jobs.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
+		done[id] = true
+
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+
+		return nil
+	}
+
+	for {
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
+
+		if num >= 1 {
+			break
+		}
+	}
+}
+
+func TestBroker_Durability_Consume2_2(t *testing.T) {
+	defer proxy.reset(true)
+
+	b := &Broker{}
+	b.Init(proxyCfg)
+	b.Register(pipe)
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		} else {
+			log.Println(ctx)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+
+	proxy.waitConn(2).reset(false)
+
+	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.Error(t, perr)
+
+	// start when connection is dead
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	// restore
 	proxy.waitConn(2)
@@ -400,12 +490,6 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 			break
 		}
 	}
-
-	ch, err := b.consume.channel("purger")
-	if err != nil {
-		panic(err)
-	}
-	ch.ch.QueuePurge("rr-queue", false)
 }
 
 func TestBroker_Durability_Consume3(t *testing.T) {
@@ -425,12 +509,18 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2)
 
@@ -465,12 +555,6 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 			break
 		}
 	}
-
-	ch, err := b.consume.channel("purger")
-	if err != nil {
-		panic(err)
-	}
-	ch.ch.QueuePurge("rr-queue", false)
 }
 
 func TestBroker_Durability_Consume4(t *testing.T) {
@@ -490,12 +574,18 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	})
 
 	exec := make(chan jobs.Handler, 1)
-	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
 	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	ch.ch.QueuePurge("rr-queue", false)
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2)
 
@@ -541,13 +631,6 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 			break
 		}
 	}
-
-	ch, err := b.consume.channel("purger")
-	if err != nil {
-		panic(err)
-	}
-	ch.ch.QueuePurge("rr-queue", false)
-
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {
