@@ -20,7 +20,7 @@ func Test_Config_Hydrate_Error(t *testing.T) {
 }
 
 func Test_Config_Hydrate_Error2(t *testing.T) {
-	cfg := &mockCfg{`{"addr:""}`}
+	cfg := &mockCfg{`{"addr":""}`}
 	c := &Config{}
 
 	assert.Error(t, c.Hydrate(cfg))
