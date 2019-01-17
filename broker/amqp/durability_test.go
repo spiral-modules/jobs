@@ -133,7 +133,11 @@ func TestBroker_Durability_Base(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	// expect 2 connections
@@ -184,7 +188,11 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2).reset(false)
@@ -258,7 +266,11 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(1).reset(false)
@@ -343,7 +355,11 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2).reset(false)
@@ -419,7 +435,10 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
 
 	proxy.waitConn(2).reset(false)
 
@@ -502,7 +521,11 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2)
@@ -565,7 +588,11 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	ch.ch.QueuePurge("rr-queue", false)
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	proxy.waitConn(2)
