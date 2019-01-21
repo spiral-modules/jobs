@@ -181,10 +181,6 @@ func (s *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
 		return nil, err
 	}
 
-	if stat == nil {
-		return nil, fmt.Errorf("can't read %s", pipe.Name())
-	}
-
 	stat.Pipeline = pipe.Name()
 	stat.Broker = pipe.Broker()
 

@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/spiral/roadrunner/service"
+	"github.com/spiral/roadrunner/service/env"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"syscall"
@@ -50,6 +51,7 @@ func jobs(container service.Container) *Service {
 
 func TestService_Init(t *testing.T) {
 	c := service.NewContainer(logrus.New())
+	c.Register("env", &env.Service{})
 	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
 
 	assert.NoError(t, c.Init(viperConfig(`{
@@ -95,6 +97,30 @@ func TestService_ServeStop(t *testing.T) {
 	go func() { c.Serve() }()
 	<-ready
 	c.Stop()
+}
+
+func TestService_ServeError(t *testing.T) {
+	l := logrus.New()
+	l.Level = logrus.FatalLevel
+
+	c := service.NewContainer(l)
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/bad-consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	assert.Error(t, c.Serve())
 }
 
 func TestService_GetPipeline(t *testing.T) {
@@ -257,6 +283,127 @@ func TestService_DoJob(t *testing.T) {
 	defer syscall.Unlink("tests/local.job")
 
 	assert.Contains(t, string(data), id)
+}
+
+func TestService_DoUndefinedJob(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	svc := jobs(c)
+
+	_, err := svc.Push(&Job{
+		Job:     "spiral.jobs.tests.undefined",
+		Payload: `{"data":100}`,
+		Options: &Options{},
+	})
+	assert.Error(t, err)
+}
+
+func TestService_DoJobIntoInvalidBroker(t *testing.T) {
+	l := logrus.New()
+	l.Level = logrus.FatalLevel
+
+	c := service.NewContainer(l)
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"undefined"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": []
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	svc := jobs(c)
+
+	_, err := svc.Push(&Job{
+		Job:     "spiral.jobs.tests.local.job",
+		Payload: `{"data":100}`,
+		Options: &Options{},
+	})
+	assert.Error(t, err)
+}
+
+func TestService_DoStatInvalidBroker(t *testing.T) {
+	l := logrus.New()
+	l.Level = logrus.FatalLevel
+
+	c := service.NewContainer(l)
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"undefined"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": []
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	svc := jobs(c)
+
+	_, err := svc.Stat(svc.Pipelines().Get("default"))
+	assert.Error(t, err)
 }
 
 func TestService_DoErrorJob(t *testing.T) {
