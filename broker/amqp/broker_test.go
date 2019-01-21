@@ -73,6 +73,17 @@ func TestBroker_Consume_BeforeServe(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, exec, err))
 }
 
+func TestBroker_Consume_BadPipeline(t *testing.T) {
+	b := &Broker{}
+	b.Init(cfg)
+	assert.Error(t, b.Register(&jobs.Pipeline{
+		"broker":   "amqp",
+		"name":     "default",
+		"exchange": "rr-exchange",
+		"prefetch": 1,
+	}))
+}
+
 func TestBroker_Consume_Serve_Nil_Stop(t *testing.T) {
 	b := &Broker{}
 	b.Init(cfg)
