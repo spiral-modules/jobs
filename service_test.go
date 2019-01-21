@@ -126,3 +126,81 @@ func TestService_GetPipeline(t *testing.T) {
 
 	assert.Equal(t, "ephemeral", jobs(container).Pipelines().Get("default").Broker())
 }
+
+func TestService_StatPipeline(t *testing.T) {
+	container := service.NewContainer(logrus.New())
+	container.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, container.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(container).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { container.Serve() }()
+	defer container.Stop()
+	<-ready
+
+	svc := jobs(container)
+	pipe := svc.Pipelines().Get("default")
+
+	stat, err := svc.Stat(pipe)
+	assert.NoError(t, err)
+
+	assert.Equal(t, int64(0), stat.Queue)
+	assert.Equal(t, true, stat.Consuming)
+}
+
+func TestService_StatNonConsumingPipeline(t *testing.T) {
+	container := service.NewContainer(logrus.New())
+	container.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, container.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": []
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(container).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { container.Serve() }()
+	defer container.Stop()
+	<-ready
+
+	svc := jobs(container)
+	pipe := svc.Pipelines().Get("default")
+
+	stat, err := svc.Stat(pipe)
+	assert.NoError(t, err)
+
+	assert.Equal(t, int64(0), stat.Queue)
+	assert.Equal(t, false, stat.Consuming)
+}
