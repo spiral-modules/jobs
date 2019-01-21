@@ -90,20 +90,20 @@ func (q *queue) serve(s *sqs.SQS, tout time.Duration) {
 	q.wait = make(chan interface{})
 	atomic.StoreInt32(&q.active, 1)
 
-	var lastError error
+	var errored bool
 	for {
 		messages, stop, err := q.consume(s)
 		if err != nil {
-			if lastError != nil {
+			if errored {
 				// reoccurring error
 				time.Sleep(tout)
 				continue
 			} else {
-				lastError = err
+				errored = true
 				q.report(err)
 			}
 		}
-		lastError = nil
+		errored = false
 
 		if stop {
 			return
