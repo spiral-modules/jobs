@@ -27,7 +27,7 @@ func (d Dispatcher) match(job *Job) (found *Options) {
 	return found
 }
 
-// prepare pattern for comparision
+// prepare pattern for comparison
 func (d *Dispatcher) prepare(pattern string) string {
 	return strings.Replace(strings.Trim(pattern, "-.*"), "-", ".", -1)
 }

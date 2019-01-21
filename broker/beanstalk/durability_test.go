@@ -217,8 +217,6 @@ func TestBroker_Durability_Consume(t *testing.T) {
 			return
 		}
 	}
-
-	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
@@ -375,8 +373,6 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 			return
 		}
 	}
-
-	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume3(t *testing.T) {
@@ -436,8 +432,6 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 			return
 		}
 	}
-
-	assert.True(t, len(done) >= 1)
 }
 
 func TestBroker_Durability_Consume4(t *testing.T) {
@@ -507,8 +501,6 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 			return
 		}
 	}
-
-	assert.True(t, len(done) >= 3)
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {
