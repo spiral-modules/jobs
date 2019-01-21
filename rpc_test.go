@@ -157,6 +157,46 @@ func TestRPC_EnableConsuming(t *testing.T) {
 	assert.Equal(t, true, list.Pipelines[0].Consuming)
 }
 
+func TestRPC_EnableConsumingUndefined(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("rpc", &rpc.Service{})
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"rpc":{"listen":"tcp://:5005"},
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": []
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	s2, _ := c.Get(rpc.ID)
+	rs := s2.(*rpc.Service)
+
+	cl, err := rs.Client()
+	assert.NoError(t, err)
+	ok := ""
+	assert.Error(t, cl.Call("jobs.Resume", "undefined", &ok))
+}
+
 func TestRPC_DisableConsuming(t *testing.T) {
 	c := service.NewContainer(logrus.New())
 	c.Register("rpc", &rpc.Service{})
@@ -210,6 +250,47 @@ func TestRPC_DisableConsuming(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, false, list.Pipelines[0].Consuming)
+}
+
+func TestRPC_DisableConsumingUndefined(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("rpc", &rpc.Service{})
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"rpc":{"listen":"tcp://:5004"},
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	s2, _ := c.Get(rpc.ID)
+	rs := s2.(*rpc.Service)
+
+	cl, err := rs.Client()
+	assert.NoError(t, err)
+
+	ok := ""
+	assert.Error(t, cl.Call("jobs.Stop", "undefined", &ok))
 }
 
 func TestRPC_EnableAllConsuming(t *testing.T) {
@@ -395,4 +476,61 @@ func TestRPC_NoOperationOnDeadServer(t *testing.T) {
 
 	assert.Error(t, rc.Workers(true, nil))
 	assert.Error(t, rc.Stat(true, nil))
+}
+
+func TestRPC_Workers(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("rpc", &rpc.Service{})
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"rpc":{"listen":"tcp://:5004"},
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	s2, _ := c.Get(rpc.ID)
+	rs := s2.(*rpc.Service)
+
+	cl, err := rs.Client()
+	assert.NoError(t, err)
+
+	list := &WorkerList{}
+	assert.NoError(t, cl.Call("jobs.Workers", true, &list))
+
+	assert.Len(t, list.Workers, 1)
+
+	pid := list.Workers[0].Pid
+	assert.NotEqual(t, 0, pid)
+
+	// reset
+	ok := ""
+	assert.NoError(t, cl.Call("jobs.Reset", true, &ok))
+
+	list = &WorkerList{}
+	assert.NoError(t, cl.Call("jobs.Workers", true, &list))
+
+	assert.Len(t, list.Workers, 1)
+
+	assert.NotEqual(t, list.Workers[0].Pid, pid)
 }
