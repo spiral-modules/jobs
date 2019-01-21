@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/spiral/roadrunner/service"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"syscall"
 	"testing"
 )
 
@@ -203,4 +205,107 @@ func TestService_StatNonConsumingPipeline(t *testing.T) {
 
 	assert.Equal(t, int64(0), stat.Queue)
 	assert.Equal(t, false, stat.Consuming)
+}
+
+func TestService_DoJob(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobReady := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+
+		if event == EventJobComplete {
+			close(jobReady)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	svc := jobs(c)
+
+	id, err := svc.Push(&Job{
+		Job:     "spiral.jobs.tests.local.job",
+		Payload: `{"data":100}`,
+		Options: &Options{},
+	})
+	assert.NoError(t, err)
+
+	<-jobReady
+
+	data, err := ioutil.ReadFile("tests/local.job")
+	assert.NoError(t, err)
+	defer syscall.Unlink("tests/local.job")
+
+	assert.Contains(t, string(data), id)
+}
+
+func TestService_DoErrorJob(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"ephemeral"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": ["default"]
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobReady := make(chan interface{})
+
+	var jobErr error
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+
+		if event == EventJobError {
+			jobErr = ctx.(error)
+			close(jobReady)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	svc := jobs(c)
+
+	_, err := svc.Push(&Job{
+		Job:     "spiral.jobs.tests.local.errorJob",
+		Payload: `{"data":100}`,
+		Options: &Options{},
+	})
+	assert.NoError(t, err)
+
+	<-jobReady
+	assert.Error(t, jobErr)
+	assert.Contains(t, jobErr.Error(), "something is wrong")
 }

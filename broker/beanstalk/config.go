@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/spiral/roadrunner/service"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -45,10 +44,6 @@ func (c *Config) newConn() (*conn, error) {
 	dsn := strings.Split(c.Addr, "://")
 	if len(dsn) != 2 {
 		return nil, fmt.Errorf("invalid socket DSN (tcp://localhost:11300, unix://beanstalk.sock)")
-	}
-
-	if dsn[0] == "unix" {
-		syscall.Unlink(dsn[1])
 	}
 
 	return newConn(dsn[0], dsn[1], c.TimeoutDuration())
