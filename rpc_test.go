@@ -197,6 +197,86 @@ func TestRPC_EnableConsumingUndefined(t *testing.T) {
 	assert.Error(t, cl.Call("jobs.Resume", "undefined", &ok))
 }
 
+func TestRPC_EnableConsumingUndefinedBroker(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("rpc", &rpc.Service{})
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"rpc":{"listen":"tcp://:5005"},
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"undefined"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": []
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	s2, _ := c.Get(rpc.ID)
+	rs := s2.(*rpc.Service)
+
+	cl, err := rs.Client()
+	assert.NoError(t, err)
+	ok := ""
+	assert.Error(t, cl.Call("jobs.Resume", "default", &ok))
+}
+
+func TestRPC_EnableConsumingAllUndefinedBroker(t *testing.T) {
+	c := service.NewContainer(logrus.New())
+	c.Register("rpc", &rpc.Service{})
+	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
+
+	assert.NoError(t, c.Init(viperConfig(`{
+	"rpc":{"listen":"tcp://:5005"},
+	"jobs":{
+		"workers":{
+			"command": "php tests/consumer.php",
+			"pool.numWorkers": 1
+		},
+		"pipelines":{"default":{"broker":"undefined"}},
+    	"dispatch": {
+	    	"spiral-jobs-tests-local-*.pipeline": "default"
+    	},
+    	"consume": []
+	}
+}`)))
+
+	ready := make(chan interface{})
+	jobs(c).AddListener(func(event int, ctx interface{}) {
+		if event == EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { c.Serve() }()
+	defer c.Stop()
+	<-ready
+
+	s2, _ := c.Get(rpc.ID)
+	rs := s2.(*rpc.Service)
+
+	cl, err := rs.Client()
+	assert.NoError(t, err)
+	ok := ""
+	assert.Error(t, cl.Call("jobs.ResumeAll", true, &ok))
+}
+
 func TestRPC_DisableConsuming(t *testing.T) {
 	c := service.NewContainer(logrus.New())
 	c.Register("rpc", &rpc.Service{})
