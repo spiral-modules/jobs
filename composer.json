@@ -12,7 +12,6 @@
   "require": {
     "php": "^7.1",
     "ext-json": "*",
-    "psr/container": "1.0.0",
     "spiral/roadrunner": "^1.1",
     "doctrine/inflector": "^1.3"
   },
