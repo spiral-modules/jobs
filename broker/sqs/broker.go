@@ -23,7 +23,7 @@ func (b *Broker) Listen(lsn func(event int, ctx interface{})) {
 	b.lsn = lsn
 }
 
-// Start configures local job broker.
+// Init configures SQS broker.
 func (b *Broker) Init(cfg *Config) (ok bool, err error) {
 	b.cfg = cfg
 	b.queues = make(map[*jobs.Pipeline]*queue)

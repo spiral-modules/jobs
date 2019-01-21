@@ -1,6 +1,6 @@
 package jobs
 
-// testBroker manages set of pipelines and provides ability to push jobs into them.
+// Broker manages set of pipelines and provides ability to push jobs into them.
 type Broker interface {
 	// Register broker pipeline.
 	Register(pipe *Pipeline) error

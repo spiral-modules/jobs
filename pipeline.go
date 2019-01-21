@@ -34,7 +34,7 @@ func (ps Pipelines) Reverse() Pipelines {
 	return out
 }
 
-// testBroker return pipelines associated with specific broker.
+// Broker return pipelines associated with specific broker.
 func (ps Pipelines) Broker(broker string) Pipelines {
 	out := make(Pipelines, 0)
 
@@ -94,7 +94,7 @@ func (p Pipeline) Name() string {
 	return p.String("name", "")
 }
 
-// testBroker associated with the pipeline.
+// Broker associated with the pipeline.
 func (p Pipeline) Broker() string {
 	return p.String("broker", "")
 }

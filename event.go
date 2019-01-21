@@ -27,7 +27,7 @@ const (
 	// EventPipelineStop when pipeline consuming has begun stopping.
 	EventPipelineStop
 
-	// EventPipelineStop when pipeline consuming has been stopped.
+	// EventPipelineStopped when pipeline consuming has been stopped.
 	EventPipelineStopped
 
 	// EventPipelineError when pipeline specific error happen.
@@ -90,7 +90,7 @@ type PipelineError struct {
 	Caused error
 }
 
-// Caused returns error message.
+// Error returns error message.
 func (e *PipelineError) Error() string {
 	return e.Caused.Error()
 }

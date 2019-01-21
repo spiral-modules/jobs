@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// String defines public service name.
+// ID defines public service name.
 const ID = "jobs"
 
 // Service wraps roadrunner container and manage set of parent within it.
@@ -30,7 +30,7 @@ type Service struct {
 	consuming map[*Pipeline]bool
 }
 
-// Listen attaches event watcher.
+// AddListener attaches event listeners to the service and all underlying brokers.
 func (s *Service) AddListener(l func(event int, ctx interface{})) {
 	s.lsns = append(s.lsns, l)
 }
