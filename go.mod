@@ -11,6 +11,7 @@ require (
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/sirupsen/logrus v1.3.0
 	github.com/spf13/cobra v0.0.3
+	github.com/spf13/viper v1.3.1
 	github.com/spiral/roadrunner v1.3.1
 	github.com/streadway/amqp v0.0.0-20181205114330-a314942b2fd9
 	github.com/stretchr/testify v1.2.2

@@ -19,7 +19,7 @@ type PipelineList struct {
 	Pipelines []*Stat `json:"pipelines"`
 }
 
-// Push job to the queue.
+// Push job to the testQueue.
 func (r *rpcServer) Push(j *Job, id *string) (err error) {
 	*id, err = r.s.Push(j)
 	return

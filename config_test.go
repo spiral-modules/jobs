@@ -10,30 +10,30 @@ import (
 type mockCfg struct{ cfg string }
 
 func (cfg *mockCfg) Get(name string) service.Config {
-	if name == "same" {
-
+	if name == "same" || name == "jobs" {
 		return cfg
 	}
+
 	return nil
 }
 func (cfg *mockCfg) Unmarshal(out interface{}) error { return json.Unmarshal([]byte(cfg.cfg), out) }
 
 func Test_Config_Hydrate_Error(t *testing.T) {
-	cfg := &mockCfg{`{"dead`}
+	cfg := &mockCfg{cfg: `{"dead`}
 	c := &Config{}
 
 	assert.Error(t, c.Hydrate(cfg))
 }
 
 func Test_Config_Hydrate_Error2(t *testing.T) {
-	cfg := &mockCfg{`{}`}
+	cfg := &mockCfg{cfg: `{}`}
 	c := &Config{}
 
 	assert.Error(t, c.Hydrate(cfg))
 }
 
 func Test_Config_Hydrate_OK(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{"pool":{"numWorkers": 1}}
 }`}
 	c := &Config{}
@@ -42,7 +42,7 @@ func Test_Config_Hydrate_OK(t *testing.T) {
 }
 
 func Test_Config_Hydrate_Unmarshal(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{"pool":{"numWorkers": 1}}
 }`}
 	c := &Config{}
@@ -54,7 +54,7 @@ func Test_Config_Hydrate_Unmarshal(t *testing.T) {
 }
 
 func Test_Config_Hydrate_Get(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{"pool":{"numWorkers": 1}}
 }`}
 	c := &Config{}
@@ -65,7 +65,7 @@ func Test_Config_Hydrate_Get(t *testing.T) {
 }
 
 func Test_Config_Hydrate_Get_Valid(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{"pool":{"numWorkers": 1}}
 }`}
 	c := &Config{}
@@ -81,7 +81,7 @@ func Test_Config_Hydrate_GetNoParent(t *testing.T) {
 }
 
 func Test_Pipelines(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{
 		"pool":{"numWorkers": 1}
 	},
@@ -101,7 +101,7 @@ func Test_Pipelines(t *testing.T) {
 }
 
 func Test_Pipelines_NoBroker(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{
 		"pool":{"numWorkers": 1}
 	},
@@ -118,7 +118,7 @@ func Test_Pipelines_NoBroker(t *testing.T) {
 }
 
 func Test_MatchPipeline(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{
 		"pool":{"numWorkers": 1}
 	},
@@ -145,7 +145,7 @@ func Test_MatchPipeline(t *testing.T) {
 }
 
 func Test_MatchPipeline_Error(t *testing.T) {
-	cfg := &mockCfg{`{
+	cfg := &mockCfg{cfg: `{
 	"workers":{
 		"pool":{"numWorkers": 1}
 	},

@@ -1,6 +1,6 @@
 package jobs
 
-// Broker manages set of pipelines and provides ability to push jobs into them.
+// testBroker manages set of pipelines and provides ability to push jobs into them.
 type Broker interface {
 	// Register broker pipeline.
 	Register(pipe *Pipeline) error
@@ -36,7 +36,7 @@ type Stat struct {
 	// Consuming indicates that pipeline is consuming jobs.
 	Consuming bool
 
-	// queue defines number of pending jobs.
+	// testQueue defines number of pending jobs.
 	Queue int64
 
 	// Active defines number of jobs which are currently being processed.

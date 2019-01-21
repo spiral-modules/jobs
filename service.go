@@ -256,7 +256,7 @@ func (s *Service) exec(id string, j *Job) error {
 	return err
 }
 
-// register died job, can be used to move to fallback queue or log
+// register died job, can be used to move to fallback testQueue or log
 func (s *Service) error(id string, j *Job, err error) {
 	// nothing for now
 }
