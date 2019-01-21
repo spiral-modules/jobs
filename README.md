@@ -14,4 +14,5 @@
 - job level timeouts, retries, retry delays
 - PHP and Golang consumers and producers
 - per pipeline stop/resume
+- interactive stats, events, RPC
 - works on Windows

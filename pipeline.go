@@ -118,14 +118,6 @@ func (p Pipeline) Map(name string) Pipeline {
 				out[k] = v
 			}
 		}
-
-		if m, ok := value.(map[interface{}]interface{}); ok {
-			for k, v := range m {
-				if ks, ok := k.(string); ok {
-					out[ks] = v
-				}
-			}
-		}
 	}
 
 	return Pipeline(out)
