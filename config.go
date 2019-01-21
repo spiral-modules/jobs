@@ -50,7 +50,11 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 func (c *Config) MatchPipeline(job *Job) (*Pipeline, *Options, error) {
 	opt := c.Dispatch.match(job)
 
-	pipe := job.Options.Pipeline
+	pipe := ""
+	if job.Options != nil {
+		pipe = job.Options.Pipeline
+	}
+
 	if pipe == "" && opt != nil {
 		pipe = opt.Pipeline
 	}

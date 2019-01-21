@@ -380,3 +380,19 @@ func TestRPC_DoJob(t *testing.T) {
 
 	assert.Contains(t, string(data), id)
 }
+
+func TestRPC_NoOperationOnDeadServer(t *testing.T) {
+	rc := &rpcServer{nil}
+
+	assert.Error(t, rc.Push(&Job{}, nil))
+	assert.Error(t, rc.Reset(true, nil))
+
+	assert.Error(t, rc.Stop("default", nil))
+	assert.Error(t, rc.StopAll(true, nil))
+
+	assert.Error(t, rc.Resume("default", nil))
+	assert.Error(t, rc.ResumeAll(true, nil))
+
+	assert.Error(t, rc.Workers(true, nil))
+	assert.Error(t, rc.Stat(true, nil))
+}
