@@ -1,7 +1,3 @@
-all:
-	@./build.sh
-build:
-	@./build.sh all
 clean:
 	rm -rf rr-jobs
 install: all
