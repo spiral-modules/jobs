@@ -97,11 +97,12 @@ func (q *queue) serve(s *sqs.SQS, tout time.Duration) {
 			if errored {
 				// reoccurring error
 				time.Sleep(tout)
-				continue
 			} else {
 				errored = true
 				q.report(err)
 			}
+
+			continue
 		}
 		errored = false
 
