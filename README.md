@@ -1,6 +1,8 @@
 # RoadRunner: Async Job Pipeline
 [![Latest Stable Version](https://poser.pugx.org/spiral/jobs/version)](https://packagist.org/packages/spiral/jobs)
+[![GoDoc](https://godoc.org/github.com/spiral/jobs?status.svg)](https://godoc.org/github.com/spiral/jobs)
 [![Build Status](https://travis-ci.org/spiral/jobs.svg?branch=master)](https://travis-ci.org/spiral/jobs)
+[![Go Report Card](https://goreportcard.com/badge/github.com/spiral/jobs)](https://goreportcard.com/report/github.com/spiral/jobs)
 [![Codecov](https://codecov.io/gh/spiral/jobs/branch/master/graph/badge.svg)](https://codecov.io/gh/spiral/jobs/)
 
 ## Features

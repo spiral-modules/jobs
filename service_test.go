@@ -51,7 +51,6 @@ func jobs(container service.Container) *Service {
 
 func TestService_Init(t *testing.T) {
 	c := service.NewContainer(logrus.New())
-	c.Register("env", &env.Service{})
 	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
 
 	assert.NoError(t, c.Init(viperConfig(`{
@@ -71,6 +70,7 @@ func TestService_Init(t *testing.T) {
 
 func TestService_ServeStop(t *testing.T) {
 	c := service.NewContainer(logrus.New())
+	c.Register("env", &env.Service{})
 	c.Register("jobs", &Service{Brokers: map[string]Broker{"ephemeral": &testBroker{}}})
 
 	assert.NoError(t, c.Init(viperConfig(`{
