@@ -45,12 +45,6 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 		return false, err
 	}
 
-	// configuring worker pools
-	s.execPool = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
-	for i := int64(0); i < s.cfg.Workers.Pool.NumWorkers; i++ {
-		s.execPool <- s.exec
-	}
-
 	if r != nil {
 		if err := r.Register(ID, &rpcServer{s}); err != nil {
 			return false, err
@@ -58,6 +52,12 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 	}
 
 	if s.cfg.Workers != nil {
+		// configuring worker pools
+		s.execPool = make(chan Handler, s.cfg.Workers.Pool.NumWorkers)
+		for i := int64(0); i < s.cfg.Workers.Pool.NumWorkers; i++ {
+			s.execPool <- s.exec
+		}
+
 		s.rr = roadrunner.NewServer(s.cfg.Workers)
 	}
 
