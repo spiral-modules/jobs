@@ -96,17 +96,17 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 
 // Serve serves local rr server and creates broker association.
 func (s *Service) Serve() error {
-	// ensure that workers aware of running within jobs
-	if s.env != nil {
-		if err := s.env.Copy(s.cfg.Workers); err != nil {
-			return err
-		}
-	}
-
-	s.cfg.Workers.SetEnv("rr_jobs", "true")
-	s.rr.Listen(s.throw)
-
 	if s.cfg.Workers != nil {
+		// ensure that workers aware of running within jobs
+		if s.env != nil {
+			if err := s.env.Copy(s.cfg.Workers); err != nil {
+				return err
+			}
+		}
+
+		s.cfg.Workers.SetEnv("rr_jobs", "true")
+		s.rr.Listen(s.throw)
+
 		if err := s.rr.Start(); err != nil {
 			return err
 		}
