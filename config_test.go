@@ -25,13 +25,6 @@ func Test_Config_Hydrate_Error(t *testing.T) {
 	assert.Error(t, c.Hydrate(cfg))
 }
 
-func Test_Config_Hydrate_Error2(t *testing.T) {
-	cfg := &mockCfg{cfg: `{}`}
-	c := &Config{}
-
-	assert.Error(t, c.Hydrate(cfg))
-}
-
 func Test_Config_Hydrate_OK(t *testing.T) {
 	cfg := &mockCfg{cfg: `{
 	"workers":{"pool":{"numWorkers": 1}}

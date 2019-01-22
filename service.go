@@ -57,7 +57,9 @@ func (s *Service) Init(c service.Config, l *logrus.Logger, r *rpc.Service, e env
 		}
 	}
 
-	s.rr = roadrunner.NewServer(s.cfg.Workers)
+	if s.cfg.Workers != nil {
+		s.rr = roadrunner.NewServer(s.cfg.Workers)
+	}
 
 	s.mu.Lock()
 	s.consuming = make(map[*Pipeline]bool)
@@ -104,15 +106,17 @@ func (s *Service) Serve() error {
 	s.cfg.Workers.SetEnv("rr_jobs", "true")
 	s.rr.Listen(s.throw)
 
-	if err := s.rr.Start(); err != nil {
-		return err
-	}
-	defer s.rr.Stop()
-
-	// start consuming of all the pipelines
-	for _, p := range s.Pipelines().Names(s.cfg.Consume...) {
-		if err := s.Consume(p, s.execPool, s.error); err != nil {
+	if s.cfg.Workers != nil {
+		if err := s.rr.Start(); err != nil {
 			return err
+		}
+		defer s.rr.Stop()
+
+		// start consuming of all the pipelines
+		for _, p := range s.Pipelines().Names(s.cfg.Consume...) {
+			if err := s.Consume(p, s.execPool, s.error); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -32,18 +32,20 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 	}
 
 	c.parent = cfg
-	if c.Workers == nil {
-		c.Workers = &roadrunner.ServerConfig{}
+	if c.Workers != nil {
+		c.Workers.InitDefaults()
 	}
-
-	c.Workers.InitDefaults()
 
 	c.pipelines, err = initPipelines(c.Pipelines)
 	if err != nil {
 		return err
 	}
 
-	return c.Workers.Pool.Valid()
+	if c.Workers != nil {
+		return c.Workers.Pool.Valid()
+	}
+
+	return nil
 }
 
 // MatchPipeline locates the pipeline associated with the job.
