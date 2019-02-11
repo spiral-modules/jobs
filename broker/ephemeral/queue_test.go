@@ -6,6 +6,6 @@ import (
 )
 
 func TestQueue_ConfigureNil(t *testing.T) {
-	q := newQueue()
+	q := newQueue(0)
 	assert.NoError(t, q.configure(nil, nil))
 }
