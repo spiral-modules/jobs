@@ -39,6 +39,9 @@ func newQueue(concurrency int) *queue {
 
 	if concurrency != 0 {
 		q.concurPool = make(chan interface{}, concurrency)
+		for i := 0; i < concurrency; i++ {
+			q.concurPool <- nil
+		}
 	}
 
 	return q
