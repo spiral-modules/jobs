@@ -12,7 +12,8 @@ type queue struct {
 	st     *jobs.Stat
 
 	// job pipeline
-	jobs chan *entry
+	concurPool chan interface{}
+	jobs       chan *entry
 
 	// active operations
 	muw sync.Mutex
@@ -33,8 +34,14 @@ type entry struct {
 }
 
 // create new queue
-func newQueue() *queue {
-	return &queue{st: &jobs.Stat{}, jobs: make(chan *entry)}
+func newQueue(concurrency int) *queue {
+	q := &queue{st: &jobs.Stat{}, jobs: make(chan *entry)}
+
+	if concurrency != 0 {
+		q.concurPool = make(chan interface{}, concurrency)
+	}
+
+	return q
 }
 
 // associate queue with new do pool
@@ -56,12 +63,22 @@ func (q *queue) serve() {
 			return
 		}
 
+		if q.concurPool != nil {
+			<-q.concurPool
+		}
+
 		atomic.AddInt64(&q.st.Active, 1)
 		h := <-q.execPool
 		go func(e *entry) {
 			q.do(h, e)
 			atomic.AddInt64(&q.st.Active, ^int64(0))
+
 			q.execPool <- h
+
+			if q.concurPool != nil {
+				q.concurPool <- nil
+			}
+
 			q.wg.Done()
 		}(e)
 	}

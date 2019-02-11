@@ -37,7 +37,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 		return fmt.Errorf("queue `%s` has already been registered", pipe.Name())
 	}
 
-	b.queues[pipe] = newQueue()
+	b.queues[pipe] = newQueue(pipe.Integer("concurPool", 0))
 
 	return nil
 }
