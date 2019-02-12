@@ -129,10 +129,11 @@ func (q *queue) stop() {
 
 	atomic.StoreInt32(&q.active, 0)
 
-	close(q.wait)
 	q.muw.Lock()
-	q.wg.Wait()
+	close(q.wait)
 	q.muw.Unlock()
+
+	q.wg.Wait()
 }
 
 // add job to the queue
