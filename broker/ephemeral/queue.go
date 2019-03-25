@@ -130,6 +130,7 @@ func (q *queue) stop() {
 	atomic.StoreInt32(&q.active, 0)
 
 	close(q.wait)
+	
 	q.muw.Lock()
 	q.wg.Wait()
 	q.muw.Unlock()	
