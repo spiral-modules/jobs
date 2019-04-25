@@ -12,9 +12,10 @@ type Dispatcher map[string]*Options
 func (d Dispatcher) match(job *Job) (found *Options) {
 	var best = 0
 
+	jobName := strings.ToLower(job.Job)
 	for pattern, opts := range d {
 		pattern = d.prepare(pattern)
-		if strings.HasPrefix(job.Job, pattern) && len(pattern) > best {
+		if strings.HasPrefix(jobName, pattern) && len(pattern) > best {
 			found = opts
 			best = len(pattern)
 		}
@@ -29,5 +30,5 @@ func (d Dispatcher) match(job *Job) (found *Options) {
 
 // prepare pattern for comparison
 func (d *Dispatcher) prepare(pattern string) string {
-	return strings.Replace(strings.Trim(pattern, "-.*"), "-", ".", -1)
+	return strings.ToLower(strings.Replace(strings.Trim(pattern, "-.*"), "-", ".", -1))
 }
