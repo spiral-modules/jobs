@@ -29,7 +29,7 @@ import (
 func init() {
 	rr.CLI.AddCommand(&cobra.Command{
 		Use:   "jobs:stop",
-		Short: "Destroy job consuming for Job service brokers",
+		Short: "Stop job consuming for Job service brokers",
 		RunE:  stopHandler,
 	})
 }
