@@ -66,6 +66,7 @@ func (ps Pipelines) Names(only ...string) Pipelines {
 
 // Get returns pipeline by it's name.
 func (ps Pipelines) Get(name string) *Pipeline {
+	// possibly optimize
 	for _, p := range ps {
 		if p.Name() == name {
 			return p
