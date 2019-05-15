@@ -11,7 +11,8 @@ var separators = []string{"/", "-", "\\"}
 type Dispatcher map[string]*Options
 
 // pre-compile patterns
-func initDispatcher(routes map[string]*Options) (d Dispatcher) {
+func initDispatcher(routes map[string]*Options) Dispatcher {
+	dispatcher := make(Dispatcher)
 	for pattern, opts := range routes {
 		pattern = strings.ToLower(pattern)
 		pattern = strings.Trim(pattern, "-.*")
@@ -20,18 +21,18 @@ func initDispatcher(routes map[string]*Options) (d Dispatcher) {
 			pattern = strings.Replace(pattern, s, ".", -1)
 		}
 
-		d[pattern] = opts
+		dispatcher[pattern] = opts
 	}
 
-	return d
+	return dispatcher
 }
 
 // match clarifies target job pipeline and other job options. Can return nil.
-func (d Dispatcher) match(job *Job) (found *Options) {
+func (dispatcher Dispatcher) match(job *Job) (found *Options) {
 	var best = 0
 
 	jobName := strings.ToLower(job.Job)
-	for pattern, opts := range d {
+	for pattern, opts := range dispatcher {
 		if strings.HasPrefix(jobName, pattern) && len(pattern) > best {
 			found = opts
 			best = len(pattern)
