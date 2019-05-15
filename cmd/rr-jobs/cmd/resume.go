@@ -53,7 +53,7 @@ func resumeHandler(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	for _, pipe := range args {
+	for _, pipe := range args[1:] {
 		util.Printf("<green>resume job consumption for</reset> <white+hb>%s</reset><green>: </reset>", pipe)
 
 		var r string

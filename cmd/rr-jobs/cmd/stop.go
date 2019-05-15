@@ -53,7 +53,7 @@ func stopHandler(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	for _, pipe := range args {
+	for _, pipe := range args[1:] {
 		util.Printf("<yellow>stop job consumption for</reset> <white+hb>%s</reset><yellow>: </reset>", pipe)
 
 		var r string
