@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
 use Spiral\Jobs\Queue;
+use Spiral\Jobs\Options;
 
 abstract class BaseTest extends TestCase
 {
