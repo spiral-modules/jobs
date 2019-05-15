@@ -15,7 +15,7 @@ use Spiral\Goridge\RPC;
 use Spiral\Jobs\Exception\JobException;
 use Spiral\RoadRunner\Exception\RoadRunnerException;
 
-class Queue implements QueueInterface, SingletonInterface
+final class Queue implements QueueInterface, SingletonInterface
 {
     const RR_SERVICE = 'jobs';
 

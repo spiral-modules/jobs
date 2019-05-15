@@ -5,14 +5,15 @@
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+declare(strict_types=1);
 
 namespace Spiral\Jobs\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
-use Spiral\Jobs\Queue;
 use Spiral\Jobs\Options;
+use Spiral\Jobs\Queue;
 
 abstract class BaseTest extends TestCase
 {

@@ -12,7 +12,7 @@ namespace Spiral\Jobs;
 /**
  * Runs all the jobs in the same process.
  */
-class ShortCircuit implements QueueInterface
+final class ShortCircuit implements QueueInterface
 {
     /** @var int */
     private $id = 0;
