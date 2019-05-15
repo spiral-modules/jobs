@@ -12,7 +12,7 @@ type Config struct {
 	Workers *roadrunner.ServerConfig
 
 	// Dispatch defines where and how to match jobs.
-	Dispatch Dispatcher
+	Dispatch map[string]*Options
 
 	// Pipelines defines mapping between PHP job pipeline and associated job broker.
 	Pipelines map[string]*Pipeline
@@ -21,8 +21,9 @@ type Config struct {
 	Consume []string
 
 	// parent config for broken options.
-	parent    service.Config
-	pipelines Pipelines
+	parent     service.Config
+	pipelines  Pipelines
+	dispatcher Dispatcher
 }
 
 // Hydrate populates config values.
@@ -47,12 +48,14 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 		return c.Workers.Pool.Valid()
 	}
 
+	c.dispatcher = NewDispatcher(c.Dispatch)
+
 	return nil
 }
 
 // MatchPipeline locates the pipeline associated with the job.
 func (c *Config) MatchPipeline(job *Job) (*Pipeline, *Options, error) {
-	opt := c.Dispatch.match(job)
+	opt := c.dispatcher.match(job)
 
 	pipe := ""
 	if job.Options != nil {
