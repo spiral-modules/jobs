@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Spiral\Jobs\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Spiral\Core\Container;
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
 use Spiral\Jobs\Options;
