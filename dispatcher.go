@@ -11,7 +11,7 @@ var separators = []string{"/", "-", "\\"}
 type Dispatcher map[string]*Options
 
 // pre-compile patterns
-func NewDispatcher(routes map[string]*Options) (d Dispatcher) {
+func initDispatcher(routes map[string]*Options) (d Dispatcher) {
 	for pattern, opts := range routes {
 		pattern = strings.ToLower(pattern)
 		pattern = strings.Trim(pattern, "-.*")
@@ -20,7 +20,7 @@ func NewDispatcher(routes map[string]*Options) (d Dispatcher) {
 			pattern = strings.Replace(pattern, s, ".", -1)
 		}
 
-		d[d.prepare(pattern)] = opts
+		d[pattern] = opts
 	}
 
 	return d
