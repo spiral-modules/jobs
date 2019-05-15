@@ -19,15 +19,21 @@ type Service struct {
 	// Associated parent
 	Brokers map[string]Broker
 
-	cfg       *Config
-	env       env.Environment
-	log       *logrus.Logger
-	lsns      []func(event int, ctx interface{})
-	rr        *roadrunner.Server
-	execPool  chan Handler
-	services  service.Container
-	mu        sync.Mutex
-	consuming map[*Pipeline]bool
+	cfg        *Config
+	env        env.Environment
+	log        *logrus.Logger
+	lsns       []func(event int, ctx interface{})
+	rr         *roadrunner.Server
+	controller roadrunner.Controller
+	execPool   chan Handler
+	services   service.Container
+	mu         sync.Mutex
+	consuming  map[*Pipeline]bool
+}
+
+// Attach attaches controller. Currently only one controller is supported.
+func (s *Service) Attach(w roadrunner.Controller) {
+	s.controller = w
 }
 
 // AddListener attaches event listeners to the service and all underlying brokers.
@@ -106,6 +112,10 @@ func (s *Service) Serve() error {
 
 		s.cfg.Workers.SetEnv("rr_jobs", "true")
 		s.rr.Listen(s.throw)
+
+		if s.controller != nil {
+			s.rr.Attach(s.controller)
+		}
 
 		if err := s.rr.Start(); err != nil {
 			return err
