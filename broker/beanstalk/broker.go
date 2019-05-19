@@ -61,7 +61,7 @@ func (b *Broker) Serve() (err error) {
 
 	for _, t := range b.tubes {
 		if t.execPool != nil {
-			go t.serve(connFactory(b.cfg))
+			go t.serve(b.cfg)
 		}
 	}
 

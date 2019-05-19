@@ -42,6 +42,10 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 	}
 	attempt, _ = strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
 
+	if _, ok := msg.MessageAttributes["rr-job"]; !ok {
+		return "", 0, nil, fmt.Errorf("missing message attribute `%s`", "rr-job")
+	}
+
 	j = &jobs.Job{
 		Job:     *msg.MessageAttributes["rr-job"].StringValue,
 		Payload: *msg.Body,

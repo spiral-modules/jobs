@@ -96,7 +96,7 @@ func (b *Broker) Stop() {
 		q.stop()
 	}
 
-	close(b.wait)
+	b.wait <- nil
 	<-b.stopped
 }
 
