@@ -44,7 +44,7 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 
 	for _, attr := range jobAttributes {
 		if _, ok := msg.MessageAttributes[*attr]; !ok {
-			return "", 0, nil, fmt.Errorf("missing message attribute `%s`", *attr)
+			return "", 0, nil, fmt.Errorf("missing message attribute `%s` (mixed queue?)", *attr)
 		}
 	}
 
