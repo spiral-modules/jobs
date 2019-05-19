@@ -245,6 +245,6 @@ func (t *tube) doStat(cn *conn) (stat *jobs.Stat, err error) {
 // report tube specific error
 func (t *tube) report(err error) {
 	if err != nil {
-		t.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
+		t.lsn(jobs.EventPipeError, &jobs.PipelineError{Pipeline: t.pipe, Caused: err})
 	}
 }

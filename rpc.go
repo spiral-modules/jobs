@@ -5,7 +5,7 @@ import (
 	"github.com/spiral/roadrunner/util"
 )
 
-type rpcServer struct{ s *Service }
+type rpcServer struct{ svc *Service }
 
 // WorkerList contains list of workers.
 type WorkerList struct {
@@ -20,37 +20,37 @@ type PipelineList struct {
 }
 
 // Push job to the testQueue.
-func (r *rpcServer) Push(j *Job, id *string) (err error) {
-	if r.s == nil || r.s.rr == nil {
+func (rpc *rpcServer) Push(j *Job, id *string) (err error) {
+	if rpc.svc == nil || rpc.svc.rr == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
-	*id, err = r.s.Push(j)
+	*id, err = rpc.svc.Push(j)
 	return
 }
 
 // Reset resets underlying RR worker pool and restarts all of it's workers.
-func (r *rpcServer) Reset(reset bool, w *string) error {
-	if r.s == nil {
+func (rpc *rpcServer) Reset(reset bool, w *string) error {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
 	*w = "OK"
-	return r.s.rr.Reset()
+	return rpc.svc.rr.Reset()
 }
 
-// Destroy job consuming for a given pipeline.
-func (r *rpcServer) Stop(pipeline string, w *string) (err error) {
-	if r.s == nil {
+// Destroy job pipelines for a given pipeline.
+func (rpc *rpcServer) Stop(pipeline string, w *string) (err error) {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
-	pipe := r.s.Pipelines().Get(pipeline)
+	pipe := rpc.svc.cfg.pipelines.Get(pipeline)
 	if pipe == nil {
 		return fmt.Errorf("undefined pipeline `%s`", pipeline)
 	}
 
-	if err := r.s.Consume(pipe, nil, nil); err != nil {
+	if err := rpc.svc.Consume(pipe, nil, nil); err != nil {
 		return err
 	}
 
@@ -58,18 +58,18 @@ func (r *rpcServer) Stop(pipeline string, w *string) (err error) {
 	return nil
 }
 
-// Resume job consuming for a given pipeline.
-func (r *rpcServer) Resume(pipeline string, w *string) (err error) {
-	if r.s == nil {
+// Resume job pipelines for a given pipeline.
+func (rpc *rpcServer) Resume(pipeline string, w *string) (err error) {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
-	pipe := r.s.Pipelines().Get(pipeline)
+	pipe := rpc.svc.cfg.pipelines.Get(pipeline)
 	if pipe == nil {
 		return fmt.Errorf("undefined pipeline `%s`", pipeline)
 	}
 
-	if err := r.s.Consume(pipe, r.s.execPool, r.s.error); err != nil {
+	if err := rpc.svc.Consume(pipe, rpc.svc.execPool, rpc.svc.error); err != nil {
 		return err
 	}
 
@@ -77,14 +77,14 @@ func (r *rpcServer) Resume(pipeline string, w *string) (err error) {
 	return nil
 }
 
-// Destroy job consuming for a given pipeline.
-func (r *rpcServer) StopAll(stop bool, w *string) (err error) {
-	if r.s == nil || r.s.rr == nil {
+// Destroy job pipelines for a given pipeline.
+func (rpc *rpcServer) StopAll(stop bool, w *string) (err error) {
+	if rpc.svc == nil || rpc.svc.rr == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
-	for _, pipe := range r.s.Pipelines() {
-		if err := r.s.Consume(pipe, nil, nil); err != nil {
+	for _, pipe := range rpc.svc.cfg.pipelines {
+		if err := rpc.svc.Consume(pipe, nil, nil); err != nil {
 			return err
 		}
 	}
@@ -93,14 +93,14 @@ func (r *rpcServer) StopAll(stop bool, w *string) (err error) {
 	return nil
 }
 
-// Resume job consuming for a given pipeline.
-func (r *rpcServer) ResumeAll(resume bool, w *string) (err error) {
-	if r.s == nil {
+// Resume job pipelines for a given pipeline.
+func (rpc *rpcServer) ResumeAll(resume bool, w *string) (err error) {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
-	for _, pipe := range r.s.Pipelines() {
-		if err := r.s.Consume(pipe, r.s.execPool, r.s.error); err != nil {
+	for _, pipe := range rpc.svc.cfg.pipelines {
+		if err := rpc.svc.Consume(pipe, rpc.svc.execPool, rpc.svc.error); err != nil {
 			return err
 		}
 	}
@@ -109,25 +109,25 @@ func (r *rpcServer) ResumeAll(resume bool, w *string) (err error) {
 	return nil
 }
 
-// Workers returns list of active workers and their stats.
-func (r *rpcServer) Workers(list bool, w *WorkerList) (err error) {
-	if r.s == nil {
+// Workers returns list of pipelines workers and their stats.
+func (rpc *rpcServer) Workers(list bool, w *WorkerList) (err error) {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
-	w.Workers, err = util.ServerState(r.s.rr)
+	w.Workers, err = util.ServerState(rpc.svc.rr)
 	return err
 }
 
-// Stat returns list of active workers and their stats.
-func (r *rpcServer) Stat(list bool, l *PipelineList) (err error) {
-	if r.s == nil {
+// Stat returns list of pipelines workers and their stats.
+func (rpc *rpcServer) Stat(list bool, l *PipelineList) (err error) {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
 	*l = PipelineList{}
-	for _, p := range r.s.Pipelines() {
-		stat, err := r.s.Stat(p)
+	for _, p := range rpc.svc.cfg.pipelines {
+		stat, err := rpc.svc.Stat(p)
 		if err != nil {
 			return err
 		}

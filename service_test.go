@@ -152,7 +152,7 @@ func TestService_GetPipeline(t *testing.T) {
 	defer c.Stop()
 	<-ready
 
-	assert.Equal(t, "ephemeral", jobs(c).Pipelines().Get("default").Broker())
+	assert.Equal(t, "ephemeral", jobs(c).cfg.pipelines.Get("default").Broker())
 }
 
 func TestService_StatPipeline(t *testing.T) {
@@ -185,7 +185,7 @@ func TestService_StatPipeline(t *testing.T) {
 	<-ready
 
 	svc := jobs(c)
-	pipe := svc.Pipelines().Get("default")
+	pipe := svc.cfg.pipelines.Get("default")
 
 	stat, err := svc.Stat(pipe)
 	assert.NoError(t, err)
@@ -224,7 +224,7 @@ func TestService_StatNonConsumingPipeline(t *testing.T) {
 	<-ready
 
 	svc := jobs(c)
-	pipe := svc.Pipelines().Get("default")
+	pipe := svc.cfg.pipelines.Get("default")
 
 	stat, err := svc.Stat(pipe)
 	assert.NoError(t, err)
@@ -258,7 +258,7 @@ func TestService_DoJob(t *testing.T) {
 			close(ready)
 		}
 
-		if event == EventJobComplete {
+		if event == EventJobOK {
 			close(jobReady)
 		}
 	})
@@ -402,7 +402,7 @@ func TestService_DoStatInvalidBroker(t *testing.T) {
 
 	svc := jobs(c)
 
-	_, err := svc.Stat(svc.Pipelines().Get("default"))
+	_, err := svc.Stat(svc.cfg.pipelines.Get("default"))
 	assert.Error(t, err)
 }
 

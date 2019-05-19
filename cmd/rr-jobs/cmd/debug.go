@@ -52,7 +52,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	}
 
 	switch event {
-	case jobs.EventPushComplete:
+	case jobs.EventPushOK:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
 			"job.<magenta+h>PUSH</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
@@ -60,7 +60,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.ID,
 		))
 
-	// case jobs.EventJobReceived:
+	// case jobs.EventJobStart:
 	// 	e := ctx.(*jobs.JobEvent)
 	// 	s.logger.Info(util.Sprintf(
 	// 		"job.<cyan+h>RECV</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
@@ -68,7 +68,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	// 		e.ID,
 	// 	))
 
-	case jobs.EventJobComplete:
+	case jobs.EventJobOK:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
 			"job.<green+h>DONE</reset> <green>%s</reset> <gray+hb>%s</reset> %s",
@@ -95,7 +95,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Error(),
 		))
 
-	// case jobs.EventPipelineConsume:
+	// case jobs.EventPipeConsume:
 	// 	e := ctx.(*jobs.Pipeline)
 	// 	s.logger.Info(util.Sprintf(
 	// 		"[%s]: resuming {<yellow+hb>%s</reset>}",
@@ -103,7 +103,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	// 		e.Name(),
 	// 	))
 
-	case jobs.EventPipelineConsuming:
+	case jobs.EventPipeActive:
 		e := ctx.(*jobs.Pipeline)
 		s.logger.Info(util.Sprintf(
 			"[%s]: resumed {<green+hb>%s</reset>}",
@@ -111,7 +111,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Name(),
 		))
 
-	// case jobs.EventPipelineStop:
+	// case jobs.EventPipeStop:
 	// 	e := ctx.(*jobs.Pipeline)
 	// 	s.logger.Info(util.Sprintf(
 	// 		"[%s]: stopping {<yellow+hb>%s</reset>}",
@@ -119,7 +119,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	// 		e.Name(),
 	// 	))
 
-	case jobs.EventPipelineStopped:
+	case jobs.EventPipeStopped:
 		e := ctx.(*jobs.Pipeline)
 		s.logger.Debugf(util.Sprintf(
 			"[%s]: stopped {<magenta+hb>%s</reset>}",
@@ -127,7 +127,7 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Name(),
 		))
 
-	case jobs.EventPipelineError:
+	case jobs.EventPipeError:
 		e := ctx.(*jobs.PipelineError)
 		s.logger.Error(util.Sprintf(
 			"[%s]: <red>{%s}</reset> <red+hb>%s</reset>",

@@ -21,9 +21,9 @@ type Config struct {
 	Consume []string
 
 	// parent config for broken options.
-	parent     service.Config
-	pipelines  Pipelines
-	dispatcher Dispatcher
+	parent    service.Config
+	pipelines Pipelines
+	route     Dispatcher
 }
 
 // Hydrate populates config values.
@@ -31,7 +31,6 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 	if c.Workers == nil {
 		c.Workers = &roadrunner.ServerConfig{}
 	}
-
 	c.Workers.InitDefaults()
 
 	if err := cfg.Unmarshal(&c); err != nil {
@@ -48,14 +47,14 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 	}
 
 	c.parent = cfg
-	c.dispatcher = initDispatcher(c.Dispatch)
+	c.route = initDispatcher(c.Dispatch)
 
 	return nil
 }
 
 // MatchPipeline locates the pipeline associated with the job.
 func (c *Config) MatchPipeline(job *Job) (*Pipeline, *Options, error) {
-	opt := c.dispatcher.match(job)
+	opt := c.route.match(job)
 
 	pipe := ""
 	if job.Options != nil {

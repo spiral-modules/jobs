@@ -3,35 +3,35 @@ package jobs
 import "time"
 
 const (
-	// EventPushComplete thrown when new job has been added. JobEvent is passed as context.
-	EventPushComplete = iota + 1500
+	// EventPushOK thrown when new job has been added. JobEvent is passed as context.
+	EventPushOK = iota + 1500
 
 	// EventPushError caused when job can not be registered.
 	EventPushError
 
-	// EventJobReceived thrown when new job received.
-	EventJobReceived
+	// EventJobStart thrown when new job received.
+	EventJobStart
 
-	// EventJobComplete thrown when job execution is successfully completed. JobEvent is passed as context.
-	EventJobComplete
+	// EventJobOK thrown when job execution is successfully completed. JobEvent is passed as context.
+	EventJobOK
 
 	// EventJobError thrown on all job related errors. See JobError as context.
 	EventJobError
 
-	// EventPipelineConsume when pipeline consuming has been requested.
-	EventPipelineConsume
+	// EventPipeConsume when pipeline pipelines has been requested.
+	EventPipeConsume
 
-	// EventPipelineConsuming when pipeline consuming has started.
-	EventPipelineConsuming
+	// EventPipeActive when pipeline has started.
+	EventPipeActive
 
-	// EventPipelineStop when pipeline consuming has begun stopping.
-	EventPipelineStop
+	// EventPipeStop when pipeline has begun stopping.
+	EventPipeStop
 
-	// EventPipelineStopped when pipeline consuming has been stopped.
-	EventPipelineStopped
+	// EventPipeStopped when pipeline has been stopped.
+	EventPipeStopped
 
-	// EventPipelineError when pipeline specific error happen.
-	EventPipelineError
+	// EventPipeError when pipeline specific error happen.
+	EventPipeError
 
 	// EventBrokerReady thrown when broken is ready to accept/serve tasks.
 	EventBrokerReady

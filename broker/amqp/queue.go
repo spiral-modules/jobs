@@ -261,6 +261,6 @@ func (q *queue) inspect(cp *chanPool) (*amqp.Queue, error) {
 // throw handles service, server and pool events.
 func (q *queue) report(err error) {
 	if err != nil {
-		q.lsn(jobs.EventPipelineError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
+		q.lsn(jobs.EventPipeError, &jobs.PipelineError{Pipeline: q.pipe, Caused: err})
 	}
 }
