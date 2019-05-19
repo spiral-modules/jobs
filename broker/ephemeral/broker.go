@@ -37,7 +37,7 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 		return fmt.Errorf("queue `%s` has already been registered", pipe.Name())
 	}
 
-	b.queues[pipe] = newQueue(pipe.Integer("concurrency", 0))
+	b.queues[pipe] = newQueue(pipe.Integer("maxThreads", 0))
 
 	return nil
 }
