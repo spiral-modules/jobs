@@ -8,6 +8,7 @@ import (
 	"github.com/spiral/roadrunner/service/env"
 	"github.com/spiral/roadrunner/service/rpc"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -35,6 +36,7 @@ type Service struct {
 	execPool chan Handler
 
 	// registered brokers
+	serving int32
 	brokers service.Container
 
 	// pipelines pipelines
@@ -143,11 +145,18 @@ func (svc *Service) Serve() error {
 		}
 	}
 
+	atomic.StoreInt32(&svc.serving, 1)
+	defer atomic.StoreInt32(&svc.serving, 0)
+
 	return svc.brokers.Serve()
 }
 
 // Stop all pipelines and rr server.
 func (svc *Service) Stop() {
+	if atomic.LoadInt32(&svc.serving) == 0 {
+		return
+	}
+
 	wg := sync.WaitGroup{}
 	for _, p := range svc.cfg.pipelines.Names(svc.cfg.Consume...).Reverse() {
 		wg.Add(1)
