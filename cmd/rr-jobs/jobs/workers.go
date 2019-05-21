@@ -18,51 +18,83 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package cmd
+package jobs
 
 import (
+	tm "github.com/buger/goterm"
 	"github.com/spf13/cobra"
+	"github.com/spiral/jobs"
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/cmd/util"
+	"net/rpc"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+)
+
+var (
+	interactive bool
+	stopSignal  = make(chan os.Signal, 1)
 )
 
 func init() {
-	rr.CLI.AddCommand(&cobra.Command{
-		Use:   "jobs:stop",
-		Short: "Stop job consuming for Job service brokers",
-		RunE:  stopHandler,
-	})
+	workersCommand := &cobra.Command{
+		Use:   "jobs:workers",
+		Short: "List workers associated with RoadRunner Jobs service",
+		RunE:  workersHandler,
+	}
+
+	workersCommand.Flags().BoolVarP(
+		&interactive,
+		"interactive",
+		"i",
+		false,
+		"render interactive workers table",
+	)
+
+	rr.CLI.AddCommand(workersCommand)
+
+	signal.Notify(stopSignal, syscall.SIGTERM)
+	signal.Notify(stopSignal, syscall.SIGINT)
 }
 
-func stopHandler(cmd *cobra.Command, args []string) error {
+func workersHandler(cmd *cobra.Command, args []string) (err error) {
+	defer func() {
+		if r, ok := recover().(error); ok {
+			err = r
+		}
+	}()
+
 	client, err := util.RPCClient(rr.Container)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	if len(args) == 0 {
-		util.Printf("<yellow>stop job consumption for all pipelines</reset>: ")
-
-		var r string
-		if err := client.Call("jobs.StopAll", true, &r); err != nil {
-			return err
-		}
-
-		util.Printf("<green+hb>done</reset>\n")
+	if !interactive {
+		showWorkers(client)
 		return nil
 	}
 
-	for _, pipe := range args[1:] {
-		util.Printf("<yellow>stop job consumption for</reset> <white+hb>%s</reset><yellow>: </reset>", pipe)
-
-		var r string
-		if err := client.Call("jobs.Stop", pipe, &r); err != nil {
-			return err
+	tm.Clear()
+	for {
+		select {
+		case <-stopSignal:
+			return nil
+		case <-time.NewTicker(time.Millisecond * 500).C:
+			tm.MoveCursor(1, 1)
+			showWorkers(client)
+			tm.Flush()
 		}
+	}
+}
 
-		util.Printf("<green+hb>done</reset>\n")
+func showWorkers(client *rpc.Client) {
+	var r jobs.WorkerList
+	if err := client.Call("jobs.Workers", true, &r); err != nil {
+		panic(err)
 	}
 
-	return nil
+	util.WorkerTable(r.Workers).Render()
 }

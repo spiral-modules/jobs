@@ -10,7 +10,7 @@ import (
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/service/rpc"
 
-	_ "github.com/spiral/jobs/cmd/rr-jobs/cmd"
+	_ "github.com/spiral/jobs/cmd/rr-jobs/jobs"
 )
 
 func main() {
