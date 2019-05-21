@@ -64,7 +64,7 @@ func (ps Pipelines) Names(only ...string) Pipelines {
 	return out
 }
 
-// Get returns pipeline by it's name.
+// Get returns pipeline by it'svc name.
 func (ps Pipelines) Get(name string) *Pipeline {
 	// possibly optimize
 	for _, p := range ps {

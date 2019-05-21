@@ -1,7 +1,7 @@
 package beanstalk
 
 import (
-	"github.com/kr/beanstalk"
+	"github.com/beanstalkd/go-beanstalk"
 	"github.com/spiral/jobs"
 	"github.com/stretchr/testify/assert"
 	"testing"

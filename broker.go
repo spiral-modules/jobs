@@ -5,7 +5,7 @@ type Broker interface {
 	// Register broker pipeline.
 	Register(pipe *Pipeline) error
 
-	// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+	// Consume configures pipeline to be consumed. With execPool to nil to disable pipelines. Method can be called before
 	// the service is started!
 	Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error
 
@@ -33,7 +33,7 @@ type Stat struct {
 	// InternalName defines internal broker specific pipeline name.
 	InternalName string
 
-	// Consuming indicates that pipeline is consuming jobs.
+	// Consuming indicates that pipeline is pipelines jobs.
 	Consuming bool
 
 	// testQueue defines number of pending jobs.

@@ -11,8 +11,8 @@ import (
 
 var jobAttributes = []*string{
 	aws.String("rr-job"),
-	aws.String("rr-delay"),
 	aws.String("rr-maxAttempts"),
+	aws.String("rr-delay"),
 	aws.String("rr-timeout"),
 	aws.String("rr-retryDelay"),
 }
@@ -41,6 +41,12 @@ func unpack(msg *sqs.Message) (id string, attempt int, j *jobs.Job, err error) {
 		return "", 0, nil, fmt.Errorf("missing attribute `%s`", "ApproximateReceiveCount")
 	}
 	attempt, _ = strconv.Atoi(*msg.Attributes["ApproximateReceiveCount"])
+
+	for _, attr := range jobAttributes {
+		if _, ok := msg.MessageAttributes[*attr]; !ok {
+			return "", 0, nil, fmt.Errorf("missing message attribute `%s` (mixed queue?)", *attr)
+		}
+	}
 
 	j = &jobs.Job{
 		Job:     *msg.MessageAttributes["rr-job"].StringValue,

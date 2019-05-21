@@ -45,7 +45,7 @@ func (b *testBroker) Register(pipe *Pipeline) error {
 
 // Serve broker pipelines.
 func (b *testBroker) Serve() error {
-	// start consuming
+	// start pipelines
 	b.mu.Lock()
 	for _, q := range b.queues {
 		if q.execPool != nil {
@@ -72,7 +72,7 @@ func (b *testBroker) Stop() {
 		return
 	}
 
-	// stop all consuming
+	// stop all pipelines
 	for _, q := range b.queues {
 		q.stop()
 	}
@@ -81,7 +81,7 @@ func (b *testBroker) Stop() {
 	<-b.stopped
 }
 
-// Consume configures pipeline to be consumed. With execPool to nil to disable consuming. Method can be called before
+// Consume configures pipeline to be consumed. With execPool to nil to disable pipelines. Method can be called before
 // the service is started!
 func (b *testBroker) Consume(pipe *Pipeline, execPool chan Handler, errHandler ErrorHandler) error {
 	b.mu.Lock()
@@ -180,7 +180,7 @@ type testQueue struct {
 	// job pipeline
 	jobs chan *entry
 
-	// active operations
+	// pipelines operations
 	muw sync.Mutex
 	wg  sync.WaitGroup
 
@@ -267,7 +267,7 @@ func (q *testQueue) do(h Handler, e *entry) {
 	q.push(e.id, e.job, e.attempt+1, e.job.Options.RetryDuration())
 }
 
-// stop the testQueue consuming
+// stop the testQueue pipelines
 func (q *testQueue) stop() {
 	if atomic.LoadInt32(&q.active) == 0 {
 		return

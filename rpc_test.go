@@ -170,7 +170,7 @@ func TestRPC_EnableConsuming(t *testing.T) {
 			close(ready)
 		}
 
-		if event == EventPipelineConsuming {
+		if event == EventPipeActive {
 			close(pipelineReady)
 		}
 	})
@@ -345,7 +345,7 @@ func TestRPC_DisableConsuming(t *testing.T) {
 			close(ready)
 		}
 
-		if event == EventPipelineStopped {
+		if event == EventPipeStopped {
 			close(pipelineReady)
 		}
 	})
@@ -441,7 +441,7 @@ func TestRPC_EnableAllConsuming(t *testing.T) {
 			close(ready)
 		}
 
-		if event == EventPipelineConsuming {
+		if event == EventPipeActive {
 			close(pipelineReady)
 		}
 	})
@@ -496,7 +496,7 @@ func TestRPC_DisableAllConsuming(t *testing.T) {
 			close(ready)
 		}
 
-		if event == EventPipelineStopped {
+		if event == EventPipeStopped {
 			close(pipelineReady)
 		}
 	})
@@ -551,7 +551,7 @@ func TestRPC_DoJob(t *testing.T) {
 			close(ready)
 		}
 
-		if event == EventJobComplete {
+		if event == EventJobOK {
 			close(jobReady)
 		}
 	})
