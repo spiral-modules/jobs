@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
 	"github.com/spiral/jobs"
 	"github.com/spiral/jobs/broker/amqp"
 	"github.com/spiral/jobs/broker/beanstalk"
@@ -15,7 +14,6 @@ import (
 
 func main() {
 	rr.Container.Register(rpc.ID, &rpc.Service{})
-
 	rr.Container.Register(jobs.ID, &jobs.Service{
 		Brokers: map[string]jobs.Broker{
 			"amqp":      &amqp.Broker{},
@@ -25,6 +23,5 @@ func main() {
 		},
 	})
 
-	rr.Logger.Formatter = &logrus.TextFormatter{ForceColors: true}
 	rr.Execute()
 }
