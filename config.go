@@ -40,7 +40,7 @@ func (c *Config) Hydrate(cfg service.Config) (err error) {
 		return err
 	}
 
-	if c.Workers.Pool != nil {
+	if c.Workers.Command != "" {
 		if err := c.Workers.Pool.Valid(); err != nil {
 			return c.Workers.Pool.Valid()
 		}
