@@ -29,11 +29,11 @@ type Config struct {
 // Hydrate populates config values.
 func (c *Config) Hydrate(cfg service.Config) (err error) {
 	c.Workers = &roadrunner.ServerConfig{}
+	c.Workers.InitDefaults()
+
 	if err := cfg.Unmarshal(&c); err != nil {
 		return err
 	}
-
-	c.Workers.InitDefaults()
 
 	c.pipelines, err = initPipelines(c.Pipelines)
 	if err != nil {
