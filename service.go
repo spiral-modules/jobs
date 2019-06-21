@@ -76,12 +76,14 @@ func (svc *Service) Init(
 	}
 
 	// limit the number of parallel threads
-	svc.execPool = make(chan Handler, svc.cfg.Workers.Pool.NumWorkers)
-	for i := int64(0); i < svc.cfg.Workers.Pool.NumWorkers; i++ {
-		svc.execPool <- svc.exec
-	}
+	if svc.cfg.Workers != nil {
+		svc.execPool = make(chan Handler, svc.cfg.Workers.Pool.NumWorkers)
+		for i := int64(0); i < svc.cfg.Workers.Pool.NumWorkers; i++ {
+			svc.execPool <- svc.exec
+		}
 
-	svc.rr = roadrunner.NewServer(svc.cfg.Workers)
+		svc.rr = roadrunner.NewServer(svc.cfg.Workers)
+	}
 
 	svc.pipelines = make(map[*Pipeline]bool)
 	for _, p := range svc.cfg.pipelines {
@@ -116,32 +118,34 @@ func (svc *Service) Init(
 
 // Serve serves local rr server and creates broker association.
 func (svc *Service) Serve() error {
-	if svc.env != nil {
-		if err := svc.env.Copy(svc.cfg.Workers); err != nil {
+	if svc.rr != nil {
+		if svc.env != nil {
+			if err := svc.env.Copy(svc.cfg.Workers); err != nil {
+				return err
+			}
+		}
+
+		// ensure that workers aware of running within jobs
+		svc.cfg.Workers.SetEnv("rr_jobs", "true")
+		svc.rr.Listen(svc.throw)
+
+		if svc.cr != nil {
+			svc.rr.Attach(svc.cr)
+		}
+
+		if err := svc.rr.Start(); err != nil {
 			return err
 		}
-	}
+		defer svc.rr.Stop()
 
-	// ensure that workers aware of running within jobs
-	svc.cfg.Workers.SetEnv("rr_jobs", "true")
-	svc.rr.Listen(svc.throw)
+		// start pipelines of all the pipelines
+		for _, p := range svc.cfg.pipelines.Names(svc.cfg.Consume...) {
+			// start pipeline consuming
+			if err := svc.Consume(p, svc.execPool, svc.error); err != nil {
+				svc.Stop()
 
-	if svc.cr != nil {
-		svc.rr.Attach(svc.cr)
-	}
-
-	if err := svc.rr.Start(); err != nil {
-		return err
-	}
-	defer svc.rr.Stop()
-
-	// start pipelines of all the pipelines
-	for _, p := range svc.cfg.pipelines.Names(svc.cfg.Consume...) {
-		// start pipeline consuming
-		if err := svc.Consume(p, svc.execPool, svc.error); err != nil {
-			svc.Stop()
-
-			return err
+				return err
+			}
 		}
 	}
 
