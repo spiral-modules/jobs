@@ -76,7 +76,7 @@ func (svc *Service) Init(
 	}
 
 	// limit the number of parallel threads
-	if svc.cfg.Workers != nil {
+	if svc.cfg.Workers.Pool != nil {
 		svc.execPool = make(chan Handler, svc.cfg.Workers.Pool.NumWorkers)
 		for i := int64(0); i < svc.cfg.Workers.Pool.NumWorkers; i++ {
 			svc.execPool <- svc.exec
