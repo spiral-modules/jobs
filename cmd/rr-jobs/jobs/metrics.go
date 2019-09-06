@@ -81,7 +81,7 @@ func newCollector() *metricCollector {
 		),
 		workersMemory: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "rr_jobs_workers_memory_bytes",
+				Name: "rr_job_workers_memory_bytes",
 				Help: "Memory usage by Jobs workers.",
 			},
 		),
