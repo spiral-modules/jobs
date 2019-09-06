@@ -50,14 +50,42 @@ jobs:
   consume: ["local", "amqp", "beanstalk", "sqs"]
 
 metrics:
+  # prometheus client address (path /metrics added automatically)
   address: localhost:2112
+
+  # list of metrics to collect from application
+  collect:
+    # metric name
+    app_metric:
+      # type [gauge, counter, histogram, symnmary]
+      type:    histogram
+
+      # short description
+      help:    "Custom application metric"
+
+      # metric groups/tags
+      labels:  ["type"]
+
+      # for histogram only
+      buckets: [0.1, 0.2, 0.3, 1.0]
 
 # monitors rr server(s)
 limit:
+  # check worker state each second
   interval: 1
+
+  # custom watch configuration for each service
   services:
+    # monitor queue workers
     jobs:
+      # maximum allowed memory consumption per worker (soft)
       maxMemory: 100
+
+      # maximum time to live for the worker (soft)
       TTL: 0
+
+      # maximum allowed amount of time worker can spend in idle before being removed (for weak db connections, soft)
       idleTTL: 0
+
+      # max_execution_time (brutal)
       execTTL: 60

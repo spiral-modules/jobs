@@ -28,13 +28,13 @@ import (
 
 func init() {
 	rr.CLI.AddCommand(&cobra.Command{
-		Use:   "jobs:stop",
-		Short: "Stop job consuming for Job service brokers",
-		RunE:  stopHandler,
+		Use:   "jobs:pause",
+		Short: "Pause job consuming for Job service brokers",
+		RunE:  pauseHandler,
 	})
 }
 
-func stopHandler(cmd *cobra.Command, args []string) error {
+func pauseHandler(cmd *cobra.Command, args []string) error {
 	client, err := util.RPCClient(rr.Container)
 	if err != nil {
 		return err

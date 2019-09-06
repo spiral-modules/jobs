@@ -60,14 +60,6 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.ID,
 		))
 
-	// case jobs.EventJobStart:
-	// 	e := ctx.(*jobs.JobEvent)
-	// 	s.logger.Info(util.Sprintf(
-	// 		"job.<cyan+h>RECV</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
-	// 		e.Job.Job,
-	// 		e.ID,
-	// 	))
-
 	case jobs.EventJobOK:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
@@ -95,14 +87,6 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Error(),
 		))
 
-	// case jobs.EventPipeConsume:
-	// 	e := ctx.(*jobs.Pipeline)
-	// 	s.logger.Info(util.Sprintf(
-	// 		"[%s]: resuming {<yellow+hb>%s</reset>}",
-	// 		e.Broker(),
-	// 		e.Name(),
-	// 	))
-
 	case jobs.EventPipeActive:
 		e := ctx.(*jobs.Pipeline)
 		s.logger.Info(util.Sprintf(
@@ -110,14 +94,6 @@ func (s *debugger) listener(event int, ctx interface{}) {
 			e.Broker(),
 			e.Name(),
 		))
-
-	// case jobs.EventPipeStop:
-	// 	e := ctx.(*jobs.Pipeline)
-	// 	s.logger.Info(util.Sprintf(
-	// 		"[%s]: stopping {<yellow+hb>%s</reset>}",
-	// 		e.Broker(),
-	// 		e.Name(),
-	// 	))
 
 	case jobs.EventPipeStopped:
 		e := ctx.(*jobs.Pipeline)

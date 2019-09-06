@@ -177,6 +177,11 @@ func (svc *Service) Stop() {
 	svc.brokers.Stop()
 }
 
+// Server returns associated rr server (if any).
+func (svc *Service) Server() *roadrunner.Server {
+	return svc.rr
+}
+
 // Stat returns list of pipelines workers and their stats.
 func (svc *Service) Stat(pipe *Pipeline) (stat *Stat, err error) {
 	b, ok := svc.Brokers[pipe.Broker()]
