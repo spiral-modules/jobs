@@ -8,11 +8,11 @@
 
 namespace Spiral\Jobs\Tests\Amqp;
 
-use Spiral\Jobs\AbstractJob;
+use Spiral\Jobs\JobHandler;
 
-class ErrorJob extends AbstractJob
+class ErrorJob extends JobHandler
 {
-    public function do(string $id)
+    public function invoke(string $id)
     {
         throw new \Error("something is wrong");
     }

@@ -15,6 +15,7 @@ use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
 use Spiral\Jobs\Options;
 use Spiral\Jobs\Queue;
+use Spiral\Jobs\Registry\ContainerRegistry;
 
 abstract class BaseTest extends TestCase
 {
@@ -41,7 +42,7 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
-        $id = $jobs->push(new $this->job(['data' => 100]));
+        $id = $jobs->push($this->job, ['data' => 100]);
 
         $this->assertNotEmpty($id);
 
@@ -57,7 +58,7 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
-        $id = $jobs->push(new $this->errorJob(['data' => 100]));
+        $id = $jobs->push($this->errorJob, ['data' => 100]);
         $this->assertNotEmpty($id);
     }
 
@@ -65,9 +66,7 @@ abstract class BaseTest extends TestCase
     {
         $jobs = $this->makeJobs();
 
-        $id = $jobs->push(new $this->job([
-            'data' => 100
-        ]), Options::delayed(1));
+        $id = $jobs->push($this->job, ['data' => 100], Options::delayed(1));
 
         $this->assertNotEmpty($id);
 
@@ -84,16 +83,20 @@ abstract class BaseTest extends TestCase
      */
     public function testConnectionException()
     {
-        $jobs = new Queue(new RPC(new SocketRelay('localhost', 6002)));
+        $jobs = new Queue(
+            new RPC(new SocketRelay('localhost', 6002)),
+            new ContainerRegistry(new Container())
+        );
 
-        $jobs->push(new $this->job([
-            'data' => 100
-        ], new Container()));
+        $jobs->push($this->job, ['data' => 100]);
     }
 
     public function makeJobs(): Queue
     {
-        return new Queue(new RPC(new SocketRelay('localhost', 6001)));
+        return new Queue(
+            new RPC(new SocketRelay('localhost', 6001)),
+            new ContainerRegistry(new Container())
+        );
     }
 
     private function waitForJob(): float

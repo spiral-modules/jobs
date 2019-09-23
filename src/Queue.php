@@ -17,32 +17,44 @@ use Spiral\RoadRunner\Exception\RoadRunnerException;
 
 final class Queue implements QueueInterface, SingletonInterface
 {
-    const RR_SERVICE = 'jobs';
+    // RoadRunner jobs service
+    private const RR_SERVICE = 'jobs';
 
     /** @var RPC */
     private $rpc;
 
+    /** @var HandlerRegistryInterface */
+    private $registry;
+
     /**
-     * @param RPC $rpc
+     * @param RPC                      $rpc
+     * @param HandlerRegistryInterface $registry
      */
-    public function __construct(RPC $rpc)
+    public function __construct(RPC $rpc, HandlerRegistryInterface $registry)
     {
         $this->rpc = $rpc;
+        $this->registry = $registry;
     }
 
     /**
-     * @inheritdoc
+     * Schedule job of a given type.
+     *
+     * @param string       $jobType
+     * @param array        $payload
+     * @param Options|null $options
+     * @return string
+     *
+     * @throws JobException
      */
-    public function push(JobInterface $job, Options $options = null): string
+    public function push(string $jobType, array $payload = [], Options $options = null): string
     {
-        try {
-            if (empty($options)) {
-                $options = new Options();
-            }
+        $options = $options ?? new Options();
+        $handler = $this->registry->getHandler($jobType);
 
+        try {
             return $this->rpc->call(self::RR_SERVICE . '.Push', [
-                'job'     => $this->jobName($job),
-                'payload' => $job->serialize(),
+                'job'     => $this->jobName($jobType),
+                'payload' => $handler->serialize($jobType, $payload),
                 'options' => $options
             ]);
         } catch (RoadRunnerException|\Throwable $e) {
@@ -51,12 +63,12 @@ final class Queue implements QueueInterface, SingletonInterface
     }
 
     /**
-     * @param JobInterface $job
+     * @param string $job
      * @return string
      */
-    private function jobName(JobInterface $job): string
+    private function jobName(string $job): string
     {
-        $names = explode('\\', get_class($job));
+        $names = explode('\\', $job);
         $names = array_map(function (string $value) {
             return Inflector::camelize($value);
         }, $names);

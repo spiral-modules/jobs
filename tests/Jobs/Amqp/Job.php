@@ -8,16 +8,16 @@
 
 namespace Spiral\Jobs\Tests\Amqp;
 
-use Spiral\Jobs\AbstractJob;
+use Spiral\Jobs\JobHandler;
 
-class Job extends AbstractJob
+class Job extends JobHandler
 {
     const JOB_FILE = __DIR__ . '/../../local.job';
 
-    public function do(string $id)
+    public function invoke(string $id, array $payload)
     {
         file_put_contents(self::JOB_FILE, json_encode(
-            $this->data + compact('id')
+            $payload + compact('id')
         ));
     }
 }

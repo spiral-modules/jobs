@@ -11,6 +11,7 @@ namespace Spiral\Jobs\Tests;
 use PHPUnit\Framework\TestCase;
 use Spiral\Core\Container;
 use Spiral\Jobs\Options;
+use Spiral\Jobs\Registry\ContainerRegistry;
 use Spiral\Jobs\ShortCircuit;
 use Spiral\Jobs\Tests\Local\ErrorJob;
 use Spiral\Jobs\Tests\Local\Job;
@@ -26,11 +27,9 @@ class ShortCircuitTest extends TestCase
 
     public function testLocal()
     {
-        $jobs = new ShortCircuit();
+        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
 
-        $id = $jobs->push(new Job([
-            'data' => 100
-        ], new Container()));
+        $id = $jobs->push(Job::class, ['data' => 100]);
 
         $this->assertNotEmpty($id);
 
@@ -43,12 +42,10 @@ class ShortCircuitTest extends TestCase
 
     public function testLocalDelayed()
     {
-        $jobs = new ShortCircuit();
+        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
 
         $t = microtime(true);
-        $id = $jobs->push(new Job([
-            'data' => 100
-        ], new Container()), Options::delayed(1));
+        $id = $jobs->push(Job::class, ['data' => 100], Options::delayed(1));
 
         $this->assertTrue(microtime(true) - $t >= 1);
 
@@ -66,18 +63,15 @@ class ShortCircuitTest extends TestCase
      */
     public function testError()
     {
-        $jobs = new ShortCircuit();
-        $jobs->push(new ErrorJob([], new Container()));
+        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
+        $jobs->push(ErrorJob::class);
     }
 
     public function testLocalDelay()
     {
-        $jobs = new ShortCircuit();
+        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
 
-        $id = $jobs->push(new Job([
-            'data' => 100
-        ], new Container()), new Options(1));
-
+        $id = $jobs->push(Job::class, ['data' => 100], Options::delayed(1));
         $this->assertNotEmpty($id);
 
         $this->assertFileExists(Job::JOB_FILE);
