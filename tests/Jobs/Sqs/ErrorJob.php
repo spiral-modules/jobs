@@ -8,11 +8,11 @@
 
 namespace Spiral\Jobs\Tests\Sqs;
 
-use Spiral\Jobs\AbstractJob;
+use Spiral\Jobs\InvokableHandler;
 
-class ErrorJob extends AbstractJob
+class ErrorJob extends InvokableHandler
 {
-    public function do(string $id)
+    public function invoke(string $id)
     {
         throw new \Error("something is wrong");
     }

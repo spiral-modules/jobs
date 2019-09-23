@@ -16,40 +16,39 @@ use Spiral\RoadRunner\Worker;
  */
 final class Consumer
 {
-    /*** @var Worker */
-    private $worker;
-
-    /** @var FactoryInterface */
-    private $factory;
+    /** @var HandlerRegistryInterface */
+    private $registry;
 
     /**
      * @codeCoverageIgnore
-     *
-     * @param Worker           $worker
-     * @param FactoryInterface $factory
+     * @param HandlerRegistryInterface $registry
      */
-    public function __construct(Worker $worker, FactoryInterface $factory)
+    public function __construct(HandlerRegistryInterface $registry)
     {
-        $this->worker = $worker;
-        $this->factory = $factory;
+        $this->registry = $registry;
     }
 
     /**
      * @codeCoverageIgnore
+     * @param Worker        $worker
      * @param callable|null $finalize
      */
-    public function serve(callable $finalize = null)
+    public function serve(Worker $worker, callable $finalize = null)
     {
-        while ($body = $this->worker->receive($context)) {
+        while ($body = $worker->receive($context)) {
             try {
                 $context = json_decode($context, true);
+                $handler = $this->registry->getHandler($context['job']);
 
-                $job = $this->factory->make($context['job'], $body);
-                $job->execute($context['id']);
+                $handler->handle(
+                    $context['job'],
+                    $context['id'],
+                    $handler->unserialize($context['job'], $body)
+                );
 
-                $this->worker->send("ok");
+                $worker->send("ok");
             } catch (\Throwable $e) {
-                $this->worker->error((string)$e);
+                $worker->error((string)$e);
             } finally {
                 if ($finalize !== null) {
                     call_user_func($finalize, $e ?? null);
