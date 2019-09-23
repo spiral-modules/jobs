@@ -8,9 +8,9 @@
 
 namespace Spiral\Jobs\Tests\Amqp;
 
-use Spiral\Jobs\InvokableHandler;
+use Spiral\Jobs\JobHandler;
 
-class Job extends InvokableHandler
+class Job extends JobHandler
 {
     const JOB_FILE = __DIR__ . '/../../local.job';
 

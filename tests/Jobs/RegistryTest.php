@@ -24,7 +24,8 @@ class RegistryTest extends TestCase
         $this->assertInstanceOf(Job::class, $j);
 
         $this->assertSame(json_encode(['data' => 200]), $j->serialize(
-            "spiral.jobs.tests.local.job", ['data' => 200]
+            "spiral.jobs.tests.local.job",
+            ['data' => 200]
         ));
     }
 

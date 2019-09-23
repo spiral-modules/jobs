@@ -8,9 +8,9 @@
 
 namespace Spiral\Jobs\Tests\Sqs;
 
-use Spiral\Jobs\InvokableHandler;
+use Spiral\Jobs\JobHandler;
 
-class ErrorJob extends InvokableHandler
+class ErrorJob extends JobHandler
 {
     public function invoke(string $id)
     {

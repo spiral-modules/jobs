@@ -15,7 +15,7 @@ use Spiral\Jobs\Exception\JobException;
 /**
  * Handler which can invoke itself.
  */
-abstract class InvokableHandler implements HandlerInterface
+abstract class JobHandler implements HandlerInterface
 {
     // default function with method injection
     protected const HANDLE_FUNCTION = 'invoke';
