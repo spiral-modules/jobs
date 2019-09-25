@@ -5,6 +5,12 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/spiral/jobs)](https://goreportcard.com/report/github.com/spiral/jobs)
 [![Codecov](https://codecov.io/gh/spiral/jobs/branch/master/graph/badge.svg)](https://codecov.io/gh/spiral/jobs/)
 
+## Documentation
+  * [Installation and Configuration](https://github.com/spiral/docs/blob/feature/2.0/queue/configuration.md)
+  * [Console Commands](https://github.com/spiral/docs/blob/feature/2.0/queue/commands.md)
+  * [Running Jobs](https://github.com/spiral/docs/blob/feature/2.0/queue/jobs.md)
+  * [Standalone Usage](https://github.com/spiral/docs/blob/feature/2.0/queue/standalone.md)
+
 ## Features
 - supports in memory queue, Beanstalk, AMQP, AWS SQS
 - can work as standalone application or as part of RoadRunner server
