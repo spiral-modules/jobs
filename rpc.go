@@ -21,7 +21,7 @@ type PipelineList struct {
 
 // Push job to the testQueue.
 func (rpc *rpcServer) Push(j *Job, id *string) (err error) {
-	if rpc.svc == nil || rpc.svc.rr == nil {
+	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
 
