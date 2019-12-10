@@ -6,10 +6,10 @@
 [![Codecov](https://codecov.io/gh/spiral/jobs/branch/master/graph/badge.svg)](https://codecov.io/gh/spiral/jobs/)
 
 ## Documentation
-  * [Installation and Configuration](https://github.com/spiral/docs/blob/feature/2.0/queue/configuration.md)
-  * [Console Commands](https://github.com/spiral/docs/blob/feature/2.0/queue/commands.md)
-  * [Running Jobs](https://github.com/spiral/docs/blob/feature/2.0/queue/jobs.md)
-  * [Standalone Usage](https://github.com/spiral/docs/blob/feature/2.0/queue/standalone.md)
+  * [Installation and Configuration](https://spiral.dev/docs/queue-configuration)
+  * [Console Commands](https://spiral.dev/docs/queue-commands)
+  * [Running Jobs](https://spiral.dev/docs/queue-jobs)
+  * [Standalone Usage](https://spiral.dev/docs/queue-standalone)
 
 ## Features
 - supports in memory queue, Beanstalk, AMQP, AWS SQS
