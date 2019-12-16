@@ -23,32 +23,32 @@ func pack(id string, attempt int, j *jobs.Job) amqp.Table {
 func unpack(d amqp.Delivery) (id string, attempt int, j *jobs.Job, err error) {
 	j = &jobs.Job{Payload: string(d.Body), Options: &jobs.Options{}}
 
-	if _, ok := d.Headers["rr-id"]; !ok {
+	if _, ok := d.Headers["rr-id"].(string); !ok {
 		return "", 0, nil, fmt.Errorf("missing header `%s`", "rr-id")
 	}
 
-	if _, ok := d.Headers["rr-attempt"]; !ok {
+	if _, ok := d.Headers["rr-attempt"].(int64); !ok {
 		return "", 0, nil, fmt.Errorf("missing header `%s`", "rr-attempt")
 	}
 
-	if _, ok := d.Headers["rr-job"]; !ok {
+	if _, ok := d.Headers["rr-job"].(string); !ok {
 		return "", 0, nil, fmt.Errorf("missing header `%s`", "rr-job")
 	}
 	j.Job = d.Headers["rr-job"].(string)
 
-	if _, ok := d.Headers["rr-maxAttempts"]; ok {
+	if _, ok := d.Headers["rr-maxAttempts"].(int64); ok {
 		j.Options.Attempts = int(d.Headers["rr-maxAttempts"].(int64))
 	}
 
-	if _, ok := d.Headers["rr-timeout"]; ok {
+	if _, ok := d.Headers["rr-timeout"].(int64); ok {
 		j.Options.Timeout = int(d.Headers["rr-timeout"].(int64))
 	}
 
-	if _, ok := d.Headers["rr-delay"]; ok {
+	if _, ok := d.Headers["rr-delay"].(int64); ok {
 		j.Options.Delay = int(d.Headers["rr-delay"].(int64))
 	}
 
-	if _, ok := d.Headers["rr-retryDelay"]; ok {
+	if _, ok := d.Headers["rr-retryDelay"].(int64); ok {
 		j.Options.RetryDelay = int(d.Headers["rr-retryDelay"].(int64))
 	}
 
