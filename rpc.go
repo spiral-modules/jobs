@@ -29,6 +29,18 @@ func (rpc *rpcServer) Push(j *Job, id *string) (err error) {
 	return
 }
 
+// Push job to the testQueue.
+func (rpc *rpcServer) PushAsync(j *Job, ok *bool) (err error) {
+	if rpc.svc == nil {
+		return fmt.Errorf("jobs server is not running")
+	}
+
+	*ok = true
+	go rpc.svc.Push(j)
+
+	return
+}
+
 // Reset resets underlying RR worker pool and restarts all of it's workers.
 func (rpc *rpcServer) Reset(reset bool, w *string) error {
 	if rpc.svc == nil {
