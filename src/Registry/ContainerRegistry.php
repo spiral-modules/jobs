@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs\Registry;
@@ -15,21 +17,29 @@ use Spiral\Core\Exception\Container\ContainerException;
 use Spiral\Jobs\Exception\JobException;
 use Spiral\Jobs\HandlerInterface;
 use Spiral\Jobs\HandlerRegistryInterface;
+use Spiral\Jobs\JsonSerializer;
+use Spiral\Jobs\SerializerInterface;
+use Spiral\Jobs\SerializerRegistryInterface;
 
 /**
  * Resolve handler from container binding.
  */
-final class ContainerRegistry implements HandlerRegistryInterface
+final class ContainerRegistry implements HandlerRegistryInterface, SerializerRegistryInterface
 {
     /** @var ContainerInterface */
     private $container;
 
+    /** @var SerializerInterface */
+    private $defaultSerializer;
+
     /**
-     * @param ContainerInterface $container
+     * @param ContainerInterface       $container
+     * @param SerializerInterface|null $defaultSerializer
      */
-    public function __construct(ContainerInterface $container)
+    public function __construct(ContainerInterface $container, SerializerInterface $defaultSerializer = null)
     {
         $this->container = $container;
+        $this->defaultSerializer = $defaultSerializer ?? new JsonSerializer();
     }
 
     /**
@@ -52,12 +62,31 @@ final class ContainerRegistry implements HandlerRegistryInterface
 
     /**
      * @param string $jobType
+     * @return SerializerInterface
+     */
+    public function getSerializer(string $jobType): SerializerInterface
+    {
+        try {
+            $handler = $this->getHandler($jobType);
+        } catch (JobException $e) {
+            return $this->defaultSerializer;
+        }
+
+        if ($handler instanceof SerializerInterface) {
+            return $handler;
+        }
+
+        return $this->defaultSerializer;
+    }
+
+    /**
+     * @param string $jobType
      * @return string
      */
     private function className(string $jobType): string
     {
         $names = explode('.', $jobType);
-        $names = array_map(function (string $value) {
+        $names = array_map(static function (string $value) {
             return Inflector::classify($value);
         }, $names);
 

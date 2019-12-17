@@ -21,13 +21,13 @@ before_script:
   - ./rr-jobs serve -c tests/.rr.yaml &
 
 script:
+  - vendor/bin/spiral-cs check src tests
   - go test -v -race -cover -coverprofile=jobs.txt -covermode=atomic
   - go test -v -race -cover ./broker/amqp -coverprofile=amqp.txt -covermode=atomic
   - go test -v -race -cover ./broker/ephemeral -coverprofile=ephemeral.txt -covermode=atomic
   - go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
   - go test -v -race -cover ./broker/sqs -coverprofile=sqs.txt -covermode=atomic
   - vendor/bin/phpunit --coverage-clover=coverage.xml
-  - vendor/bin/phpcs -n --standard=PSR2 --colors src tests
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -f jobs.txt

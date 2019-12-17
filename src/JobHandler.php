@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs;
@@ -15,7 +17,7 @@ use Spiral\Jobs\Exception\JobException;
 /**
  * Handler which can invoke itself.
  */
-abstract class JobHandler implements HandlerInterface
+abstract class JobHandler implements HandlerInterface, SerializerInterface
 {
     // default function with method injection
     protected const HANDLE_FUNCTION = 'invoke';
@@ -34,16 +36,22 @@ abstract class JobHandler implements HandlerInterface
     /**
      * @inheritdoc
      */
-    public function handle(string $jobType, string $jobID, array $payload): void
+    public function handle(string $jobType, string $jobID, string $payload): void
     {
+        $payloadData = $this->unserialize($jobType, $payload);
+
         $method = new \ReflectionMethod($this, static::HANDLE_FUNCTION);
         $method->setAccessible(true);
 
         try {
-            $parameters = ['payload' => $payload, 'id' => $jobID,] + $payload;
+            $parameters = array_merge(['payload' => $payloadData, 'id' => $jobID], $payloadData);
             $method->invokeArgs($this, $this->resolver->resolveArguments($method, $parameters));
         } catch (\Throwable $e) {
-            throw new JobException(sprintf("[%s] %s", get_class($this), $e->getMessage()), $e->getCode(), $e);
+            throw new JobException(
+                sprintf('[%s] %s', get_class($this), $e->getMessage()),
+                $e->getCode(),
+                $e
+            );
         }
     }
 
@@ -56,7 +64,9 @@ abstract class JobHandler implements HandlerInterface
     }
 
     /**
-     * @inheritdoc
+     * @param string $jobType
+     * @param string $payload
+     * @return array
      */
     public function unserialize(string $jobType, string $payload): array
     {

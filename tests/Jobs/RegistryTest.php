@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs\Tests;
@@ -16,15 +18,15 @@ use Spiral\Jobs\Tests\Local\Job;
 
 class RegistryTest extends TestCase
 {
-    public function testMakeJob()
+    public function testMakeJob(): void
     {
         $factory = new ContainerRegistry(new Container());
 
-        $j = $factory->getHandler("spiral.jobs.tests.local.job");
+        $j = $factory->getHandler('spiral.jobs.tests.local.job');
         $this->assertInstanceOf(Job::class, $j);
 
         $this->assertSame(json_encode(['data' => 200]), $j->serialize(
-            "spiral.jobs.tests.local.job",
+            'spiral.jobs.tests.local.job',
             ['data' => 200]
         ));
     }
@@ -32,10 +34,10 @@ class RegistryTest extends TestCase
     /**
      * @expectedException \Spiral\Jobs\Exception\JobException
      */
-    public function testMakeUndefined()
+    public function testMakeUndefined(): void
     {
         $factory = new ContainerRegistry(new Container());
 
-        $factory->getHandler("spiral.jobs.undefined");
+        $factory->getHandler('spiral.jobs.undefined');
     }
 }

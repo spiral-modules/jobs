@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs;
@@ -23,17 +25,17 @@ final class Queue implements QueueInterface, SingletonInterface
     /** @var RPC */
     private $rpc;
 
-    /** @var HandlerRegistryInterface */
-    private $registry;
+    /** @var SerializerRegistryInterface */
+    private $serializerRegistry;
 
     /**
-     * @param RPC                      $rpc
-     * @param HandlerRegistryInterface $registry
+     * @param RPC                         $rpc
+     * @param SerializerRegistryInterface $registry
      */
-    public function __construct(RPC $rpc, HandlerRegistryInterface $registry)
+    public function __construct(RPC $rpc, SerializerRegistryInterface $registry)
     {
         $this->rpc = $rpc;
-        $this->registry = $registry;
+        $this->serializerRegistry = $registry;
     }
 
     /**
@@ -48,16 +50,36 @@ final class Queue implements QueueInterface, SingletonInterface
      */
     public function push(string $jobType, array $payload = [], Options $options = null): string
     {
-        $options = $options ?? new Options();
-        $handler = $this->registry->getHandler($jobType);
-
         try {
             return $this->rpc->call(self::RR_SERVICE . '.Push', [
                 'job'     => $this->jobName($jobType),
-                'payload' => $handler->serialize($jobType, $payload),
-                'options' => $options
+                'payload' => $this->serialize($jobType, $payload),
+                'options' => $options ?? new Options()
             ]);
-        } catch (RoadRunnerException|\Throwable $e) {
+        } catch (RoadRunnerException | \Throwable $e) {
+            throw new JobException($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    /**
+     * Schedule job of a given type.
+     *
+     * @param string       $jobType
+     * @param array        $payload
+     * @param Options|null $options
+     * @return bool
+     *
+     * @throws JobException
+     */
+    public function pushAsync(string $jobType, array $payload = [], Options $options = null): bool
+    {
+        try {
+            return $this->rpc->call(self::RR_SERVICE . '.PushAsync', [
+                'job'     => $this->jobName($jobType),
+                'payload' => $this->serialize($jobType, $payload),
+                'options' => $options ?? new Options()
+            ]);
+        } catch (RoadRunnerException | \Throwable $e) {
             throw new JobException($e->getMessage(), $e->getCode(), $e);
         }
     }
@@ -74,5 +96,15 @@ final class Queue implements QueueInterface, SingletonInterface
         }, $names);
 
         return join('.', $names);
+    }
+
+    /**
+     * @param string $jobType
+     * @param array  $payload
+     * @return string
+     */
+    private function serialize(string $jobType, array $payload): string
+    {
+        return $this->serializerRegistry->getSerializer($jobType)->serialize($jobType, $payload);
     }
 }

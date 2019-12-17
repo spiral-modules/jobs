@@ -1,10 +1,13 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
+declare(strict_types=1);
 
 namespace Spiral\Jobs\Tests;
 
@@ -13,7 +16,7 @@ use Spiral\Jobs\Options;
 
 class OptionsTest extends TestCase
 {
-    public function testDelay()
+    public function testDelay(): void
     {
         $o = new Options();
         $this->assertNull($o->getDelay());
@@ -21,11 +24,11 @@ class OptionsTest extends TestCase
         $this->assertSame(10, $o->getDelay());
     }
 
-    public function testPipeline()
+    public function testPipeline(): void
     {
         $o = new Options();
         $this->assertNull($o->getPipeline());
-        $o = $o->withPipeline("custom");
-        $this->assertSame("custom", $o->getPipeline());
+        $o = $o->withPipeline('custom');
+        $this->assertSame('custom', $o->getPipeline());
     }
 }

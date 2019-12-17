@@ -1,7 +1,13 @@
 <?php
+
 /**
- * @var Goridge\RelayInterface $relay
+ * Spiral Framework.
+ *
+ * @license   MIT
+ * @author    Anton Titov (Wolfy-J)
  */
+
+declare(strict_types=1);
 
 use Spiral\Core\Container;
 use Spiral\Goridge;

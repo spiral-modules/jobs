@@ -1,10 +1,13 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
+declare(strict_types=1);
 
 namespace Spiral\Jobs\Tests;
 
@@ -18,16 +21,17 @@ use Spiral\Jobs\Tests\Local\Job;
 
 class ShortCircuitTest extends TestCase
 {
-    protected function tearDown()
+    protected function tearDown(): void
     {
         if (file_exists(Job::JOB_FILE)) {
             unlink(Job::JOB_FILE);
         }
     }
 
-    public function testLocal()
+    public function testLocal(): void
     {
-        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
+        $c = new ContainerRegistry(new Container());
+        $jobs = new ShortCircuit($c, $c);
 
         $id = $jobs->push(Job::class, ['data' => 100]);
 
@@ -40,9 +44,10 @@ class ShortCircuitTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
-    public function testLocalDelayed()
+    public function testLocalDelayed(): void
     {
-        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
+        $c = new ContainerRegistry(new Container());
+        $jobs = new ShortCircuit($c, $c);
 
         $t = microtime(true);
         $id = $jobs->push(Job::class, ['data' => 100], Options::delayed(1));
@@ -61,15 +66,17 @@ class ShortCircuitTest extends TestCase
     /**
      * @expectedException \Spiral\Jobs\Exception\JobException
      */
-    public function testError()
+    public function testError(): void
     {
-        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
+        $c = new ContainerRegistry(new Container());
+        $jobs = new ShortCircuit($c, $c);
         $jobs->push(ErrorJob::class);
     }
 
-    public function testLocalDelay()
+    public function testLocalDelay(): void
     {
-        $jobs = new ShortCircuit(new ContainerRegistry(new Container()));
+        $c = new ContainerRegistry(new Container());
+        $jobs = new ShortCircuit($c, $c);
 
         $id = $jobs->push(Job::class, ['data' => 100], Options::delayed(1));
         $this->assertNotEmpty($id);

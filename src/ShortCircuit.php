@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs;
@@ -20,12 +22,16 @@ final class ShortCircuit implements QueueInterface
     /** @var HandlerRegistryInterface */
     private $registry;
 
+    /** @var SerializerRegistryInterface */
+    private $serializerRegistry;
+
     /**
      * @param HandlerRegistryInterface $registry
      */
-    public function __construct(HandlerRegistryInterface $registry)
+    public function __construct(HandlerRegistryInterface $registry, SerializerRegistryInterface $serializerRegistry)
     {
         $this->registry = $registry;
+        $this->serializerRegistry = $serializerRegistry;
     }
 
     /**
@@ -33,17 +39,25 @@ final class ShortCircuit implements QueueInterface
      */
     public function push(string $jobType, array $payload = [], Options $options = null): string
     {
-        $handler = $this->registry->getHandler($jobType);
-        $payload = $handler->unserialize($jobType, $handler->serialize($jobType, $payload));
-
+        $payloadBody = $this->serialize($jobType, $payload);
         if ($options !== null && $options->getDelay()) {
             sleep($options->getDelay());
         }
 
         $id = (string)(++$this->id);
 
-        $handler->handle($jobType, $id, $payload);
+        $this->registry->getHandler($jobType)->handle($jobType, $id, $payloadBody);
 
         return $id;
+    }
+
+    /**
+     * @param string $jobType
+     * @param array  $payload
+     * @return string
+     */
+    private function serialize(string $jobType, array $payload): string
+    {
+        return $this->serializerRegistry->getSerializer($jobType)->serialize($jobType, $payload);
     }
 }

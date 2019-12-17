@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Spiral Framework.
  *
@@ -6,12 +7,14 @@
  * @author    Anton Titov (Wolfy-J)
  */
 
+declare(strict_types=1);
+
 namespace Spiral\Jobs\Tests\Amqp;
 
 use Spiral\Jobs\Tests\BaseTest;
 
 class BrokerTest extends BaseTest
 {
-    const JOB       = Job::class;
-    const ERROR_JOB = ErrorJob::class;
+    public const JOB       = Job::class;
+    public const ERROR_JOB = ErrorJob::class;
 }

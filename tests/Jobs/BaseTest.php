@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs\Tests;
@@ -19,26 +21,26 @@ use Spiral\Jobs\Registry\ContainerRegistry;
 
 abstract class BaseTest extends TestCase
 {
-    const JOB       = null;
-    const ERROR_JOB = null;
+    public const JOB       = null;
+    public const ERROR_JOB = null;
 
     private $job;
     private $errorJob;
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->job = static::JOB;
         $this->errorJob = static::ERROR_JOB;
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         if (file_exists((static::JOB)::JOB_FILE)) {
             unlink((static::JOB)::JOB_FILE);
         }
     }
 
-    public function testJob()
+    public function testJob(): void
     {
         $jobs = $this->makeJobs();
 
@@ -54,7 +56,7 @@ abstract class BaseTest extends TestCase
         $this->assertSame(100, $data['data']);
     }
 
-    public function testErrorJob()
+    public function testErrorJob(): void
     {
         $jobs = $this->makeJobs();
 
@@ -62,7 +64,7 @@ abstract class BaseTest extends TestCase
         $this->assertNotEmpty($id);
     }
 
-    public function testDelayJob()
+    public function testDelayJob(): void
     {
         $jobs = $this->makeJobs();
 
@@ -81,7 +83,7 @@ abstract class BaseTest extends TestCase
     /**
      * @expectedException \Spiral\Jobs\Exception\JobException
      */
-    public function testConnectionException()
+    public function testConnectionException(): void
     {
         $jobs = new Queue(
             new RPC(new SocketRelay('localhost', 6002)),

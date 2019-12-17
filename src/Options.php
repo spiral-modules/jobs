@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs;
@@ -62,7 +64,10 @@ final class Options implements \JsonSerializable
      */
     public function jsonSerialize()
     {
-        return ['delay' => $this->delay, 'pipeline' => $this->pipeline];
+        return [
+            'delay'    => $this->delay,
+            'pipeline' => $this->pipeline
+        ];
     }
 
     /**
@@ -71,7 +76,7 @@ final class Options implements \JsonSerializable
      */
     public static function delayed(int $delay): Options
     {
-        $options = new self;
+        $options = new self();
         $options->delay = $delay;
 
         return $options;

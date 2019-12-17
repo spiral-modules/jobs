@@ -1,10 +1,12 @@
 <?php
+
 /**
  * Spiral Framework.
  *
  * @license   MIT
  * @author    Anton Titov (Wolfy-J)
  */
+
 declare(strict_types=1);
 
 namespace Spiral\Jobs;
@@ -33,22 +35,18 @@ final class Consumer
      * @param Worker        $worker
      * @param callable|null $finalize
      */
-    public function serve(Worker $worker, callable $finalize = null)
+    public function serve(Worker $worker, callable $finalize = null): void
     {
         while ($body = $worker->receive($context)) {
             try {
                 $context = json_decode($context, true);
                 $handler = $this->registry->getHandler($context['job']);
 
-                $handler->handle(
-                    $context['job'],
-                    $context['id'],
-                    $handler->unserialize($context['job'], $body)
-                );
+                $handler->handle($context['job'], $context['id'], $body);
 
-                $worker->send("ok");
+                $worker->send('ok');
             } catch (\Throwable $e) {
-                $worker->error((string)$e);
+                $worker->error((string)$e->getMessage());
             } finally {
                 if ($finalize !== null) {
                     call_user_func($finalize, $e ?? null);
