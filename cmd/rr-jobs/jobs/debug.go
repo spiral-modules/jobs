@@ -52,14 +52,6 @@ func (s *debugger) listener(event int, ctx interface{}) {
 	}
 
 	switch event {
-	case jobs.EventPushOK:
-		e := ctx.(*jobs.JobEvent)
-		s.logger.Info(util.Sprintf(
-			"job.<yellow+h>PUSH</reset> <white+hb>%s</reset> <gray+hb>%s</reset>",
-			e.Job.Job,
-			e.ID,
-		))
-
 	case jobs.EventJobOK:
 		e := ctx.(*jobs.JobEvent)
 		s.logger.Info(util.Sprintf(
