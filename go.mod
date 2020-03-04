@@ -1,5 +1,7 @@
 module github.com/spiral/jobs
 
+go 1.14
+
 require (
 	github.com/aws/aws-sdk-go v1.16.14
 	github.com/beanstalkd/go-beanstalk v0.0.0-20180822062812-53ecdaa3bcfb
