@@ -1,18 +1,18 @@
 package main
 
 import (
-	"github.com/spiral/jobs"
-	"github.com/spiral/jobs/broker/amqp"
-	"github.com/spiral/jobs/broker/beanstalk"
-	"github.com/spiral/jobs/broker/ephemeral"
-	"github.com/spiral/jobs/broker/sqs"
+	"github.com/spiral/jobs/v2"
+	"github.com/spiral/jobs/v2/broker/amqp"
+	"github.com/spiral/jobs/v2/broker/beanstalk"
+	"github.com/spiral/jobs/v2/broker/ephemeral"
+	"github.com/spiral/jobs/v2/broker/sqs"
 
 	rr "github.com/spiral/roadrunner/cmd/rr/cmd"
 	"github.com/spiral/roadrunner/service/limit"
 	"github.com/spiral/roadrunner/service/metrics"
 	"github.com/spiral/roadrunner/service/rpc"
 
-	_ "github.com/spiral/jobs/cmd/rr-jobs/jobs"
+	_ "github.com/spiral/jobs/v2/cmd/rr-jobs/jobs"
 )
 
 func main() {

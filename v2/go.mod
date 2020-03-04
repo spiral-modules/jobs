@@ -1,4 +1,4 @@
-module github.com/spiral/jobs
+module github.com/spiral/jobs/v2
 
 go 1.14
 
@@ -8,7 +8,6 @@ require (
 	github.com/buger/goterm v0.0.0-20181115115552-c206103e1f37
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gofrs/uuid v3.2.0+incompatible
-	github.com/kr/beanstalk v0.0.0-20180818045031-cae1762e4858
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/prometheus/client_golang v1.5.0
 	github.com/sirupsen/logrus v1.4.2
