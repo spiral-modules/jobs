@@ -1,7 +1,7 @@
 package beanstalk
 
 import (
-	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

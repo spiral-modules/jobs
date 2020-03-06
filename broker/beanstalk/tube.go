@@ -3,7 +3,7 @@ package beanstalk
 import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
-	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/v2"
 	"strconv"
 	"sync"
 	"sync/atomic"
