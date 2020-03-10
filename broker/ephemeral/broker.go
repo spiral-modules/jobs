@@ -3,7 +3,7 @@ package ephemeral
 import (
 	"fmt"
 	"github.com/gofrs/uuid"
-	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/v2"
 	"sync"
 )
 

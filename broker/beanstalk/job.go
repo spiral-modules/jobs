@@ -3,7 +3,7 @@ package beanstalk
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/spiral/jobs"
+	"github.com/spiral/jobs/v2"
 )
 
 func pack(j *jobs.Job) []byte {
