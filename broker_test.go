@@ -204,12 +204,13 @@ func newQueue() *testQueue {
 }
 
 // associate testQueue with new do pool
-func (q *testQueue) configure(execPool chan Handler, err ErrorHandler) error {
-	q.execPool = execPool
-	q.errHandler = err
-
-	return nil
-}
+// NOT USED
+//func (q *testQueue) configure(execPool chan Handler, err ErrorHandler) error {
+//	q.execPool = execPool
+//	q.errHandler = err
+//
+//	return nil
+//}
 
 // serve consumers
 func (q *testQueue) serve() {

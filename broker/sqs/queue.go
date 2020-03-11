@@ -72,7 +72,10 @@ func (q *queue) declareQueue(s *sqs.SQS) (*string, error) {
 			QueueName:  aws.String(q.pipe.String("queue", "")),
 			Attributes: attr,
 		})
-
+		if err != nil {
+			return nil, err
+		}
+		// r here might be nil, we need to check error before invoking fields on nil r
 		return r.QueueUrl, err
 	}
 
@@ -153,8 +156,11 @@ func (q *queue) consume(s *sqs.SQS) ([]*sqs.Message, bool, error) {
 func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 	id, attempt, j, err := unpack(msg)
 	if err != nil {
-		go q.deleteMessage(s, msg, err)
-		return err
+		err = q.deleteMessage(s, msg)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// block the job based on known timeout
@@ -164,19 +170,26 @@ func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 		VisibilityTimeout: aws.Int64(int64(j.Options.TimeoutDuration().Seconds())),
 	})
 	if err != nil {
-		go q.deleteMessage(s, msg, err)
-		return err
+		err = q.deleteMessage(s, msg)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	err = h(id, j)
-	if err == nil {
-		return q.deleteMessage(s, msg, nil)
+	if err != nil {
+		err = q.deleteMessage(s, msg)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	q.errHandler(id, j, err)
 
 	if !j.Options.CanRetry(attempt) {
-		return q.deleteMessage(s, msg, err)
+		return q.deleteMessage(s, msg)
 	}
 
 	// retry after specified duration
@@ -189,9 +202,12 @@ func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 	return err
 }
 
-func (q *queue) deleteMessage(s *sqs.SQS, msg *sqs.Message, err error) error {
-	_, drr := s.DeleteMessage(&sqs.DeleteMessageInput{QueueUrl: q.url, ReceiptHandle: msg.ReceiptHandle})
-	return drr
+func (q *queue) deleteMessage(s *sqs.SQS, msg *sqs.Message) error {
+	_, err := s.DeleteMessage(&sqs.DeleteMessageInput{QueueUrl: q.url, ReceiptHandle: msg.ReceiptHandle})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // stop the queue consuming

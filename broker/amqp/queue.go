@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spiral/jobs/v2"
 	"github.com/streadway/amqp"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -104,17 +105,24 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 		return nil, nil, consume.closeChan(cc, err)
 	}
 
-	// do i like it?
-	go func() {
-		for {
-			select {
-			case err := <-cc.signal:
-				// channel error, we need new channel
-				consume.closeChan(cc, err)
-				return
+
+	g := &errgroup.Group{}
+
+	g.Go(func() error {
+		for err := range cc.signal {
+			// channel error, we need new channel
+			err = consume.closeChan(cc, err)
+			if err != nil {
+				// TODO temporary, we need to g.Wait() for waiting error
+				// but it will block the execution
+				fmt.Println("--------ERROR OCCURED---------")
+				fmt.Println(fmt.Sprintf("ERROR: %s", err.Error()))
+				return err
 			}
 		}
-	}()
+		return nil
+	})
+
 
 	return delivery, cc, err
 }

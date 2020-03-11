@@ -3,6 +3,8 @@ package jobs
 import (
 	"fmt"
 	"github.com/spiral/roadrunner/util"
+	"golang.org/x/sync/errgroup"
+
 )
 
 type rpcServer struct{ svc *Service }
@@ -29,16 +31,22 @@ func (rpc *rpcServer) Push(j *Job, id *string) (err error) {
 	return
 }
 
-// Push job to the testQueue.
+// PushAsync push job to the queue in goroutine and wait for the error
 func (rpc *rpcServer) PushAsync(j *Job, ok *bool) (err error) {
 	if rpc.svc == nil {
 		return fmt.Errorf("jobs server is not running")
 	}
+	g := errgroup.Group{}
 
+	g.Go(func() error {
+		_, err := rpc.svc.Push(j)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 	*ok = true
-	go rpc.svc.Push(j)
-
-	return
+	return g.Wait()
 }
 
 // Reset resets underlying RR worker pool and restarts all of it's workers.

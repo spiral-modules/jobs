@@ -8,8 +8,14 @@ import (
 
 func TestBroker_Stat(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {

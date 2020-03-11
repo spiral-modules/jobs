@@ -65,7 +65,14 @@ func (t *tube) serve(connector connFactory) {
 		t.report(err)
 		return
 	}
-	defer cn.Close()
+	defer func() {
+		err = cn.Close()
+		if err != nil {
+			// blank
+			// TODO integrate logs
+			println(err)
+		}
+	}()
 
 	t.wait = make(chan interface{})
 	atomic.StoreInt32(&t.active, 1)
@@ -110,8 +117,7 @@ func (t *tube) consume(cn *conn) (*entry, error) {
 		t.tubeSet.Conn = conn
 
 		id, data, err := t.tubeSet.Reserve(t.reserve)
-		cn.release(err)
-
+		err = cn.release(err)
 		if err != nil {
 			return nil, err
 		}

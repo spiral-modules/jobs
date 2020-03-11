@@ -9,7 +9,6 @@ import (
 // Broker run consume using Broker service.
 type Broker struct {
 	cfg     *Config
-	mul     sync.Mutex
 	lsn     func(event int, ctx interface{})
 	mu      sync.Mutex
 	wait    chan error
@@ -129,7 +128,11 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	return t.put(b.conn, 0, pack(j), j.Options.DelayDuration(), j.Options.TimeoutDuration())
+	packed, err := pack(j)
+	if err != nil {
+		return "", err
+	}
+	return t.put(b.conn, 0, packed, j.Options.DelayDuration(), j.Options.TimeoutDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.

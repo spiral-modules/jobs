@@ -94,7 +94,12 @@ func TestService_ServeStop(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 	c.Stop()
 }
@@ -148,11 +153,17 @@ func TestService_GetPipeline(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	assert.Equal(t, "ephemeral", jobs(c).cfg.pipelines.Get("default").Broker())
+	c.Stop()
 }
 
 func TestService_StatPipeline(t *testing.T) {
@@ -180,8 +191,12 @@ func TestService_StatPipeline(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
@@ -192,6 +207,7 @@ func TestService_StatPipeline(t *testing.T) {
 
 	assert.Equal(t, int64(0), stat.Queue)
 	assert.Equal(t, true, stat.Consuming)
+	c.Stop()
 }
 
 func TestService_StatNonConsumingPipeline(t *testing.T) {
@@ -219,8 +235,12 @@ func TestService_StatNonConsumingPipeline(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
@@ -231,6 +251,7 @@ func TestService_StatNonConsumingPipeline(t *testing.T) {
 
 	assert.Equal(t, int64(0), stat.Queue)
 	assert.Equal(t, false, stat.Consuming)
+	c.Stop()
 }
 
 func TestService_DoJob(t *testing.T) {
@@ -263,8 +284,12 @@ func TestService_DoJob(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
@@ -280,9 +305,13 @@ func TestService_DoJob(t *testing.T) {
 
 	data, err := ioutil.ReadFile("tests/local.job")
 	assert.NoError(t, err)
-	defer syscall.Unlink("tests/local.job")
 
 	assert.Contains(t, string(data), id)
+	err = syscall.Unlink("tests/local.job")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Stop()
 }
 
 func TestService_DoUndefinedJob(t *testing.T) {
@@ -311,8 +340,12 @@ func TestService_DoUndefinedJob(t *testing.T) {
 
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
@@ -323,6 +356,7 @@ func TestService_DoUndefinedJob(t *testing.T) {
 		Options: &Options{},
 	})
 	assert.Error(t, err)
+	c.Stop()
 }
 
 func TestService_DoJobIntoInvalidBroker(t *testing.T) {
@@ -354,8 +388,12 @@ func TestService_DoJobIntoInvalidBroker(t *testing.T) {
 
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
@@ -366,6 +404,7 @@ func TestService_DoJobIntoInvalidBroker(t *testing.T) {
 		Options: &Options{},
 	})
 	assert.Error(t, err)
+	c.Stop()
 }
 
 func TestService_DoStatInvalidBroker(t *testing.T) {
@@ -396,14 +435,19 @@ func TestService_DoStatInvalidBroker(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
 
 	_, err := svc.Stat(svc.cfg.pipelines.Get("default"))
 	assert.Error(t, err)
+	c.Stop()
 }
 
 func TestService_DoErrorJob(t *testing.T) {
@@ -439,8 +483,12 @@ func TestService_DoErrorJob(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
 	<-ready
 
 	svc := jobs(c)
@@ -455,4 +503,5 @@ func TestService_DoErrorJob(t *testing.T) {
 	<-jobReady
 	assert.Error(t, jobErr)
 	assert.Contains(t, jobErr.Error(), "something is wrong")
+	c.Stop()
 }

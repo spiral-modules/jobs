@@ -37,8 +37,13 @@ func TestRPC_StatPipeline(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -54,6 +59,7 @@ func TestRPC_StatPipeline(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, true, list.Pipelines[0].Consuming)
+	c.Stop()
 }
 
 func TestRPC_StatNonActivePipeline(t *testing.T) {
@@ -83,8 +89,13 @@ func TestRPC_StatNonActivePipeline(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -100,6 +111,7 @@ func TestRPC_StatNonActivePipeline(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, false, list.Pipelines[0].Consuming)
+	c.Stop()
 }
 
 func TestRPC_StatPipelineWithUndefinedBroker(t *testing.T) {
@@ -129,8 +141,14 @@ func TestRPC_StatPipelineWithUndefinedBroker(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -141,6 +159,7 @@ func TestRPC_StatPipelineWithUndefinedBroker(t *testing.T) {
 
 	list := &PipelineList{}
 	assert.Error(t, cl.Call("jobs.Stat", true, &list))
+	c.Stop()
 }
 
 func TestRPC_EnableConsuming(t *testing.T) {
@@ -175,8 +194,13 @@ func TestRPC_EnableConsuming(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -196,6 +220,7 @@ func TestRPC_EnableConsuming(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, true, list.Pipelines[0].Consuming)
+	c.Stop()
 }
 
 func TestRPC_EnableConsumingUndefined(t *testing.T) {
@@ -225,8 +250,13 @@ func TestRPC_EnableConsumingUndefined(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -236,6 +266,7 @@ func TestRPC_EnableConsumingUndefined(t *testing.T) {
 	assert.NoError(t, err)
 	ok := ""
 	assert.Error(t, cl.Call("jobs.Resume", "undefined", &ok))
+	c.Stop()
 }
 
 func TestRPC_EnableConsumingUndefinedBroker(t *testing.T) {
@@ -265,8 +296,13 @@ func TestRPC_EnableConsumingUndefinedBroker(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -276,6 +312,7 @@ func TestRPC_EnableConsumingUndefinedBroker(t *testing.T) {
 	assert.NoError(t, err)
 	ok := ""
 	assert.Error(t, cl.Call("jobs.Resume", "default", &ok))
+	c.Stop()
 }
 
 func TestRPC_EnableConsumingAllUndefinedBroker(t *testing.T) {
@@ -305,8 +342,13 @@ func TestRPC_EnableConsumingAllUndefinedBroker(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -316,6 +358,7 @@ func TestRPC_EnableConsumingAllUndefinedBroker(t *testing.T) {
 	assert.NoError(t, err)
 	ok := ""
 	assert.Error(t, cl.Call("jobs.ResumeAll", true, &ok))
+	c.Stop()
 }
 
 func TestRPC_DisableConsuming(t *testing.T) {
@@ -350,8 +393,14 @@ func TestRPC_DisableConsuming(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -371,6 +420,7 @@ func TestRPC_DisableConsuming(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, false, list.Pipelines[0].Consuming)
+	c.Stop()
 }
 
 func TestRPC_DisableConsumingUndefined(t *testing.T) {
@@ -400,8 +450,13 @@ func TestRPC_DisableConsumingUndefined(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -412,6 +467,7 @@ func TestRPC_DisableConsumingUndefined(t *testing.T) {
 
 	ok := ""
 	assert.Error(t, cl.Call("jobs.Stop", "undefined", &ok))
+	c.Stop()
 }
 
 func TestRPC_EnableAllConsuming(t *testing.T) {
@@ -446,8 +502,13 @@ func TestRPC_EnableAllConsuming(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -467,6 +528,7 @@ func TestRPC_EnableAllConsuming(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, true, list.Pipelines[0].Consuming)
+	c.Stop()
 }
 
 func TestRPC_DisableAllConsuming(t *testing.T) {
@@ -501,8 +563,13 @@ func TestRPC_DisableAllConsuming(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -522,6 +589,7 @@ func TestRPC_DisableAllConsuming(t *testing.T) {
 
 	assert.Equal(t, int64(0), list.Pipelines[0].Queue)
 	assert.Equal(t, false, list.Pipelines[0].Consuming)
+	c.Stop()
 }
 
 func TestRPC_DoJob(t *testing.T) {
@@ -556,8 +624,13 @@ func TestRPC_DoJob(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -578,9 +651,13 @@ func TestRPC_DoJob(t *testing.T) {
 
 	data, err := ioutil.ReadFile("tests/local.job")
 	assert.NoError(t, err)
-	defer syscall.Unlink("tests/local.job")
 
 	assert.Contains(t, string(data), id)
+	err = syscall.Unlink("tests/local.job")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Stop()
 }
 
 func TestRPC_NoOperationOnDeadServer(t *testing.T) {
@@ -626,8 +703,13 @@ func TestRPC_Workers(t *testing.T) {
 		}
 	})
 
-	go func() { c.Serve() }()
-	defer c.Stop()
+	go func() {
+		err := c.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	<-ready
 
 	s2, _ := c.Get(rpc.ID)
@@ -654,4 +736,5 @@ func TestRPC_Workers(t *testing.T) {
 	assert.Len(t, list.Workers, 1)
 
 	assert.NotEqual(t, list.Workers[0].Pid, pid)
+	c.Stop()
 }

@@ -57,7 +57,10 @@ func (p *tcpProxy) serve() {
 		}
 
 		if !p.accepting() {
-			in.Close()
+			err = in.Close()
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		up, err := net.Dial("tcp", p.upstream)
@@ -65,8 +68,19 @@ func (p *tcpProxy) serve() {
 			panic(err)
 		}
 
-		go io.Copy(in, up)
-		go io.Copy(up, in)
+		go func() {
+			_, err = io.Copy(in, up)
+			if err != nil {
+				panic(err)
+			}
+		}()
+
+		go func() {
+			_, err = io.Copy(up, in)
+			if err != nil {
+				panic(err)
+			}
+		}()
 
 		p.mu.Lock()
 		p.conn = append(p.conn, in, up)
@@ -102,7 +116,10 @@ func (p *tcpProxy) reset(accept bool) int {
 
 	count := 0
 	for _, conn := range p.conn {
-		conn.Close()
+		err := conn.Close()
+		if err != nil {
+			panic(err)
+		}
 		count++
 	}
 
@@ -125,8 +142,14 @@ func TestBroker_Durability_Base(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -170,8 +193,14 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -238,8 +267,14 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -307,8 +342,14 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -389,8 +430,14 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -450,8 +497,14 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -470,23 +523,32 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 
 	proxy.waitConn(1)
 
-	b.Push(proxyPipe, &jobs.Job{
+	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "kill",
-		Options: &jobs.Options{Timeout: 2},
+		Options: &jobs.Options{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	b.Push(proxyPipe, &jobs.Job{
+	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 2},
+		Options: &jobs.Options{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	b.Push(proxyPipe, &jobs.Job{
+	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
-		Options: &jobs.Options{Timeout: 2},
+		Options: &jobs.Options{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	st, serr := b.Stat(proxyPipe)
 	assert.NoError(t, serr)
@@ -521,8 +583,14 @@ func TestBroker_Durability_StopDead(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(proxyPipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {

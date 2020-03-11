@@ -3,6 +3,7 @@ package amqp
 import (
 	"fmt"
 	"github.com/streadway/amqp"
+	"golang.org/x/sync/errgroup"
 	"sync"
 	"time"
 )
@@ -20,7 +21,6 @@ type chanPool struct {
 // manages single channel
 type channel struct {
 	ch       *amqp.Channel
-	consumer string
 	confirm  chan amqp.Confirmation
 	signal   chan error
 }
@@ -58,18 +58,26 @@ func (cp *chanPool) Close() error {
 	}
 
 	// close all channels and consume
-	var wg sync.WaitGroup
-	for _, ch := range cp.channels {
-		wg.Add(1)
+	g := &errgroup.Group{}
 
-		go func(ch *channel) {
-			defer wg.Done()
-			cp.closeChan(ch, nil)
-		}(ch)
+	for _, ch := range cp.channels {
+		// copy variable
+		channel := *ch
+
+		g.Go(func() error {
+			err := cp.closeChan(&channel, nil)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
 	cp.mu.Unlock()
 
-	wg.Wait()
+	err := g.Wait()
+	if err != nil {
+		return err
+	}
 
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
