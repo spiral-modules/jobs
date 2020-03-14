@@ -284,6 +284,9 @@ func TestBroker_Consume_Errored(t *testing.T) {
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
 			close(ready)
+		} else {
+			close(ready)
+			t.Fatalf("event isn't equal to jobs.EventBrokerReady, event: %d", event)
 		}
 	})
 
@@ -298,7 +301,7 @@ func TestBroker_Consume_Errored(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, exec, errHandler))
 
 	go func() { assert.NoError(t, b.Serve()) }()
-
+	defer b.Stop()
 	<-ready
 
 	jid, perr := b.Push(pipe, &jobs.Job{Job: "test", Payload: "body", Options: &jobs.Options{}})
@@ -315,7 +318,6 @@ func TestBroker_Consume_Errored(t *testing.T) {
 
 	<-waitJob
 	<-errHandled
-	b.Stop()
 }
 
 func TestBroker_Consume_Errored_Attempts(t *testing.T) {

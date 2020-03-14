@@ -97,12 +97,12 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 	}
 
 	if err := cc.ch.Qos(q.pipe.Integer("prefetch", 4), 0, false); err != nil {
-		return nil, nil, consume.closeChan(cc, err)
+		return nil, nil, consume.closeChan(cc)
 	}
 
 	delivery, err := cc.ch.Consume(q.name, q.consumer, false, false, false, false, nil)
 	if err != nil {
-		return nil, nil, consume.closeChan(cc, err)
+		return nil, nil, consume.closeChan(cc)
 	}
 
 
@@ -111,7 +111,7 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 	g.Go(func() error {
 		for err := range cc.signal {
 			// channel error, we need new channel
-			err = consume.closeChan(cc, err)
+			err = consume.closeChan(cc)
 			if err != nil {
 				// TODO temporary, we need to g.Wait() for waiting error
 				// but it will block the execution
@@ -213,7 +213,7 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 	)
 
 	if err != nil {
-		return cp.closeChan(c, err)
+		return cp.closeChan(c)
 	}
 
 	confirmed, ok := <-c.confirm
@@ -233,17 +233,17 @@ func (q *queue) declare(cp *chanPool, queue string, key string, args amqp.Table)
 
 	err = c.ch.ExchangeDeclare(q.exchange, "direct", true, false, false, false, nil)
 	if err != nil {
-		return cp.closeChan(c, err)
+		return cp.closeChan(c)
 	}
 
 	_, err = c.ch.QueueDeclare(queue, true, false, false, false, args)
 	if err != nil {
-		return cp.closeChan(c, err)
+		return cp.closeChan(c)
 	}
 
 	err = c.ch.QueueBind(queue, key, q.exchange, false, nil)
 	if err != nil {
-		return cp.closeChan(c, err)
+		return cp.closeChan(c)
 	}
 
 	// keep channel open
@@ -259,7 +259,7 @@ func (q *queue) inspect(cp *chanPool) (*amqp.Queue, error) {
 
 	queue, err := c.ch.QueueInspect(q.name)
 	if err != nil {
-		return nil, cp.closeChan(c, err)
+		return nil, cp.closeChan(c)
 	}
 
 	// keep channel open

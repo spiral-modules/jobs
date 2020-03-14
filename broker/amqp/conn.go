@@ -65,7 +65,7 @@ func (cp *chanPool) Close() error {
 		channel := *ch
 
 		g.Go(func() error {
-			err := cp.closeChan(&channel, nil)
+			err := cp.closeChan(&channel)
 			if err != nil {
 				return err
 			}
@@ -209,14 +209,20 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 }
 
 // closeChan gracefully closes and removes channel allocation.
-func (cp *chanPool) closeChan(c *channel, err error) error {
+func (cp *chanPool) closeChan(c *channel) error {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 
-	go func() {
+	g := &errgroup.Group{}
+
+	g.Go(func() error {
 		c.signal <- nil
-		c.ch.Close()
-	}()
+		err := c.ch.Close()
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 
 	for name, ch := range cp.channels {
 		if ch == c {
@@ -224,5 +230,5 @@ func (cp *chanPool) closeChan(c *channel, err error) error {
 		}
 	}
 
-	return err
+	return g.Wait()
 }

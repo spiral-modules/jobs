@@ -60,13 +60,23 @@ func (b *Broker) Serve() (err error) {
 		b.mu.Unlock()
 		return err
 	}
-	defer b.publish.Close()
+	defer func() {
+		err = b.publish.Close()
+		if err != nil {
+			println(err.Error())
+		}
+	}()
 
 	if b.consume, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
 		b.mu.Unlock()
 		return err
 	}
-	defer b.consume.Close()
+	defer func() {
+		err = b.consume.Close()
+		if err != nil {
+			println(err.Error())
+		}
+	}()
 
 	for _, q := range b.queues {
 		err := q.declare(b.publish, q.name, q.name, nil)
