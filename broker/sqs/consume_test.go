@@ -258,7 +258,6 @@ func TestBroker_Consume_Errored(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, exec, errHandler))
 
 	go func() { assert.NoError(t, b.Serve()) }()
-	defer b.Stop()
 
 	<-ready
 
@@ -276,6 +275,7 @@ func TestBroker_Consume_Errored(t *testing.T) {
 
 	<-waitJob
 	<-errHandled
+	b.Stop()
 }
 
 func TestBroker_Consume_Errored_Attempts(t *testing.T) {

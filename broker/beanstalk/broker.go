@@ -60,7 +60,7 @@ func (b *Broker) Serve() (err error) {
 	defer b.conn.Close()
 
 	for _, t := range b.tubes {
-		tt := *t
+		tt := t
 		if tt.execPool != nil {
 			go tt.serve(b.cfg)
 		}
@@ -111,7 +111,7 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 	t.errHandler = errHandler
 
 	if b.conn != nil {
-		tt := *t
+		tt := t
 		if tt.execPool != nil {
 			go tt.serve(connFactory(b.cfg))
 		}

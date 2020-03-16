@@ -47,7 +47,7 @@ func (b *Broker) Serve() error {
 	// start consuming
 	b.mu.Lock()
 	for _, q := range b.queues {
-		qq := *q
+		qq := q
 		if qq.execPool != nil {
 			go qq.serve()
 		}

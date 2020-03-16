@@ -67,7 +67,7 @@ func (b *Broker) Serve() (err error) {
 	}
 
 	for _, q := range b.queues {
-		qq := *q
+		qq := q
 		if qq.execPool != nil {
 			go qq.serve(b.sqs, b.cfg.TimeoutDuration())
 		}
