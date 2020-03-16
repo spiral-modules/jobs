@@ -1,26 +1,59 @@
 package amqp
 
 import (
+	"github.com/Shopify/toxiproxy/client"
 	"github.com/spiral/jobs/v2"
 	"github.com/stretchr/testify/assert"
-	"io"
 	"net"
 	"sync"
 	"testing"
 	"time"
 )
 
+
+var toxiClient *toxiproxy.Client
+var proxy *toxiproxy.Proxy
+
+
+func init() {
+	var err error
+	toxiClient = toxiproxy.NewClient("localhost:8474")
+	//proxies, err = toxiClient.Populate([]toxiproxy.Proxy{{
+	//	Name:     "amqp",
+	//	Listen:   "localhost:5673",
+	//	Upstream: "localhost:5672",
+	//}})
+	//err = toxiClient.ResetState()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//p, err := toxiClient.Proxy("amqp")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//err = p.Delete()
+	//if err != nil {
+	//	panic(err)
+	//}
+	proxy, err = toxiClient.CreateProxy("amqp", "localhost:26379", "localhost:15672")
+	if err != nil {
+		panic(err)
+	}
+	// Alternatively, create the proxies manually with
+	// toxiClient.CreateProxy("redis", "localhost:26379", "localhost:6379")
+}
+
 var (
 	proxyCfg = &Config{
-		Addr:    "amqp://guest:guest@localhost:5673/",
+		Addr:    "amqp://guest:guest@localhost:26379/",
 		Timeout: 1,
 	}
 
-	proxy = &tcpProxy{
-		listen:   "localhost:5673",
-		upstream: "localhost:5672",
-		accept:   true,
-	}
+	//proxy = &tcpProxy{
+	//	listen:   "localhost:5673",
+	//	upstream: "localhost:5672",
+	//	accept:   true,
+	//}
 )
 
 type tcpProxy struct {
@@ -31,100 +64,100 @@ type tcpProxy struct {
 	conn     []net.Conn
 }
 
-func (p *tcpProxy) serve() {
-	l, err := net.Listen("tcp", p.listen)
-	if err != nil {
-		panic(err)
-	}
-
-	for {
-		in, err := l.Accept()
-		if err != nil {
-			panic(err)
-		}
-
-		if !p.accepting() {
-			err = in.Close()
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		up, err := net.Dial("tcp", p.upstream)
-		if err != nil {
-			panic(err)
-		}
-
-		go func() {
-			_, _ = io.Copy(in, up)
-		}()
-
-
-		go func() {
-			_, _ = io.Copy(up, in)
-		}()
-
-		p.mu.Lock()
-		p.conn = append(p.conn, in, up)
-		p.mu.Unlock()
-	}
-}
+//func (p *tcpProxy) serve() {
+//	l, err := net.Listen("tcp", p.listen)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	for {
+//		in, err := l.Accept()
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		if !p.accepting() {
+//			err = in.Close()
+//			if err != nil {
+//				panic(err)
+//			}
+//		}
+//
+//		up, err := net.Dial("tcp", p.upstream)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		go func() {
+//			_, _ = io.Copy(in, up)
+//		}()
+//
+//
+//		go func() {
+//			_, _ = io.Copy(up, in)
+//		}()
+//
+//		p.mu.Lock()
+//		p.conn = append(p.conn, in, up)
+//		p.mu.Unlock()
+//	}
+//}
 
 // wait for specific number of connections
-func (p *tcpProxy) waitConn(count int) *tcpProxy {
-	p.mu.Lock()
-	p.accept = true
-	p.mu.Unlock()
+//func (p *tcpProxy) waitConn(count int) *tcpProxy {
+//	p.mu.Lock()
+//	p.accept = true
+//	p.mu.Unlock()
+//
+//	for {
+//		p.mu.Lock()
+//		current := len(p.conn)
+//		p.mu.Unlock()
+//
+//		if current >= count*2 {
+//			break
+//		}
+//
+//		time.Sleep(time.Millisecond * 500)
+//	}
+//
+//	return p
+//}
 
-	for {
-		p.mu.Lock()
-		current := len(p.conn)
-		p.mu.Unlock()
-
-		if current >= count*2 {
-			break
-		}
-
-		time.Sleep(time.Millisecond * 500)
-	}
-
-	return p
-}
-
-func (p *tcpProxy) reset(accept bool) int {
-	p.mu.Lock()
-	p.accept = accept
-	defer p.mu.Unlock()
-
-	count := 0
-	for _, conn := range p.conn {
-		err := conn.Close()
-		if err != nil {
-			panic(err)
-		}
-		count++
-	}
-
-	p.conn = nil
-	return count / 2
-}
-
-func (p *tcpProxy) accepting() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	return p.accept
-}
-
-func init() {
-	go proxy.serve()
-}
+//func (p *tcpProxy) reset(accept bool) int {
+//	p.mu.Lock()
+//	p.accept = accept
+//	defer p.mu.Unlock()
+//
+//	count := 0
+//	for _, conn := range p.conn {
+//		conn.Close()
+//		count++
+//	}
+//
+//	p.conn = nil
+//	return count / 2
+//}
+//
+//func (p *tcpProxy) accepting() bool {
+//	p.mu.Lock()
+//	defer p.mu.Unlock()
+//
+//	return p.accept
+//}
+//
+//func init() {
+//	go proxy.serve()
+//}
 
 func TestBroker_Durability_Base(t *testing.T) {
-	defer proxy.reset(true)
-
+	err := proxy.Enable()
+	defer proxy.Delete()
+	if err != nil {
+		t.Fatal(err)
+	}
 	b := &Broker{}
-	_, err := b.Init(proxyCfg)
+	_, err = b.Init(proxyCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +191,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	// expect 2 connections
-	proxy.waitConn(2)
+	//proxy.waitConn(2)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -181,7 +214,7 @@ func TestBroker_Durability_Base(t *testing.T) {
 }
 
 func TestBroker_Durability_Consume(t *testing.T) {
-	defer proxy.reset(true)
+	//defer proxy.reset(true)
 
 	b := &Broker{}
 	_, err := b.Init(proxyCfg)
@@ -218,7 +251,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
-	proxy.waitConn(2).reset(false)
+	//proxy.waitConn(2).reset(false)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -229,7 +262,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	assert.Error(t, perr)
 
 	// restore
-	proxy.waitConn(2)
+	//proxy.waitConn(2)
 
 	jid, perr = b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -265,7 +298,7 @@ func TestBroker_Durability_Consume(t *testing.T) {
 }
 
 func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
-	defer proxy.reset(true)
+	//defer proxy.reset(true)
 
 	b := &Broker{}
 	_, err := b.Init(proxyCfg)
@@ -302,7 +335,7 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
-	proxy.waitConn(1).reset(false)
+	//proxy.waitConn(1).reset(false)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -322,7 +355,7 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 
 	// restore
 	time.Sleep(3 * time.Second)
-	proxy.waitConn(1)
+	//proxy.waitConn(1)
 
 	jid, perr = b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -359,102 +392,102 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 	}
 }
 
-//func TestBroker_Durability_Consume2(t *testing.T) {
-//	defer proxy.reset(true)
-//
-//	b := &Broker{}
-//	_, err := b.Init(proxyCfg)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	err = b.Register(pipe)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	ready := make(chan interface{})
-//	b.Listen(func(event int, ctx interface{}) {
-//		if event == jobs.EventBrokerReady {
-//			close(ready)
-//		}
-//	})
-//
-//	exec := make(chan jobs.Handler, 1)
-//
-//	go func() {
-//		err = b.Serve()
-//		if err != nil {
-//			panic(err)
-//		}
-//	}()
-//	defer b.Stop()
-//
-//	<-ready
-//
-//	ch, err := b.consume.channel("purger")
-//	if err != nil {
-//		panic(err)
-//	}
-//	_, err = ch.ch.QueuePurge("rr-queue", false)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
-//
-//	proxy.waitConn(2).reset(false)
-//
-//	jid, perr := b.Push(pipe, &jobs.Job{
-//		Job:     "test",
-//		Payload: "body",
-//		Options: &jobs.Options{},
-//	})
-//
-//	assert.Error(t, perr)
-//
-//	// restore
-//	proxy.waitConn(2)
-//
-//	jid, perr = b.Push(pipe, &jobs.Job{
-//		Job:     "test",
-//		Payload: "body",
-//		Options: &jobs.Options{},
-//	})
-//
-//	assert.NotEqual(t, "", jid)
-//	assert.NoError(t, perr)
-//	if perr != nil {
-//		panic(perr)
-//	}
-//
-//	proxy.reset(true)
-//
-//	mu := sync.Mutex{}
-//	done := make(map[string]bool)
-//	exec <- func(id string, j *jobs.Job) error {
-//		mu.Lock()
-//		defer mu.Unlock()
-//		done[id] = true
-//
-//		assert.Equal(t, jid, id)
-//		assert.Equal(t, "body", j.Payload)
-//
-//		return nil
-//	}
-//
-//	for {
-//		mu.Lock()
-//		num := len(done)
-//		mu.Unlock()
-//
-//		if num >= 1 {
-//			break
-//		}
-//	}
-//}
+func TestBroker_Durability_Consume2(t *testing.T) {
+	//defer proxy.reset(true)
+
+	b := &Broker{}
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	exec := make(chan jobs.Handler, 1)
+
+	go func() {
+		err = b.Serve()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	defer b.Stop()
+
+	<-ready
+
+	ch, err := b.consume.channel("purger")
+	if err != nil {
+		panic(err)
+	}
+	_, err = ch.ch.QueuePurge("rr-queue", false)
+	if err != nil {
+		panic(err)
+	}
+
+	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
+
+	//proxy.waitConn(2).reset(false)
+
+	jid, perr := b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.Error(t, perr)
+
+	// restore
+	//proxy.waitConn(2)
+
+	jid, perr = b.Push(pipe, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+	if perr != nil {
+		panic(perr)
+	}
+
+	//proxy.reset(true)
+
+	mu := sync.Mutex{}
+	done := make(map[string]bool)
+	exec <- func(id string, j *jobs.Job) error {
+		mu.Lock()
+		defer mu.Unlock()
+		done[id] = true
+
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+
+		return nil
+	}
+
+	for {
+		mu.Lock()
+		num := len(done)
+		mu.Unlock()
+
+		if num >= 1 {
+			break
+		}
+	}
+}
 
 func TestBroker_Durability_Consume2_2(t *testing.T) {
-	defer proxy.reset(true)
+	//defer proxy.reset(true)
 
 	b := &Broker{}
 	_, err := b.Init(proxyCfg)
@@ -489,7 +522,7 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 		panic(err)
 	}
 
-	proxy.waitConn(2).reset(false)
+	//proxy.waitConn(2).reset(false)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -503,7 +536,7 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
 	// restore
-	proxy.waitConn(2)
+	//proxy.waitConn(2)
 
 	jid, perr = b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -517,12 +550,12 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 		panic(perr)
 	}
 
-	proxy.reset(false)
+	//proxy.reset(false)
 
 	_, serr := b.Stat(pipe)
 	assert.Error(t, serr)
 
-	proxy.reset(true)
+	//proxy.reset(true)
 
 	mu := sync.Mutex{}
 	done := make(map[string]bool)
@@ -549,7 +582,7 @@ func TestBroker_Durability_Consume2_2(t *testing.T) {
 }
 
 func TestBroker_Durability_Consume3(t *testing.T) {
-	defer proxy.reset(true)
+	//defer proxy.reset(true)
 
 	b := &Broker{}
 	_, err := b.Init(proxyCfg)
@@ -586,7 +619,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
-	proxy.waitConn(2)
+	//proxy.waitConn(2)
 
 	jid, perr := b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -625,7 +658,7 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 }
 
 func TestBroker_Durability_Consume4(t *testing.T) {
-	defer proxy.reset(true)
+	//defer proxy.reset(true)
 
 	b := &Broker{}
 	_, err := b.Init(proxyCfg)
@@ -662,7 +695,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
-	proxy.waitConn(2)
+	//proxy.waitConn(2)
 
 	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
@@ -696,7 +729,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	exec <- func(id string, j *jobs.Job) error {
 
 		if j.Payload == "kill" && len(done) == 0 {
-			proxy.reset(true)
+			//proxy.reset(true)
 		}
 
 		mu.Lock()
@@ -718,7 +751,7 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 }
 
 func TestBroker_Durability_StopDead(t *testing.T) {
-	defer proxy.reset(true)
+	//defer proxy.reset(true)
 
 	b := &Broker{}
 	_, err := b.Init(proxyCfg)
@@ -744,7 +777,7 @@ func TestBroker_Durability_StopDead(t *testing.T) {
 
 	<-ready
 
-	proxy.waitConn(2).reset(false)
+	//proxy.waitConn(2).reset(false)
 
 	b.Stop()
 }

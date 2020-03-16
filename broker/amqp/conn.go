@@ -3,7 +3,6 @@ package amqp
 import (
 	"fmt"
 	"github.com/streadway/amqp"
-	"golang.org/x/sync/errgroup"
 	"sync"
 	"time"
 )
@@ -20,9 +19,9 @@ type chanPool struct {
 
 // manages single channel
 type channel struct {
-	ch       *amqp.Channel
-	confirm  chan amqp.Confirmation
-	signal   chan error
+	ch      *amqp.Channel
+	confirm chan amqp.Confirmation
+	signal  chan error
 }
 
 type dialer func() (*amqp.Connection, error)
@@ -57,26 +56,12 @@ func (cp *chanPool) Close() error {
 		return fmt.Errorf("connection is dead")
 	}
 
-	// close all channels and consume
-	g := &errgroup.Group{}
-
-	for _, ch := range cp.channels {
-		// copy variable
-		channel := *ch
-
-		g.Go(func() error {
-			err := cp.closeChan(&channel)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-	}
 	cp.mu.Unlock()
-
-	err := g.Wait()
-	if err != nil {
-		return err
+	for _, ch := range cp.channels {
+		err := cp.closeChan(ch)
+		if err != nil {
+			return err
+		}
 	}
 
 	cp.mu.Lock()
@@ -213,16 +198,10 @@ func (cp *chanPool) closeChan(c *channel) error {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 
-	g := &errgroup.Group{}
-
-	g.Go(func() error {
-		c.signal <- nil
-		err := c.ch.Close()
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	err := c.ch.Close()
+	if err != nil {
+		return err
+	}
 
 	for name, ch := range cp.channels {
 		if ch == c {
@@ -230,5 +209,5 @@ func (cp *chanPool) closeChan(c *channel) error {
 		}
 	}
 
-	return g.Wait()
+	return nil
 }

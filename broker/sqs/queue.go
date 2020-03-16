@@ -156,11 +156,9 @@ func (q *queue) consume(s *sqs.SQS) ([]*sqs.Message, bool, error) {
 func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 	id, attempt, j, err := unpack(msg)
 	if err != nil {
-		err = q.deleteMessage(s, msg)
-		if err != nil {
-			return err
-		}
-		return nil
+		q.errHandler(id, j, err)
+		_ = q.deleteMessage(s, msg)
+		return err
 	}
 
 	// block the job based on known timeout
@@ -170,23 +168,17 @@ func (q *queue) do(s *sqs.SQS, h jobs.Handler, msg *sqs.Message) (err error) {
 		VisibilityTimeout: aws.Int64(int64(j.Options.TimeoutDuration().Seconds())),
 	})
 	if err != nil {
-		err = q.deleteMessage(s, msg)
-		if err != nil {
-			return err
-		}
-		return nil
+		_ = q.deleteMessage(s, msg)
+		q.errHandler(id, j, err)
+		return err
 	}
 
 	err = h(id, j)
 	if err != nil {
-		err = q.deleteMessage(s, msg)
-		if err != nil {
-			return err
-		}
-		return nil
+		_ = q.deleteMessage(s, msg)
+		q.errHandler(id, j, err)
+		return err
 	}
-
-	q.errHandler(id, j, err)
 
 	if !j.Options.CanRetry(attempt) {
 		return q.deleteMessage(s, msg)

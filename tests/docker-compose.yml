@@ -5,6 +5,10 @@ services:
     image: schickling/beanstalkd
     ports:
       - "11300:11300"
+  toxicproxy:
+    image: shopify/toxiproxy
+    ports:
+      - "8474:8474"
 
   sqs:
     image: vsouza/sqs-local

@@ -53,8 +53,9 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 }
 
 // Serve broker pipelines.
-func (b *Broker) Serve() (err error) {
+func (b *Broker) Serve() error {
 	b.mu.Lock()
+	var err error
 
 	if b.publish, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
 		b.mu.Unlock()
@@ -79,7 +80,7 @@ func (b *Broker) Serve() (err error) {
 	}()
 
 	for _, q := range b.queues {
-		err := q.declare(b.publish, q.name, q.name, nil)
+		err = q.declare(b.publish, q.name, q.name, nil)
 		if err != nil {
 			b.mu.Unlock()
 			return err

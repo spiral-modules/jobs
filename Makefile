@@ -5,7 +5,7 @@ install: all
 uninstall: 
 	rm -f /usr/local/bin/rr-jobs
 test:
-	#composer update
+	composer update
 	go test -v -race -cover
 	go test -v -race -cover ./broker/amqp
 	go test -v -race -cover ./broker/ephemeral

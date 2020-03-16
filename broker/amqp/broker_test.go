@@ -171,15 +171,15 @@ func TestBroker_Consume_Serve_Stop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wait := make(chan interface{})
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		assert.NoError(t, b.Serve())
-		close(wait)
 	}()
 	time.Sleep(time.Millisecond * 500)
 	b.Stop()
-
-	<-wait
+	wg.Wait()
 }
 
 func TestBroker_PushToNotRunning(t *testing.T) {

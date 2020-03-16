@@ -67,8 +67,9 @@ func (b *Broker) Serve() (err error) {
 	}
 
 	for _, q := range b.queues {
-		if q.execPool != nil {
-			go q.serve(b.sqs, b.cfg.TimeoutDuration())
+		qq := *q
+		if qq.execPool != nil {
+			go qq.serve(b.sqs, b.cfg.TimeoutDuration())
 		}
 	}
 
@@ -117,7 +118,8 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 	q.errHandler = errHandler
 
 	if b.sqs != nil && q.execPool != nil {
-		go q.serve(b.sqs, b.cfg.TimeoutDuration())
+		qq := *q
+		go qq.serve(b.sqs, b.cfg.TimeoutDuration())
 	}
 
 	return nil

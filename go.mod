@@ -3,6 +3,7 @@ module github.com/spiral/jobs/v2
 go 1.13
 
 require (
+	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/aws/aws-sdk-go v1.16.14
 	github.com/beanstalkd/go-beanstalk v0.0.0-20180822062812-53ecdaa3bcfb
 	github.com/buger/goterm v0.0.0-20181115115552-c206103e1f37
@@ -20,5 +21,6 @@ require (
 	github.com/streadway/amqp v0.0.0-20181205114330-a314942b2fd9
 	github.com/stretchr/testify v1.5.1
 	github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8 // indirect
+	golang.org/x/net v0.0.0-20200222125558-5a598a2470a0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 )
