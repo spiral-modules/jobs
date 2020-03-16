@@ -77,8 +77,9 @@ func (b *Broker) Serve() (err error) {
 	}
 
 	for _, q := range b.queues {
-		if q.execPool != nil {
-			go q.serve(b.publish, b.consume)
+		qq := *q
+		if qq.execPool != nil {
+			go qq.serve(b.publish, b.consume)
 		}
 	}
 
