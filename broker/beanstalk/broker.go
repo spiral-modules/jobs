@@ -60,8 +60,9 @@ func (b *Broker) Serve() (err error) {
 	defer b.conn.Close()
 
 	for _, t := range b.tubes {
-		if t.execPool != nil {
-			go t.serve(b.cfg)
+		tt := t
+		if tt.execPool != nil {
+			go tt.serve(b.cfg)
 		}
 	}
 
@@ -110,8 +111,9 @@ func (b *Broker) Consume(pipe *jobs.Pipeline, execPool chan jobs.Handler, errHan
 	t.errHandler = errHandler
 
 	if b.conn != nil {
-		if t.execPool != nil {
-			go t.serve(connFactory(b.cfg))
+		tt := t
+		if tt.execPool != nil {
+			go tt.serve(connFactory(b.cfg))
 		}
 	}
 
@@ -129,7 +131,12 @@ func (b *Broker) Push(pipe *jobs.Pipeline, j *jobs.Job) (string, error) {
 		return "", fmt.Errorf("undefined tube `%s`", pipe.Name())
 	}
 
-	return t.put(b.conn, 0, pack(j), j.Options.DelayDuration(), j.Options.TimeoutDuration())
+	data, err := pack(j)
+	if err != nil {
+		return "", err
+	}
+
+	return t.put(b.conn, 0, data, j.Options.DelayDuration(), j.Options.TimeoutDuration())
 }
 
 // Stat must fetch statistics about given pipeline or return error.

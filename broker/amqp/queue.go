@@ -105,7 +105,7 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 	}
 
 	// do i like it?
-	go func() {
+	go func(consume *chanPool) {
 		for {
 			select {
 			case err := <-cc.signal:
@@ -114,7 +114,7 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 				return
 			}
 		}
-	}()
+	}(consume)
 
 	return delivery, cc, err
 }

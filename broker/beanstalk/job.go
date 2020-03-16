@@ -6,11 +6,14 @@ import (
 	"github.com/spiral/jobs/v2"
 )
 
-func pack(j *jobs.Job) []byte {
+func pack(j *jobs.Job) ([]byte, error) {
 	b := new(bytes.Buffer)
-	gob.NewEncoder(b).Encode(j)
+	err := gob.NewEncoder(b).Encode(j)
+	if err != nil {
+		return nil, err
+	}
 
-	return b.Bytes()
+	return b.Bytes(), nil
 }
 
 func unpack(data []byte) (*jobs.Job, error) {
