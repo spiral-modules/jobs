@@ -112,8 +112,14 @@ func TestBroker_Durability_Base(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -157,9 +163,14 @@ func TestBroker_Durability_Consume(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
-
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -223,9 +234,14 @@ func TestBroker_Durability_Consume_LongTimeout(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
-
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -303,9 +319,14 @@ func TestBroker_Durability_Consume2(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
-
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -379,9 +400,14 @@ func TestBroker_Durability_Consume3(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
-
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -438,9 +464,14 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
-
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -458,23 +489,32 @@ func TestBroker_Durability_Consume4(t *testing.T) {
 
 	proxy.waitConn(2)
 
-	b.Push(pipe, &jobs.Job{
+	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "kill",
 		Options: &jobs.Options{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	b.Push(pipe, &jobs.Job{
+	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	b.Push(pipe, &jobs.Job{
+	_, err = b.Push(pipe, &jobs.Job{
 		Job:     "test",
 		Payload: "body",
 		Options: &jobs.Options{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	st, serr := b.Stat(pipe)
 	assert.NoError(t, serr)
@@ -507,9 +547,14 @@ func TestBroker_Durability_StopDead(t *testing.T) {
 	defer proxy.reset(true)
 
 	b := &Broker{}
-	b.Init(proxyCfg)
-	b.Register(pipe)
-
+	_, err := b.Init(proxyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {

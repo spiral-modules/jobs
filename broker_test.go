@@ -204,13 +204,14 @@ func newQueue() *testQueue {
 	return &testQueue{st: &Stat{}, jobs: make(chan *entry)}
 }
 
+// todo NOT USED
 // associate testQueue with new do pool
-func (q *testQueue) configure(execPool chan Handler, err ErrorHandler) error {
-	q.execPool = execPool
-	q.errHandler = err
-
-	return nil
-}
+//func (q *testQueue) configure(execPool chan Handler, err ErrorHandler) error {
+//	q.execPool = execPool
+//	q.errHandler = err
+//
+//	return nil
+//}
 
 // serve consumers
 func (q *testQueue) serve() {
