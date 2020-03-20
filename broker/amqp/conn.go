@@ -10,6 +10,8 @@ import (
 
 // manages set of AMQP channels
 type chanPool struct {
+	// timeout to backoff redial
+	tout      time.Duration
 	mu        sync.Mutex
 	conn      *amqp.Connection
 	channels  map[string]*channel
@@ -19,11 +21,11 @@ type chanPool struct {
 
 // manages single channel
 type channel struct {
-	ch       *amqp.Channel
+	ch *amqp.Channel
 	// todo unused
 	//consumer string
-	confirm  chan amqp.Confirmation
-	signal   chan error
+	confirm chan amqp.Confirmation
+	signal  chan error
 }
 
 type dialer func() (*amqp.Connection, error)
@@ -36,6 +38,7 @@ func newConn(dial dialer, tout time.Duration) (*chanPool, error) {
 	}
 
 	cp := &chanPool{
+		tout:      tout,
 		conn:      conn,
 		channels:  make(map[string]*channel),
 		wait:      make(chan interface{}),
@@ -43,7 +46,9 @@ func newConn(dial dialer, tout time.Duration) (*chanPool, error) {
 	}
 
 	close(cp.connected)
-	go cp.watch(dial, conn.NotifyClose(make(chan *amqp.Error)))
+	go func(dial dialer, conn *amqp.Connection) {
+		cp.watch(dial, conn.NotifyClose(make(chan *amqp.Error)))
+	}(dial, conn)
 
 	return cp, nil
 }
@@ -113,7 +118,7 @@ func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
 
 			// initialize the backoff
 			expb := backoff.NewExponentialBackOff()
-			expb.MaxInterval = DefaultMaxInterval
+			expb.MaxInterval = cp.tout
 
 			//reconnect function
 			reconnect := func() error {
@@ -138,7 +143,6 @@ func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
 				return nil
 			}
 
-
 			errb := backoff.Retry(reconnect, expb)
 			if errb != nil {
 				fmt.Println(fmt.Sprintf("backoff Retry error, %s", errb.Error()))
@@ -162,7 +166,7 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 	if dead {
 		// wait for connection restoration (doubled the timeout duration)
 		select {
-		case <-time.NewTimer(DefaultMaxInterval * 2).C:
+		case <-time.NewTimer(cp.tout * 2).C:
 			return nil, fmt.Errorf("connection is dead")
 		case <-cp.connected:
 			// connected

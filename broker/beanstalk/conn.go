@@ -117,7 +117,7 @@ func (cn *conn) watch(network, addr string) {
 			// try to reconnect
 			// TODO add logging here
 			expb := backoff.NewExponentialBackOff()
-			expb.MaxInterval = time.Second * 5
+			expb.MaxInterval = cn.tout
 
 			reconnect := func() error {
 				conn, err := beanstalk.Dial(network, addr)
