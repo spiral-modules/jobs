@@ -11,8 +11,11 @@ import (
 // manages set of AMQP channels
 type chanPool struct {
 	// timeout to backoff redial
-	tout      time.Duration
-	mu        sync.Mutex
+	tout time.Duration
+	url  string
+
+	mu sync.Mutex
+
 	conn      *amqp.Connection
 	channels  map[string]*channel
 	wait      chan interface{}
@@ -28,16 +31,15 @@ type channel struct {
 	signal  chan error
 }
 
-type dialer func() (*amqp.Connection, error)
-
 // newConn creates new watched AMQP connection
-func newConn(dial dialer, tout time.Duration) (*chanPool, error) {
-	conn, err := dial()
+func newConn(url string, tout time.Duration) (*chanPool, error) {
+	conn, err := dial(url)
 	if err != nil {
 		return nil, err
 	}
 
 	cp := &chanPool{
+		url:       url,
 		tout:      tout,
 		conn:      conn,
 		channels:  make(map[string]*channel),
@@ -46,11 +48,13 @@ func newConn(dial dialer, tout time.Duration) (*chanPool, error) {
 	}
 
 	close(cp.connected)
-	go func(dial dialer, conn *amqp.Connection) {
-		cp.watch(dial, conn.NotifyClose(make(chan *amqp.Error)))
-	}(dial, conn)
-
+	go cp.watch()
 	return cp, nil
+}
+
+// dial dials to AMQP.
+func dial(url string) (*amqp.Connection, error) {
+	return amqp.Dial(url)
 }
 
 // Close gracefully closes all underlying channels and connection.
@@ -96,14 +100,16 @@ func (cp *chanPool) waitConnected() chan interface{} {
 }
 
 // watch manages connection state and reconnects if needed
-func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
+func (cp *chanPool) watch() {
 	for {
 		select {
 		case <-cp.wait:
 			// connection has been closed
 			return
-		case err := <-errors:
+			// here we are waiting for the errors from amqp connection
+		case err := <-cp.conn.NotifyClose(make(chan *amqp.Error)):
 			cp.mu.Lock()
+			// clear connected, since connections are dead
 			cp.connected = make(chan interface{})
 
 			// broadcast error to all consume to let them for the tryReconnect
@@ -114,20 +120,20 @@ func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
 			// disable channel allocation while server is dead
 			cp.conn = nil
 			cp.channels = nil
-			cp.mu.Unlock()
 
 			// initialize the backoff
 			expb := backoff.NewExponentialBackOff()
 			expb.MaxInterval = cp.tout
+			cp.mu.Unlock()
 
-			//reconnect function
+			// reconnect function
 			reconnect := func() error {
 				cp.mu.Lock()
-				defer cp.mu.Unlock()
-				conn, err := dial()
+				conn, err := dial(cp.url)
 				if err != nil {
 					// still failing
 					fmt.Println(fmt.Sprintf("error during the amqp dialing, %s", err.Error()))
+					cp.mu.Unlock()
 					return err
 				}
 
@@ -139,17 +145,16 @@ func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
 				cp.conn = conn
 				// re-init the channels
 				cp.channels = make(map[string]*channel)
-				errors = cp.conn.NotifyClose(make(chan *amqp.Error))
+				cp.mu.Unlock()
 				return nil
 			}
 
+			// start backoff retry
 			errb := backoff.Retry(reconnect, expb)
 			if errb != nil {
 				fmt.Println(fmt.Sprintf("backoff Retry error, %s", errb.Error()))
 				// reconnection failed
-				cp.mu.Lock()
 				close(cp.connected)
-				cp.mu.Unlock()
 				return
 			}
 			close(cp.connected)

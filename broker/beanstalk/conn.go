@@ -111,9 +111,13 @@ func (cn *conn) release(err error) error {
 // watch and reconnect if dead
 func (cn *conn) watch(network, addr string) {
 	cn.free <- nil
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
 	for {
 		select {
 		case <-cn.dead:
+			// simple throttle limiter
+			<-t.C
 			// try to reconnect
 			// TODO add logging here
 			expb := backoff.NewExponentialBackOff()
