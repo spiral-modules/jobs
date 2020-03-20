@@ -3,6 +3,7 @@ package beanstalk
 import (
 	"fmt"
 	"github.com/beanstalkd/go-beanstalk"
+	"github.com/cenkalti/backoff/v4"
 	"strings"
 	"sync"
 	"time"
@@ -114,15 +115,30 @@ func (cn *conn) watch(network, addr string) {
 		select {
 		case <-cn.dead:
 			// try to reconnect
-			if conn, err := beanstalk.Dial(network, addr); err == nil {
+			// TODO add logging here
+			expb := backoff.NewExponentialBackOff()
+			expb.MaxInterval = time.Second * 5
+
+			reconnect := func() error {
+				conn, err := beanstalk.Dial(network, addr)
+				if err != nil {
+					fmt.Println(fmt.Sprintf("redial: error during the beanstalk dialing, %s", err.Error()))
+					return err
+				}
+
+				// TODO ADD LOGGING
+				fmt.Println("------beanstalk successfully redialed------")
+
 				cn.conn = conn
 				cn.free <- nil
-				continue
+				return nil
 			}
 
-			// retry later
-			time.Sleep(cn.tout)
-			cn.dead <- nil
+			err := backoff.Retry(reconnect, expb)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("redial failed: %s", err.Error()))
+				cn.dead <- nil
+			}
 
 		case <-cn.stop:
 			cn.lock.L.Lock()

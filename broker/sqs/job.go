@@ -19,7 +19,7 @@ var jobAttributes = []*string{
 
 // pack job metadata into headers
 func pack(url *string, j *jobs.Job) *sqs.SendMessageInput {
-	msg := &sqs.SendMessageInput{
+	return &sqs.SendMessageInput{
 		QueueUrl:     url,
 		DelaySeconds: aws.Int64(int64(j.Options.Delay)),
 		MessageBody:  aws.String(j.Payload),
@@ -31,8 +31,6 @@ func pack(url *string, j *jobs.Job) *sqs.SendMessageInput {
 			"rr-retryDelay":  {DataType: aws.String("Number"), StringValue: awsDuration(j.Options.RetryDuration())},
 		},
 	}
-
-	return msg
 }
 
 // unpack restores jobs.Options

@@ -6,6 +6,8 @@ require (
 	github.com/aws/aws-sdk-go v1.16.14
 	github.com/beanstalkd/go-beanstalk v0.0.0-20180822062812-53ecdaa3bcfb
 	github.com/buger/goterm v0.0.0-20181115115552-c206103e1f37
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/cenkalti/backoff/v4 v4.0.0
 	github.com/coreos/go-etcd v2.0.0+incompatible // indirect
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/dustin/go-humanize v1.0.0

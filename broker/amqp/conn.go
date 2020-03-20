@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"fmt"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/streadway/amqp"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 
 // manages set of AMQP channels
 type chanPool struct {
-	tout      time.Duration
 	mu        sync.Mutex
 	conn      *amqp.Connection
 	channels  map[string]*channel
@@ -36,7 +36,6 @@ func newConn(dial dialer, tout time.Duration) (*chanPool, error) {
 	}
 
 	cp := &chanPool{
-		tout:      tout,
 		conn:      conn,
 		channels:  make(map[string]*channel),
 		wait:      make(chan interface{}),
@@ -112,42 +111,44 @@ func (cp *chanPool) watch(dial dialer, errors chan *amqp.Error) {
 			cp.channels = nil
 			cp.mu.Unlock()
 
-			conn, errChan := cp.reconnect(dial)
-			if conn == nil {
+			// initialize the backoff
+			expb := backoff.NewExponentialBackOff()
+			expb.MaxInterval = DefaultMaxInterval
+
+			//reconnect function
+			reconnect := func() error {
+				cp.mu.Lock()
+				defer cp.mu.Unlock()
+				conn, err := dial()
+				if err != nil {
+					// still failing
+					fmt.Println(fmt.Sprintf("error during the amqp dialing, %s", err.Error()))
+					return err
+				}
+
+				// TODO ADD LOGGING
+				fmt.Println("------amqp successfully redialed------")
+
+				// here we are reconnected
+				// replace the connection
+				cp.conn = conn
+				// re-init the channels
+				cp.channels = make(map[string]*channel)
+				errors = cp.conn.NotifyClose(make(chan *amqp.Error))
+				return nil
+			}
+
+
+			errb := backoff.Retry(reconnect, expb)
+			if errb != nil {
+				fmt.Println(fmt.Sprintf("backoff Retry error, %s", errb.Error()))
+				// reconnection failed
 				cp.mu.Lock()
 				close(cp.connected)
 				cp.mu.Unlock()
-
-				// interrupted
 				return
 			}
-
-			cp.mu.Lock()
-			cp.conn = conn
-			cp.channels = make(map[string]*channel)
-			errors = errChan
-			cp.mu.Unlock()
-
 			close(cp.connected)
-		}
-	}
-}
-
-func (cp *chanPool) reconnect(dial dialer) (conn *amqp.Connection, errors chan *amqp.Error) {
-	for {
-		select {
-		case <-cp.wait:
-			// connection has been cancelled is not possible
-			return nil, nil
-
-		case <-time.NewTimer(cp.tout).C:
-			conn, err := dial()
-			if err != nil {
-				// still failing
-				continue
-			}
-
-			return conn, conn.NotifyClose(make(chan *amqp.Error))
 		}
 	}
 }
@@ -161,7 +162,7 @@ func (cp *chanPool) channel(name string) (*channel, error) {
 	if dead {
 		// wait for connection restoration (doubled the timeout duration)
 		select {
-		case <-time.NewTimer(cp.tout * 2).C:
+		case <-time.NewTimer(DefaultMaxInterval * 2).C:
 			return nil, fmt.Errorf("connection is dead")
 		case <-cp.connected:
 			// connected

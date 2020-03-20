@@ -5,6 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/spiral/jobs)](https://goreportcard.com/report/github.com/spiral/jobs)
 [![Codecov](https://codecov.io/gh/spiral/jobs/branch/master/graph/badge.svg)](https://codecov.io/gh/spiral/jobs/)
 
+
 ## Documentation
   * [Installation and Configuration](https://spiral.dev/docs/queue-configuration)
   * [Console Commands](https://spiral.dev/docs/queue-commands)
