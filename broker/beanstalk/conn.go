@@ -117,13 +117,18 @@ func (cn *conn) watch(network, addr string) {
 			// try to reconnect
 			// TODO add logging here
 			expb := backoff.NewExponentialBackOff()
+			expb.MaxInterval = time.Second * 5
 
 			reconnect := func() error {
 				conn, err := beanstalk.Dial(network, addr)
 				if err != nil {
-					fmt.Println(fmt.Sprintf("error during the beanstalk dialing, %s", err.Error()))
+					fmt.Println(fmt.Sprintf("redial: error during the beanstalk dialing, %s", err.Error()))
 					return err
 				}
+
+				// TODO ADD LOGGING
+				fmt.Println("------beanstalk successfully redialed------")
+
 				cn.conn = conn
 				cn.free <- nil
 				return nil
@@ -131,9 +136,11 @@ func (cn *conn) watch(network, addr string) {
 
 			err := backoff.Retry(reconnect, expb)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Redial failed: %s", err.Error()))
+				fmt.Println(fmt.Sprintf("redial failed: %s", err.Error()))
 				cn.dead <- nil
+				return
 			}
+			continue
 
 		case <-cn.stop:
 			cn.lock.L.Lock()
