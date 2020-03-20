@@ -9,7 +9,6 @@ import (
 // Broker run consume using Broker service.
 type Broker struct {
 	cfg     *Config
-	mul     sync.Mutex
 	lsn     func(event int, ctx interface{})
 	mu      sync.Mutex
 	wait    chan error

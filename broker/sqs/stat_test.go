@@ -8,8 +8,14 @@ import (
 
 func TestBroker_Stat(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -31,7 +37,7 @@ func TestBroker_Stat(t *testing.T) {
 	assert.NoError(t, perr)
 
 	// unable to use approximated stats
-	_, err := b.Stat(pipe)
+	_, err = b.Stat(pipe)
 	assert.NoError(t, err)
 
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))

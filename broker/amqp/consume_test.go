@@ -10,7 +10,10 @@ import (
 
 func TestBroker_Consume_Job(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
+		_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Register(pipe)
 
 	ready := make(chan interface{})
@@ -50,7 +53,10 @@ func TestBroker_Consume_Job(t *testing.T) {
 
 func TestBroker_ConsumeAfterStart_Job(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
+		_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Register(pipe)
 
 	ready := make(chan interface{})
@@ -90,7 +96,11 @@ func TestBroker_ConsumeAfterStart_Job(t *testing.T) {
 
 func TestBroker_Consume_Delayed(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	b.Register(pipe)
 
 	ready := make(chan interface{})
@@ -135,7 +145,10 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 
 func TestBroker_Consume_Errored(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
+		_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Register(pipe)
 
 	ready := make(chan interface{})
@@ -178,7 +191,10 @@ func TestBroker_Consume_Errored(t *testing.T) {
 
 func TestBroker_Consume_Errored_Attempts(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
+		_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	b.Register(pipe)
 
 	ready := make(chan interface{})

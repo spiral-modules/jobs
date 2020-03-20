@@ -10,8 +10,14 @@ import (
 
 func TestBroker_Consume_Job(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -56,9 +62,14 @@ func TestBroker_Consume_JobUseExistedPipeline(t *testing.T) {
 	}
 
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -96,9 +107,14 @@ func TestBroker_Consume_JobUseExistedPipeline(t *testing.T) {
 
 func TestBroker_Consume_PushTooBigDelay(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -124,9 +140,14 @@ func TestBroker_Consume_PushTooBigDelay(t *testing.T) {
 
 func TestBroker_Consume_PushTooBigDelay2(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -152,9 +173,14 @@ func TestBroker_Consume_PushTooBigDelay2(t *testing.T) {
 
 func TestBroker_ConsumeAfterStart_Job(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -192,9 +218,14 @@ func TestBroker_ConsumeAfterStart_Job(t *testing.T) {
 
 func TestBroker_Consume_Delayed(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -237,9 +268,14 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 
 func TestBroker_Consume_Errored(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {
@@ -280,9 +316,14 @@ func TestBroker_Consume_Errored(t *testing.T) {
 
 func TestBroker_Consume_Errored_Attempts(t *testing.T) {
 	b := &Broker{}
-	b.Init(cfg)
-	b.Register(pipe)
-
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
 		if event == jobs.EventBrokerReady {

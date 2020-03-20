@@ -106,13 +106,9 @@ func (q *queue) consume(consume *chanPool) (jobs <-chan amqp.Delivery, cc *chann
 
 	// do i like it?
 	go func(consume *chanPool) {
-		for {
-			select {
-			case err := <-cc.signal:
-				// channel error, we need new channel
-				consume.closeChan(cc, err)
-				return
-			}
+		for err := range cc.signal {
+			consume.closeChan(cc, err)
+			return
 		}
 	}(consume)
 

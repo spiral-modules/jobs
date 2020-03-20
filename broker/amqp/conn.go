@@ -20,7 +20,8 @@ type chanPool struct {
 // manages single channel
 type channel struct {
 	ch       *amqp.Channel
-	consumer string
+	// todo unused
+	//consumer string
 	confirm  chan amqp.Confirmation
 	signal   chan error
 }
