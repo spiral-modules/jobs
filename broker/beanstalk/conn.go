@@ -111,7 +111,7 @@ func (cn *conn) release(err error) error {
 // watch and reconnect if dead
 func (cn *conn) watch(network, addr string) {
 	cn.free <- nil
-	t := time.NewTicker(time.Second)
+	t := time.NewTicker(WatchThrottleLimit)
 	defer t.Stop()
 	for {
 		select {
