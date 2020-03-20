@@ -138,9 +138,7 @@ func (cn *conn) watch(network, addr string) {
 			if err != nil {
 				fmt.Println(fmt.Sprintf("redial failed: %s", err.Error()))
 				cn.dead <- nil
-				return
 			}
-			continue
 
 		case <-cn.stop:
 			cn.lock.L.Lock()
