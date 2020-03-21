@@ -1,6 +1,6 @@
 package jobs
 
-import "encoding/json"
+import json "github.com/json-iterator/go"
 
 // Handler handles job execution.
 type Handler func(id string, j *Job) error

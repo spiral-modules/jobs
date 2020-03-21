@@ -1,6 +1,6 @@
 module github.com/spiral/jobs/v2
 
-go 1.13
+go 1.14
 
 require (
 	github.com/aws/aws-sdk-go v1.16.14
@@ -12,6 +12,7 @@ require (
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gofrs/uuid v3.1.0+incompatible
+	github.com/json-iterator/go v1.1.9
 	github.com/kr/beanstalk v0.0.0-20180818045031-cae1762e4858 // indirect
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/prometheus/client_golang v1.5.0

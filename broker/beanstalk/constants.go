@@ -2,5 +2,5 @@ package beanstalk
 
 import "time"
 
-// DefaultMaxInterval is the max reconnect time interval
-const DefaultMaxInterval = 30 * time.Second
+// WatchThrottleLimit is used to limit reconnection occurrence in watch function
+const WatchThrottleLimit = time.Second

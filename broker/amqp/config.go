@@ -3,7 +3,6 @@ package amqp
 import (
 	"fmt"
 	"github.com/spiral/roadrunner/service"
-	"github.com/streadway/amqp"
 	"time"
 )
 
@@ -29,7 +28,7 @@ func (c *Config) Hydrate(cfg service.Config) error {
 	return nil
 }
 
-// TimeoutDuration returns number of seconds allowed to allocate the publish.
+// TimeoutDuration returns number of seconds allowed to redial
 func (c *Config) TimeoutDuration() time.Duration {
 	timeout := c.Timeout
 	if timeout == 0 {
@@ -37,9 +36,4 @@ func (c *Config) TimeoutDuration() time.Duration {
 	}
 
 	return time.Duration(timeout) * time.Second
-}
-
-// dial dials to AMQP.
-func (c *Config) dial() (*amqp.Connection, error) {
-	return amqp.Dial(c.Addr)
 }

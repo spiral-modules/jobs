@@ -56,13 +56,13 @@ func (b *Broker) Register(pipe *jobs.Pipeline) error {
 func (b *Broker) Serve() (err error) {
 	b.mu.Lock()
 
-	if b.publish, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
+	if b.publish, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
 		b.mu.Unlock()
 		return err
 	}
 	defer b.publish.Close()
 
-	if b.consume, err = newConn(b.cfg.dial, b.cfg.TimeoutDuration()); err != nil {
+	if b.consume, err = newConn(b.cfg.Addr, b.cfg.TimeoutDuration()); err != nil {
 		b.mu.Unlock()
 		return err
 	}

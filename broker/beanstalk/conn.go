@@ -111,13 +111,17 @@ func (cn *conn) release(err error) error {
 // watch and reconnect if dead
 func (cn *conn) watch(network, addr string) {
 	cn.free <- nil
+	t := time.NewTicker(WatchThrottleLimit)
+	defer t.Stop()
 	for {
 		select {
 		case <-cn.dead:
+			// simple throttle limiter
+			<-t.C
 			// try to reconnect
 			// TODO add logging here
 			expb := backoff.NewExponentialBackOff()
-			expb.MaxInterval = time.Second * 5
+			expb.MaxInterval = cn.tout
 
 			reconnect := func() error {
 				conn, err := beanstalk.Dial(network, addr)
