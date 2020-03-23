@@ -3,6 +3,7 @@ package amqp
 import (
 	"github.com/spiral/jobs/v2"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 )
 
@@ -40,8 +41,10 @@ func TestBroker_Stat(t *testing.T) {
 
 	assert.NoError(t, b.Consume(pipe, exec, func(id string, j *jobs.Job, err error) {}))
 
-	waitJob := make(chan interface{})
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	exec <- func(id string, j *jobs.Job) error {
+		defer wg.Done()
 		assert.Equal(t, jid, id)
 		assert.Equal(t, "body", j.Payload)
 
@@ -49,11 +52,10 @@ func TestBroker_Stat(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), stat.Active)
 
-		close(waitJob)
 		return nil
 	}
 
-	<-waitJob
+	wg.Wait()
 	stat, err = b.Stat(pipe)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), stat.Queue)

@@ -14,7 +14,10 @@ func TestBroker_Consume_Job(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.Register(pipe)
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -57,7 +60,10 @@ func TestBroker_ConsumeAfterStart_Job(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.Register(pipe)
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -101,7 +107,10 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b.Register(pipe)
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -140,7 +149,7 @@ func TestBroker_Consume_Delayed(t *testing.T) {
 
 	elapsed := time.Since(start)
 	assert.True(t, elapsed >= time.Second)
-	assert.True(t, elapsed < 2*time.Second)
+	assert.True(t, elapsed < 3*time.Second)
 }
 
 func TestBroker_Consume_Errored(t *testing.T) {
@@ -149,7 +158,10 @@ func TestBroker_Consume_Errored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.Register(pipe)
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {
@@ -195,7 +207,10 @@ func TestBroker_Consume_Errored_Attempts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.Register(pipe)
+	err = b.Register(pipe)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ready := make(chan interface{})
 	b.Listen(func(event int, ctx interface{}) {

@@ -14,7 +14,7 @@ type chanPool struct {
 	tout time.Duration
 	url  string
 
-	mu sync.Mutex
+	mu *sync.Mutex
 
 	conn      *amqp.Connection
 	channels  map[string]*channel
@@ -42,6 +42,7 @@ func newConn(url string, tout time.Duration) (*chanPool, error) {
 		url:       url,
 		tout:      tout,
 		conn:      conn,
+		mu:        &sync.Mutex{},
 		channels:  make(map[string]*channel),
 		wait:      make(chan interface{}),
 		connected: make(chan interface{}),
