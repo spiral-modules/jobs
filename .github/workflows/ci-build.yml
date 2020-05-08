@@ -59,7 +59,7 @@ jobs:
         run: |
           docker-compose -f ./tests/docker-compose.yml up -d
           composer update
-          vendor_bin/bin/spiral-cs check src tests
+          vendor_php/bin/spiral-cs check src tests
           go test -v -race -cover                    -coverprofile=jobs.txt      -covermode=atomic
           go test -v -race -cover ./broker/amqp      -coverprofile=amqp.txt      -covermode=atomic
           go test -v -race -cover ./broker/ephemeral -coverprofile=ephemeral.txt -covermode=atomic
