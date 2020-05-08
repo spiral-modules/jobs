@@ -89,7 +89,7 @@ final class ContainerRegistry implements HandlerRegistryInterface, SerializerReg
     private function className(string $jobType): string
     {
         $names = explode('.', $jobType);
-        $names = array_map(static function (string $value) {
+        $names = array_map(function (string $value) {
             return $this->inflector->classify($value);
         }, $names);
 
