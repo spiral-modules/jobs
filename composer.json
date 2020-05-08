@@ -25,6 +25,9 @@
       "Spiral\\Jobs\\": "src/"
     }
   },
+  "config": {
+    "vendor-dir": "vendor_php"
+  },
   "autoload-dev": {
     "psr-4": {
       "Spiral\\Jobs\\Tests\\": "tests/Jobs/"

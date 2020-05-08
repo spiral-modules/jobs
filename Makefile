@@ -5,7 +5,6 @@ install: all
 uninstall: 
 	rm -f /usr/local/bin/rr-jobs
 test:
-	go mod vendor
 	composer update
 	go test -v -race -cover
 	go test -v -race -cover ./broker/amqp
