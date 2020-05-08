@@ -58,8 +58,7 @@ jobs:
       - name: Run golang tests
         run: |
           docker-compose -f ./tests/docker-compose.yml up -d
-          vendor/bin/spiral-cs check src tests
-          go mod vendor
+          vendor_bin/bin/spiral-cs check src tests
           composer update
           go test -v -race -cover                    -coverprofile=jobs.txt      -covermode=atomic
           go test -v -race -cover ./broker/amqp      -coverprofile=amqp.txt      -covermode=atomic
