@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace Spiral\Jobs\Registry;
 
-use Doctrine\Common\Inflector\Inflector;
 use Psr\Container\ContainerInterface;
 use Spiral\Core\Exception\Container\ContainerException;
 use Spiral\Jobs\Exception\JobException;
@@ -32,6 +31,9 @@ final class ContainerRegistry implements HandlerRegistryInterface, SerializerReg
     /** @var SerializerInterface */
     private $defaultSerializer;
 
+    /** @var \Doctrine\Inflector\Inflector */
+    private $inflector;
+
     /**
      * @param ContainerInterface       $container
      * @param SerializerInterface|null $defaultSerializer
@@ -40,6 +42,7 @@ final class ContainerRegistry implements HandlerRegistryInterface, SerializerReg
     {
         $this->container = $container;
         $this->defaultSerializer = $defaultSerializer ?? new JsonSerializer();
+        $this->inflector = (new \Doctrine\Inflector\Rules\English\InflectorFactory())->build();
     }
 
     /**
@@ -87,7 +90,7 @@ final class ContainerRegistry implements HandlerRegistryInterface, SerializerReg
     {
         $names = explode('.', $jobType);
         $names = array_map(static function (string $value) {
-            return Inflector::classify($value);
+            return $this->inflector->classify($value);
         }, $names);
 
         return join('\\', $names);

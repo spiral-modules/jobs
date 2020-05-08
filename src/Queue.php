@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace Spiral\Jobs;
 
-use Doctrine\Common\Inflector\Inflector;
 use Spiral\Core\Container\SingletonInterface;
 use Spiral\Goridge\RPC;
 use Spiral\Jobs\Exception\JobException;
@@ -28,6 +27,9 @@ final class Queue implements QueueInterface, SingletonInterface
     /** @var SerializerRegistryInterface */
     private $serializerRegistry;
 
+    /** @var \Doctrine\Inflector\Inflector */
+    private $inflector;
+
     /**
      * @param RPC                         $rpc
      * @param SerializerRegistryInterface $registry
@@ -36,6 +38,7 @@ final class Queue implements QueueInterface, SingletonInterface
     {
         $this->rpc = $rpc;
         $this->serializerRegistry = $registry;
+        $this->inflector = (new \Doctrine\Inflector\Rules\English\InflectorFactory())->build();
     }
 
     /**
@@ -92,7 +95,7 @@ final class Queue implements QueueInterface, SingletonInterface
     {
         $names = explode('\\', $job);
         $names = array_map(function (string $value) {
-            return Inflector::camelize($value);
+            return $this->inflector->camelize($value);
         }, $names);
 
         return join('.', $names);
