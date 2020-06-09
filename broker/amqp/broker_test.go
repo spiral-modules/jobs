@@ -256,3 +256,57 @@ func TestBroker_StatNotRegistered(t *testing.T) {
 	_, err = b.Stat(pipe)
 	assert.Error(t, err)
 }
+
+func TestBroker_Queue_RoutingKey(t *testing.T) {
+	pipeWithKey := pipe.With("routing-key", "rr-exchange-routing-key")
+
+	assert.Equal(t, pipeWithKey.String("routing-key", ""), "rr-exchange-routing-key")
+}
+
+func TestBroker_Register_With_RoutingKey(t *testing.T) {
+	b := &Broker{}
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pipeWithKey := pipe.With("routing-key", "rr-exchange-routing-key")
+
+	assert.NoError(t, b.Register(&pipeWithKey))
+}
+
+func TestBroker_PushToExchange_With_RoutingKey(t *testing.T) {
+	b := &Broker{}
+	_, err := b.Init(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pipeWithKey := pipe.With("routing-key", "rr-exchange-routing-key")
+
+	err = b.Register(&pipeWithKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ready := make(chan interface{})
+	b.Listen(func(event int, ctx interface{}) {
+		if event == jobs.EventBrokerReady {
+			close(ready)
+		}
+	})
+
+	go func() { assert.NoError(t, b.Serve()) }()
+	defer b.Stop()
+
+	<-ready
+
+	jid, perr := b.Push(&pipeWithKey, &jobs.Job{
+		Job:     "test",
+		Payload: "body",
+		Options: &jobs.Options{},
+	})
+
+	assert.NotEqual(t, "", jid)
+	assert.NoError(t, perr)
+}
