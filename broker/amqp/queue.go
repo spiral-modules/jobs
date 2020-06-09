@@ -190,9 +190,6 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 		}
 	}
 
-	fmt.Println("my msg here")
-	fmt.Println(q.key)
-
 	err = c.ch.Publish(
 		q.exchange, // exchange
 		q.key,      // routing key
