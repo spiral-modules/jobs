@@ -275,7 +275,7 @@ func TestBroker_Register_With_RoutingKey(t *testing.T) {
 	assert.NoError(t, b.Register(&pipeWithKey))
 }
 
-func TestBroker_PushToExchange_With_RoutingKey(t *testing.T) {
+func TestBroker_Consume_With_RoutingKey(t *testing.T) {
 	b := &Broker{}
 	_, err := b.Init(cfg)
 	if err != nil {
@@ -296,6 +296,9 @@ func TestBroker_PushToExchange_With_RoutingKey(t *testing.T) {
 		}
 	})
 
+	exec := make(chan jobs.Handler, 1)
+	assert.NoError(t, b.Consume(&pipeWithKey, exec, func(id string, j *jobs.Job, err error) {}))
+
 	go func() { assert.NoError(t, b.Serve()) }()
 	defer b.Stop()
 
@@ -309,4 +312,14 @@ func TestBroker_PushToExchange_With_RoutingKey(t *testing.T) {
 
 	assert.NotEqual(t, "", jid)
 	assert.NoError(t, perr)
+
+	waitJob := make(chan interface{})
+	exec <- func(id string, j *jobs.Job) error {
+		assert.Equal(t, jid, id)
+		assert.Equal(t, "body", j.Payload)
+		close(waitJob)
+		return nil
+	}
+
+	<-waitJob
 }
