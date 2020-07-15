@@ -170,7 +170,6 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 		return err
 	}
 
-	qName := q.name
 	qKey := q.key
 
 	if delay != 0 {
