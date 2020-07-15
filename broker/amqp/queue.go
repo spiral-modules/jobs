@@ -174,7 +174,7 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 
 	if delay != 0 {
 		delayMs := int64(delay.Seconds() * 1000)
-		qName = fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
+		qName := fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
 		qKey = qName
 
 		err := q.declare(cp, qName, qName, amqp.Table{
