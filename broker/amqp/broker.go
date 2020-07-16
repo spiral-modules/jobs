@@ -69,7 +69,7 @@ func (b *Broker) Serve() (err error) {
 	defer b.consume.Close()
 
 	for _, q := range b.queues {
-		err := q.declare(b.publish, q.name, q.name, nil)
+		err := q.declare(b.publish, q.name, q.key, nil)
 		if err != nil {
 			b.mu.Unlock()
 			return err
