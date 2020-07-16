@@ -14,6 +14,7 @@ type queue struct {
 	active         int32
 	pipe           *jobs.Pipeline
 	exchange, name string
+	exchangeType   string
 	consumer       string
 
 	// active consuming channel
@@ -39,8 +40,16 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 		return nil, fmt.Errorf("missing `queue` parameter on amqp pipeline")
 	}
 
+	isValidExchangeType := map[string]bool{"direct": true, "fanout": true, "topic": true, "headers": true}
+	exchangeType := pipe.String("exchange-type", "direct")
+
+	if !isValidExchangeType[exchangeType] {
+		return nil, fmt.Errorf("unknown `exchange-type` parameter on amqp pipeline")
+	}
+
 	return &queue{
 		exchange: pipe.String("exchange", "amqp.direct"),
+		exchangeType: exchangeType,
 		name:     pipe.String("queue", ""),
 		consumer: pipe.String("consumer", fmt.Sprintf("rr-jobs:%s-%v", pipe.Name(), os.Getpid())),
 		pipe:     pipe,
@@ -219,7 +228,7 @@ func (q *queue) declare(cp *chanPool, queue string, key string, args amqp.Table)
 		return err
 	}
 
-	err = c.ch.ExchangeDeclare(q.exchange, "direct", true, false, false, false, nil)
+	err = c.ch.ExchangeDeclare(q.exchange, q.exchangeType, true, false, false, false, nil)
 	if err != nil {
 		return cp.closeChan(c, err)
 	}
