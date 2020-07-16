@@ -11,11 +11,12 @@ import (
 )
 
 type queue struct {
-	active         int32
-	pipe           *jobs.Pipeline
-	exchange, name string
-	exchangeType   string
-	consumer       string
+	active                 int32
+	pipe                   *jobs.Pipeline
+	exchange               string
+	exchangeType           string
+	name, key              string
+	consumer               string
 
 	// active consuming channel
 	muc sync.Mutex
@@ -51,6 +52,7 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 		exchange: pipe.String("exchange", "amqp.direct"),
 		exchangeType: exchangeType,
 		name:     pipe.String("queue", ""),
+		key:      pipe.String("routing-key", pipe.String("queue", "")),
 		consumer: pipe.String("consumer", fmt.Sprintf("rr-jobs:%s-%v", pipe.Name(), os.Getpid())),
 		pipe:     pipe,
 		lsn:      lsn,
@@ -179,10 +181,12 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 	}
 
 	qName := q.name
+	qKey := q.key
 
 	if delay != 0 {
 		delayMs := int64(delay.Seconds() * 1000)
 		qName = fmt.Sprintf("delayed-%d.%s.%s", delayMs, q.exchange, q.name)
+		qKey = qName
 
 		err := q.declare(cp, qName, qName, amqp.Table{
 			"x-dead-letter-exchange":    q.exchange,
@@ -198,7 +202,7 @@ func (q *queue) publish(cp *chanPool, id string, attempt int, j *jobs.Job, delay
 
 	err = c.ch.Publish(
 		q.exchange, // exchange
-		qName,      // routing key
+		qKey,      // routing key
 		false,      // mandatory
 		false,      // immediate
 		amqp.Publishing{
