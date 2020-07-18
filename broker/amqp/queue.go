@@ -1,6 +1,7 @@
 package amqp
 
 import (
+	"errors"
 	"fmt"
 	"github.com/spiral/jobs/v2"
 	"github.com/streadway/amqp"
