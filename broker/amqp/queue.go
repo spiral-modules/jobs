@@ -1,6 +1,7 @@
 package amqp
 
 import (
+	"errors"
 	"fmt"
 	"github.com/spiral/jobs/v2"
 	"github.com/streadway/amqp"
@@ -10,11 +11,40 @@ import (
 	"time"
 )
 
+type ExchangeType string
+
+const (
+	Direct  ExchangeType = "direct"
+	Fanout  ExchangeType = "fanout"
+	Topic   ExchangeType = "topic"
+	Headers ExchangeType = "headers"
+)
+
+func (et ExchangeType) IsValid() error {
+	switch et {
+	case Direct, Fanout, Topic, Headers:
+		return nil
+	}
+	return errors.New("unknown exchange-type")
+}
+
+func (et ExchangeType) String() string {
+	switch et {
+	case Direct, Fanout, Topic, Headers:
+		return string(et)
+	default:
+		return "direct"
+	}
+}
+
+
 type queue struct {
-	active              int32
-	pipe                *jobs.Pipeline
-	exchange, name, key string
-	consumer            string
+	active                 int32
+	pipe                   *jobs.Pipeline
+	exchange               string
+	exchangeType           ExchangeType
+	name, key              string
+	consumer               string
 
 	// active consuming channel
 	muc sync.Mutex
@@ -39,8 +69,16 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 		return nil, fmt.Errorf("missing `queue` parameter on amqp pipeline")
 	}
 
+	exchangeType := ExchangeType(pipe.String("exchange-type", "direct"))
+
+	err := exchangeType.IsValid()
+	if err != nil {
+		return nil, fmt.Errorf(err.Error())
+	}
+
 	return &queue{
 		exchange: pipe.String("exchange", "amqp.direct"),
+		exchangeType: exchangeType,
 		name:     pipe.String("queue", ""),
 		key:      pipe.String("routing-key", pipe.String("queue", "")),
 		consumer: pipe.String("consumer", fmt.Sprintf("rr-jobs:%s-%v", pipe.Name(), os.Getpid())),
@@ -221,7 +259,7 @@ func (q *queue) declare(cp *chanPool, queue string, key string, args amqp.Table)
 		return err
 	}
 
-	err = c.ch.ExchangeDeclare(q.exchange, "direct", true, false, false, false, nil)
+	err = c.ch.ExchangeDeclare(q.exchange, q.exchangeType.String(), true, false, false, false, nil)
 	if err != nil {
 		return cp.closeChan(c, err)
 	}
