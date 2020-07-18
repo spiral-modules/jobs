@@ -10,11 +10,38 @@ import (
 	"time"
 )
 
+type ExchangeType string
+
+const (
+	Direct  ExchangeType = "direct"
+	Fanout  ExchangeType = "fanout"
+	Topic   ExchangeType = "topic"
+	Headers ExchangeType = "headers"
+)
+
+func (et ExchangeType) IsValid() error {
+	switch et {
+	case Direct, Fanout, Topic, Headers:
+		return nil
+	}
+	return errors.New("unknown exchange-type")
+}
+
+func (et ExchangeType) String() string {
+	switch et {
+	case Direct, Fanout, Topic, Headers:
+		return fmt.Sprintf("%s", string(et))
+	default:
+		return "direct"
+	}
+}
+
+
 type queue struct {
 	active                 int32
 	pipe                   *jobs.Pipeline
 	exchange               string
-	exchangeType           string
+	exchangeType           ExchangeType
 	name, key              string
 	consumer               string
 
@@ -41,11 +68,11 @@ func newQueue(pipe *jobs.Pipeline, lsn func(event int, ctx interface{})) (*queue
 		return nil, fmt.Errorf("missing `queue` parameter on amqp pipeline")
 	}
 
-	isValidExchangeType := map[string]bool{"direct": true, "fanout": true, "topic": true, "headers": true}
-	exchangeType := pipe.String("exchange-type", "direct")
+	exchangeType := ExchangeType(pipe.String("exchange-type", "direct"))
 
-	if !isValidExchangeType[exchangeType] {
-		return nil, fmt.Errorf("unknown `exchange-type` parameter on amqp pipeline")
+	err := exchangeType.IsValid()
+	if err != nil {
+		return nil, fmt.Errorf(err.Error())
 	}
 
 	return &queue{
@@ -231,7 +258,7 @@ func (q *queue) declare(cp *chanPool, queue string, key string, args amqp.Table)
 		return err
 	}
 
-	err = c.ch.ExchangeDeclare(q.exchange, q.exchangeType, true, false, false, false, nil)
+	err = c.ch.ExchangeDeclare(q.exchange, q.exchangeType.String(), true, false, false, false, nil)
 	if err != nil {
 		return cp.closeChan(c, err)
 	}
