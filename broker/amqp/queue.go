@@ -31,7 +31,7 @@ func (et ExchangeType) IsValid() error {
 func (et ExchangeType) String() string {
 	switch et {
 	case Direct, Fanout, Topic, Headers:
-		return fmt.Sprintf("%s", string(et))
+		return string(et)
 	default:
 		return "direct"
 	}
