@@ -1,95 +1,213 @@
-name: CI
 
-on: [push, pull_request]
+name: build
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
-  build:
-    name: Build (PHP ${{ matrix.php }}, Go ${{ matrix.go }}, OS ${{ matrix.os }})
+  security:
+    name: Security
     runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
-        php: [7.2, 7.3, 7.4]
-        go: [1.13, 1.14]
+        php: ['8.0'] # Note: This workflow requires only the LATEST version of PHP
         os: [ubuntu-latest]
-    env:
-      GO111MODULE: on
-    steps:
-      - name: Set up Go ${{ matrix.go }}
-        uses: actions/setup-go@v1
-        with:
-          go-version: ${{ matrix.go }}
 
-      - name: Set up PHP ${{ matrix.php }}
-        uses: shivammathur/setup-php@v1
+    steps:
+      # General Steps
+      - name: Set Git To Use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Install PHP Dependencies
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom
-          coverage: xdebug
-
-      - name: Check out code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-
-      - name: Show versions
-        run: php -v ; composer -V ; go version
-
-      - name: Syntax check only (lint)
-        run: find ./src/ -name "*.php" -print0 | xargs -0 -n1 -P8 php -l
-
-      - name: Get Composer Cache Directory # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
+      - name: Validate Composer
+        run: composer validate
+      - name: Get Composer Cache Directory
+        # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
         id: composer-cache
         run: echo "::set-output name=dir::$(composer config cache-files-dir)"
-
-      - name: Cache dependencies # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
+      - name: Restore Composer Cache
         uses: actions/cache@v1
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.json') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-interaction --no-suggest # --prefer-source
-
-      - name: Install Go dependencies
-        run: go mod download
-
-      - name: Run golang tests
-        run: |
-          docker-compose -f ./tests/docker-compose.yml up -d
-          composer update
-          vendor_php/bin/spiral-cs check src tests
-          go test -v -race -cover                    -coverprofile=jobs.txt      -covermode=atomic
-          go test -v -race -cover ./broker/amqp      -coverprofile=amqp.txt      -covermode=atomic
-          go test -v -race -cover ./broker/ephemeral -coverprofile=ephemeral.txt -covermode=atomic
-          go test -v -race -cover ./broker/beanstalk -coverprofile=beanstalk.txt -covermode=atomic
-          go test -v -race -cover ./broker/sqs       -coverprofile=sqs.txt       -covermode=atomic
-
-      - name: Run code coverage
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          if [[ "$CODECOV_TOKEN" != "" ]]; then
-            curl https://codecov.io/bash -o codecov-bash
-            chmod +x codecov-bash
-            ./codecov-bash -f jobs.txt
-            ./codecov-bash -f amqp.txt
-            ./codecov-bash -f ephemeral.txt
-            ./codecov-bash -f beanstalk.txt
-            ./codecov-bash -f sqs.txt
-          fi
-
-  golangci-check:
-    name: runner / golangci-lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-      - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v1
+          key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer-
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
         with:
-          github_token: ${{ secrets.github_token }}
-          golangci_lint_flags: "-D errcheck"
+          timeout_minutes: 5
+          max_attempts: 5
+          command: composer update --prefer-dist --no-interaction --no-progress
+
+      # Execution
+      - name: Security Advisories
+        run: composer require --dev roave/security-advisories:dev-latest
+
+  static-analysis:
+    name: Psalm
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0'] # Note: This workflow requires only the LATEST version of PHP
+        os: [ubuntu-latest]
+
+    steps:
+      # General Steps
+      - name: Set Git To Use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Install PHP Dependencies
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+      - name: Validate Composer
+        run: composer validate
+      - name: Get Composer Cache Directory
+        # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+      - name: Restore Composer Cache
+        uses: actions/cache@v1
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer-
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          command: composer update --prefer-dist --no-interaction --no-progress
+
+      # Execution
+      - name: Static Analysis
+        run: vendor/bin/psalm --no-cache
 
 
+  coding-standards:
+    name: Coding Standards
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0'] # Note: This workflow requires only the LATEST version of PHP
+        os: [ubuntu-latest]
+
+    steps:
+      # General Steps
+      - name: Set Git To Use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Install PHP Dependencies
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+      - name: Validate Composer
+        run: composer validate
+      - name: Get Composer Cache Directory
+        # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+      - name: Restore Composer Cache
+        uses: actions/cache@v1
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer-
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          command: composer update --prefer-dist --no-interaction --no-progress
+
+      # Execution
+      - name: Check Coding Standards
+        run: vendor/bin/phpcs --standard=phpcs.xml
+
+  #
+  # Execute unit tests on all valid PHP versions.
+  #
+  test:
+    name: Build (${{matrix.php}}, ${{ matrix.os }}, ${{ matrix.stability }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.0']
+        os: [ubuntu-latest]
+        stability: [prefer-lowest, prefer-stable]
+
+    steps:
+      # General Steps
+      - name: Set Git To Use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Install PHP Dependencies
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # PHP Extras
+          extensions: sockets, igbinary, sodium
+          coverage: pcov
+          tools: pecl
+          ini-values: "memory_limit=-1"
+      - name: Validate Composer
+        run: composer validate
+      - name: Get Composer Cache Directory
+        # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+      - name: Restore Composer Cache
+        uses: actions/cache@v1
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer-
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          command: composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
+
+      # Execution
+      - name: Execute Tests
+        run: vendor/bin/phpunit --coverage-clover=coverage.xml
+      - name: Upload Coverage To Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          fail_ci_if_error: false

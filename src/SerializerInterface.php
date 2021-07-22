@@ -1,15 +1,17 @@
 <?php
 
 /**
- * Spiral Framework.
+ * This file is part of RoadRunner package.
  *
- * @license   MIT
- * @author    Anton Titov (Wolfy-J)
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 declare(strict_types=1);
 
-namespace Spiral\Jobs;
+namespace Spiral\RoadRunner\Jobs;
+
+use Spiral\RoadRunner\Jobs\Exception\SerializationException;
 
 /**
  * Serializes job payloads.
@@ -17,11 +19,20 @@ namespace Spiral\Jobs;
 interface SerializerInterface
 {
     /**
-     * Serialize payload.
+     * Serializes payload.
      *
-     * @param string $jobType
-     * @param array  $payload
+     * @param array $payload
      * @return string
+     * @throws SerializationException
      */
-    public function serialize(string $jobType, array $payload): string;
+    public function serialize(array $payload): string;
+
+    /**
+     * Unserializes payload.
+     *
+     * @param string $payload
+     * @return array
+     * @throws SerializationException
+     */
+    public function unserialize(string $payload): array;
 }

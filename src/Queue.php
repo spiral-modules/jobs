@@ -1,113 +1,93 @@
 <?php
 
 /**
- * Spiral Framework.
+ * This file is part of RoadRunner package.
  *
- * @license   MIT
- * @author    Anton Titov (Wolfy-J)
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 declare(strict_types=1);
 
-namespace Spiral\Jobs;
+namespace Spiral\RoadRunner\Jobs;
 
-use Spiral\Core\Container\SingletonInterface;
-use Spiral\Goridge\RPC;
-use Spiral\Jobs\Exception\JobException;
-use Spiral\RoadRunner\Exception\RoadRunnerException;
+use Spiral\Goridge\RPC\Codec\ProtobufCodec;
+use Spiral\Goridge\RPC\RPCInterface;
+use Spiral\RoadRunner\Jobs\Serializer\JsonSerializer;
+use Spiral\RoadRunner\Jobs\Task\QueuedTask;
 
-final class Queue implements QueueInterface, SingletonInterface
+final class Queue implements QueueInterface
 {
-    // RoadRunner jobs service
-    private const RR_SERVICE = 'jobs';
-
-    /** @var RPC */
-    private $rpc;
-
-    /** @var SerializerRegistryInterface */
-    private $serializerRegistry;
-
-    /** @var \Doctrine\Inflector\Inflector */
-    private $inflector;
+    /**
+     * @var RPCInterface
+     */
+    private RPCInterface $rpc;
 
     /**
-     * @param RPC                         $rpc
-     * @param SerializerRegistryInterface $registry
+     * @var Options
      */
-    public function __construct(RPC $rpc, SerializerRegistryInterface $registry)
+    private Options $options;
+
+    /**
+     * @var non-empty-string
+     */
+    private string $name;
+
+    /**
+     * @var SerializerInterface
+     */
+    private SerializerInterface $serializer;
+
+    /**
+     * @param RPCInterface $rpc
+     * @param non-empty-string $name
+     */
+    public function __construct(RPCInterface $rpc, string $name)
     {
-        $this->rpc = $rpc;
-        $this->serializerRegistry = $registry;
-        $this->inflector = (new \Doctrine\Inflector\Rules\English\InflectorFactory())->build();
+        assert($name !== '', 'Precondition [name !== ""] failed');
+
+        $this->rpc = $rpc->withCodec(new ProtobufCodec());
+        $this->name = $name;
+
+        $this->options = new Options();
+        $this->serializer = new JsonSerializer();
     }
 
     /**
-     * Schedule job of a given type.
-     *
-     * @param string       $jobType
-     * @param array        $payload
-     * @param Options|null $options
-     * @return string
-     *
-     * @throws JobException
+     * {@inheritDoc}
      */
-    public function push(string $jobType, array $payload = [], Options $options = null): string
+    public function getDefaultOptions(): OptionsInterface
     {
-        try {
-            return $this->rpc->call(self::RR_SERVICE . '.Push', [
-                'job'     => $this->jobName($jobType),
-                'payload' => $this->serialize($jobType, $payload),
-                'options' => $options ?? new Options()
-            ]);
-        } catch (RoadRunnerException | \Throwable $e) {
-            throw new JobException($e->getMessage(), $e->getCode(), $e);
-        }
+        return $this->options;
     }
 
     /**
-     * Schedule job of a given type.
-     *
-     * @param string       $jobType
-     * @param array        $payload
-     * @param Options|null $options
-     * @return bool
-     *
-     * @throws JobException
+     * {@inheritDoc}
+     * @psalm-suppress MoreSpecificReturnType
+     * @psalm-suppress LessSpecificReturnStatement
      */
-    public function pushAsync(string $jobType, array $payload = [], Options $options = null): bool
+    public function withDefaultOptions(?OptionsInterface $options): self
     {
-        try {
-            return $this->rpc->call(self::RR_SERVICE . '.PushAsync', [
-                'job'     => $this->jobName($jobType),
-                'payload' => $this->serialize($jobType, $payload),
-                'options' => $options ?? new Options()
-            ]);
-        } catch (RoadRunnerException | \Throwable $e) {
-            throw new JobException($e->getMessage(), $e->getCode(), $e);
-        }
+        $self = clone $this;
+        /** @psalm-suppress PropertyTypeCoercion */
+        $self->options = $options ?? new Options();
+
+        return $self;
     }
 
     /**
-     * @param string $job
-     * @return string
+     * {@inheritDoc}
      */
-    private function jobName(string $job): string
+    public function create(string $job, array $payload = []): QueuedTaskInterface
     {
-        $names = explode('\\', $job);
-        $names = array_map(function (string $value) {
-            return $this->inflector->camelize($value);
-        }, $names);
-
-        return join('.', $names);
+        return new QueuedTask($this->rpc, $this->serializer, $this->options, $this->name, $job, $payload);
     }
 
     /**
-     * @param string $jobType
-     * @param array  $payload
-     * @return string
+     * @return void
      */
-    private function serialize(string $jobType, array $payload): string
+    public function __clone()
     {
-        return $this->serializerRegistry->getSerializer($jobType)->serialize($jobType, $payload);
+        $this->options = clone $this->options;
     }
 }

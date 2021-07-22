@@ -1,0 +1,30 @@
+rpc:
+  listen: tcp://127.0.0.1:6001
+
+logs:
+    mode: development
+
+server:
+  command: php consumer.php
+  relay: tcp://127.0.0.1:6002
+  relay_timeout: 20s
+
+amqp:
+  addr: amqp://guest:guest@localhost:5672
+
+jobs:
+  num_pollers: 1
+  pipeline_size: 100000
+  pool:
+    num_workers: 1
+    max_jobs: 1
+    allocate_timeout: 60s
+    destroy_timeout: 60s
+  consume:
+    - "test"
+  pipelines:
+    test:
+      driver: amqp
+      queue: test-1-queue
+      priority: 1
+

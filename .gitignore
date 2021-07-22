@@ -1,12 +1,20 @@
+# IDEA
 .idea/
-.env
-composer.lock
+*.iml
+
+# Composer
+composer.phar
 vendor/
-vendor_php
-*.db
-clover.xml
+composer.lock
+
+# OS
 .DS_Store
-tests/.rr-test.yml
-go.sum
-psr-worker.php
-.rr-sample.yaml
+Thumbs.db
+*.exe
+
+# Other
+.phpunit.result.cache
+.php_cs.cache
+clover.xml
+.env
+builds

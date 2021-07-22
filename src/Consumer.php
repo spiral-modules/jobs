@@ -1,57 +1,102 @@
 <?php
 
 /**
- * Spiral Framework.
+ * This file is part of RoadRunner package.
  *
- * @license   MIT
- * @author    Anton Titov (Wolfy-J)
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 declare(strict_types=1);
 
-namespace Spiral\Jobs;
+namespace Spiral\RoadRunner\Jobs;
 
-use Spiral\RoadRunner\Worker;
+use Spiral\RoadRunner\Jobs\Exception\SerializationException;
+use Spiral\RoadRunner\Jobs\Task\ReceivedTask;
+use Spiral\RoadRunner\Payload;
+use Spiral\RoadRunner\WorkerInterface;
 
-/***
- * @codeCoverageIgnore handled on Golang end.
+/**
+ * @psalm-type HeaderPayload = array {
+ *    id:       non-empty-string,
+ *    job:      non-empty-string,
+ *    headers:  array<string, array<string>>|null,
+ *    timeout:  positive-int,
+ *    pipeline: non-empty-string
+ * }
  */
 final class Consumer
 {
-    /** @var HandlerRegistryInterface */
-    private $registry;
+    /**
+     * @var WorkerInterface
+     */
+    private WorkerInterface $worker;
 
     /**
-     * @codeCoverageIgnore
-     * @param HandlerRegistryInterface $registry
+     * @param WorkerInterface $worker
      */
-    public function __construct(HandlerRegistryInterface $registry)
+    public function __construct(WorkerInterface $worker)
     {
-        $this->registry = $registry;
+        $this->worker = $worker;
     }
 
     /**
-     * @codeCoverageIgnore
-     * @param Worker        $worker
-     * @param callable|null $finalize
+     * @return ReceivedTaskInterface|null
+     * @throws SerializationException
      */
-    public function serve(Worker $worker, callable $finalize = null): void
+    public function waitTask(): ?ReceivedTaskInterface
     {
-        while ($body = $worker->receive($context)) {
-            try {
-                $context = json_decode($context, true);
-                $handler = $this->registry->getHandler($context['job']);
+        $payload = $this->worker->waitPayload();
 
-                $handler->handle($context['job'], $context['id'], $body);
-
-                $worker->send('ok');
-            } catch (\Throwable $e) {
-                $worker->error((string)$e->getMessage());
-            } finally {
-                if ($finalize !== null) {
-                    call_user_func($finalize, $e ?? null);
-                }
-            }
+        if ($payload === null) {
+            return null;
         }
+
+        [$body, $header] = [$this->getPayload($payload), $this->getHeader($payload)];
+
+        return new ReceivedTask(
+            $this->worker,
+            $header['pipeline'],
+            $header['id'],
+            $header['job'],
+            $body,
+            (array)$header['headers']
+        );
+    }
+
+    /**
+     * @param Payload $payload
+     * @return array
+     * @throws SerializationException
+     */
+    private function getPayload(Payload $payload): array
+    {
+        return $this->decode($payload->header);
+    }
+
+    /**
+     * @param string $json
+     * @return array
+     * @throws SerializationException
+     */
+    private function decode(string $json): array
+    {
+        try {
+            return (array)json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new SerializationException($e->getMessage(), (int)$e->getCode(), $e);
+        }
+    }
+
+    /**
+     * @psalm-suppress MixedReturnTypeCoercion
+     *
+     * @param Payload $payload
+     * @return HeaderPayload
+     * @throws SerializationException
+     */
+    private function getHeader(Payload $payload): array
+    {
+        return $this->decode($payload->header);
     }
 }

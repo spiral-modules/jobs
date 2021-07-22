@@ -1,29 +1,33 @@
 <?php
 
 /**
- * Spiral Framework.
+ * This file is part of RoadRunner package.
  *
- * @license   MIT
- * @author    Anton Titov (Wolfy-J)
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 declare(strict_types=1);
 
-namespace Spiral\Jobs;
-
-use Spiral\Jobs\Exception\JobException;
+namespace Spiral\RoadRunner\Jobs;
 
 interface QueueInterface
 {
     /**
-     * Schedule job of a given type.
-     *
-     * @param string       $jobType
-     * @param array        $payload
-     * @param Options|null $options
-     * @return string
-     *
-     * @throws JobException
+     * @return OptionsInterface
      */
-    public function push(string $jobType, array $payload = [], Options $options = null): string;
+    public function getDefaultOptions(): OptionsInterface;
+
+    /**
+     * @param OptionsInterface|null $options
+     * @return $this
+     */
+    public function withDefaultOptions(?OptionsInterface $options): self;
+
+    /**
+     * @param class-string $job
+     * @param array $payload
+     * @return QueuedTaskInterface
+     */
+    public function create(string $job, array $payload = []): QueuedTaskInterface;
 }
