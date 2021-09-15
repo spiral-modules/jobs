@@ -62,6 +62,7 @@ final class Options implements \JsonSerializable
     /**
      * @return array|mixed
      */
+    #[\ReturnTypeWillChange]
     public function jsonSerialize()
     {
         return [
